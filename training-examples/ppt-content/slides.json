@@ -1,0 +1,1491 @@
+{
+  "title": "Dify 使用讲解",
+  "subtitle": "从入门到实践",
+  "date": "2026-07-04",
+  "totalSlides": 73,
+  "slides": [
+    {
+      "id": 1,
+      "part": "第一部分：平台概览",
+      "type": "title",
+      "title": "Dify 是什么",
+      "content": {
+        "definition": "Dify 是一个开源的 LLM 应用开发平台",
+        "coreValue": "结合 AI 工作流、RAG 管道、Agent 能力、模型管理和 LLMOps，帮助用户快速从原型到生产",
+        "highlights": [
+          "可视化工作流编排",
+          "支持数百种模型",
+          "完整的 RAG 能力",
+          "Agent 与工具集成",
+          "Backend-as-a-Service API"
+        ]
+      }
+    },
+    {
+      "id": 2,
+      "part": "第一部分：平台概览",
+      "type": "content",
+      "title": "核心功能",
+      "content": {
+        "items": [
+          {
+            "name": "工作流",
+            "description": "在可视化画布上构建和测试 AI 工作流"
+          },
+          {
+            "name": "Agent",
+            "description": "基于 Function Calling 或 ReAct 的智能体，支持 50+ 内置工具"
+          },
+          {
+            "name": "RAG",
+            "description": "从文档摄入到检索的完整 RAG 管道"
+          },
+          {
+            "name": "模型管理",
+            "description": "无缝集成数十家推理提供商的数百种模型"
+          },
+          {
+            "name": "LLMOps",
+            "description": "监控和分析应用日志与性能"
+          },
+          {
+            "name": "API",
+            "description": "所有功能均提供对应 API，轻松集成到业务系统"
+          }
+        ]
+      }
+    },
+    {
+      "id": 3,
+      "part": "第一部分：平台概览",
+      "type": "content",
+      "title": "应用场景",
+      "content": {
+        "items": [
+          {
+            "name": "智能客服",
+            "description": "基于知识库的多轮对话客服系统"
+          },
+          {
+            "name": "内容生成",
+            "description": "文章撰写、翻译、摘要等文本生成任务"
+          },
+          {
+            "name": "数据分析",
+            "description": "结构化数据提取与分析"
+          },
+          {
+            "name": "知识问答",
+            "description": "企业知识库驱动的智能问答"
+          }
+        ]
+      }
+    },
+    {
+      "id": 4,
+      "part": "第一部分：平台概览",
+      "type": "screenshot",
+      "title": "界面导览",
+      "content": {
+        "screenshot": "console-overview.png",
+        "description": "Dify 控制台主界面",
+        "annotations": [
+          "控制台首页",
+          "应用列表",
+          "知识库管理",
+          "工具管理",
+          "插件市场"
+        ]
+      }
+    },
+    {
+      "id": 5,
+      "part": "第一部分：平台概览",
+      "type": "content",
+      "title": "账户与设置",
+      "content": {
+        "items": [
+          {
+            "name": "模型供应商配置",
+            "description": "添加和管理 LLM 提供商的 API Key"
+          },
+          {
+            "name": "成员管理",
+            "description": "邀请团队成员并分配角色权限"
+          },
+          {
+            "name": "计费管理",
+            "description": "查看用量和账单信息"
+          },
+          {
+            "name": "数据源",
+            "description": "配置外部数据源连接"
+          },
+          {
+            "name": "API 扩展",
+            "description": "管理 API 密钥和访问控制"
+          },
+          {
+            "name": "自定义设置",
+            "description": "自定义平台外观和行为"
+          },
+          {
+            "name": "语言切换",
+            "description": "支持 23 种语言界面"
+          }
+        ]
+      }
+    },
+    {
+      "id": 6,
+      "part": "第二部分：模型配置",
+      "type": "content",
+      "title": "支持的模型",
+      "content": {
+        "categories": [
+          {
+            "name": "商业模型",
+            "examples": ["OpenAI GPT-4/3.5", "Claude 3.5", "Gemini Pro"]
+          },
+          {
+            "name": "国产模型",
+            "examples": ["通义千问", "文心一言", "智谱 ChatGLM", "讯飞星火"]
+          },
+          {
+            "name": "开源模型",
+            "examples": ["Llama 3", "Mistral", "Qwen"]
+          },
+          {
+            "name": "本地部署",
+            "examples": ["Ollama", "vLLM", "LocalAI"]
+          }
+        ]
+      }
+    },
+    {
+      "id": 7,
+      "part": "第二部分：模型配置",
+      "type": "screenshot",
+      "title": "API Key 配置",
+      "content": {
+        "screenshot": "model-config.png",
+        "description": "模型供应商 API Key 配置界面",
+        "steps": [
+          "进入设置 → 模型供应商",
+          "选择供应商（如 OpenAI）",
+          "输入 API Key",
+          "点击保存并验证"
+        ],
+        "faq": [
+          "Q: API Key 在哪里获取？",
+          "A: 在对应供应商的官网控制台创建",
+          "Q: 配置后如何验证？",
+          "A: 系统会自动发送测试请求验证"
+        ]
+      }
+    },
+    {
+      "id": 8,
+      "part": "第二部分：模型配置",
+      "type": "content",
+      "title": "模型选择建议",
+      "content": {
+        "items": [
+          {
+            "name": "场景匹配",
+            "description": "简单任务用轻量模型，复杂推理用高级模型"
+          },
+          {
+            "name": "成本考虑",
+            "description": "GPT-4 成本高但效果好，GPT-3.5 性价比高"
+          },
+          {
+            "name": "性能对比",
+            "description": "根据延迟、吞吐量、上下文长度选择"
+          }
+        ],
+        "recommendations": {
+          "日常对话": "GPT-3.5 / Claude Haiku",
+          "复杂推理": "GPT-4 / Claude Sonnet",
+          "代码生成": "GPT-4 / Claude Sonnet",
+          "中文场景": "通义千问 / 文心一言"
+        }
+      }
+    },
+    {
+      "id": 9,
+      "part": "第二部分：模型配置",
+      "type": "content",
+      "title": "参数调优",
+      "content": {
+        "parameters": [
+          {
+            "name": "Temperature",
+            "range": "0-2",
+            "description": "控制输出随机性。低值更确定，高值更创意",
+            "recommendation": "事实问答: 0-0.3, 创意写作: 0.7-1.0"
+          },
+          {
+            "name": "Top-P",
+            "range": "0-1",
+            "description": "核采样，控制词汇选择范围",
+            "recommendation": "通常保持 0.9-1.0"
+          },
+          {
+            "name": "Max Tokens",
+            "range": "1-模型上限",
+            "description": "限制输出长度",
+            "recommendation": "根据任务需要设置，避免截断"
+          }
+        ]
+      }
+    },
+    {
+      "id": 10,
+      "part": "第三部分：应用类型概览",
+      "type": "content",
+      "title": "五种应用类型",
+      "content": {
+        "types": [
+          {
+            "name": "Chatbot",
+            "chineseName": "聊天助手",
+            "icon": "💬",
+            "brief": "多轮对话应用"
+          },
+          {
+            "name": "Completion",
+            "chineseName": "文本生成",
+            "icon": "📝",
+            "brief": "单次文本生成"
+          },
+          {
+            "name": "Agent",
+            "chineseName": "智能体",
+            "icon": "🤖",
+            "brief": "具备推理和工具调用能力"
+          },
+          {
+            "name": "Workflow",
+            "chineseName": "工作流",
+            "icon": "🔀",
+            "brief": "可视化流程编排"
+          },
+          {
+            "name": "Chatflow",
+            "chineseName": "对话流",
+            "icon": "🔄",
+            "brief": "基于工作流的对话应用"
+          }
+        ]
+      }
+    },
+    {
+      "id": 11,
+      "part": "第三部分：应用类型概览",
+      "type": "content",
+      "title": "Chatbot（聊天助手）",
+      "content": {
+        "definition": "多轮对话应用，支持上下文记忆",
+        "features": [
+          "自动维护对话历史",
+          "支持上下文理解",
+          "可配置系统提示词",
+          "支持开场白设置"
+        ],
+        "useCases": [
+          "智能客服",
+          "知识问答",
+          "对话式助手"
+        ]
+      }
+    },
+    {
+      "id": 12,
+      "part": "第三部分：应用类型概览",
+      "type": "content",
+      "title": "Completion（文本生成）",
+      "content": {
+        "definition": "单次文本生成应用，输入-输出模式",
+        "features": [
+          "表单式输入",
+          "一次性生成输出",
+          "无对话上下文",
+          "适合批处理任务"
+        ],
+        "useCases": [
+          "文本翻译",
+          "文章摘要",
+          "内容写作",
+          "数据格式化"
+        ]
+      }
+    },
+    {
+      "id": 13,
+      "part": "第三部分：应用类型概览",
+      "type": "content",
+      "title": "Agent（智能体）",
+      "content": {
+        "definition": "具备推理和工具调用能力的智能体",
+        "features": [
+          "自主决策能力",
+          "工具调用（搜索、计算、API 等）",
+          "多步骤任务执行",
+          "支持 Function Calling 和 ReAct 模式"
+        ],
+        "useCases": [
+          "复杂任务处理",
+          "多步骤操作",
+          "需要工具辅助的场景"
+        ]
+      }
+    },
+    {
+      "id": 14,
+      "part": "第三部分：应用类型概览",
+      "type": "content",
+      "title": "Workflow（工作流）",
+      "content": {
+        "definition": "可视化流程编排应用",
+        "features": [
+          "节点拖拽设计",
+          "条件分支控制",
+          "变量传递",
+          "支持 LLM、代码、HTTP 等节点"
+        ],
+        "useCases": [
+          "数据处理管道",
+          "自动化流程",
+          "复杂业务逻辑"
+        ]
+      }
+    },
+    {
+      "id": 15,
+      "part": "第三部分：应用类型概览",
+      "type": "content",
+      "title": "Chatflow（对话流）",
+      "content": {
+        "definition": "基于工作流的对话应用，结合多轮对话与流程控制",
+        "features": [
+          "多轮对话能力",
+          "工作流式流程控制",
+          "上下文传递",
+          "灵活的节点编排"
+        ],
+        "useCases": [
+          "复杂对话场景",
+          "需要流程控制的对话",
+          "多步骤交互式任务"
+        ]
+      }
+    },
+    {
+      "id": 16,
+      "part": "第四部分：普通智能体",
+      "type": "content",
+      "title": "什么是普通智能体",
+      "content": {
+        "definition": "基于 LLM 的基础智能体，通过系统提示词定义行为",
+        "features": [
+          "简单的创建流程",
+          "系统提示词驱动",
+          "支持工具扩展",
+          "适合快速原型"
+        ],
+        "useCases": [
+          "简单问答",
+          "文本处理",
+          "基础对话助手"
+        ]
+      }
+    },
+    {
+      "id": 17,
+      "part": "第四部分：普通智能体",
+      "type": "screenshot",
+      "title": "创建流程",
+      "content": {
+        "screenshot": "create-agent.png",
+        "description": "创建普通智能体的步骤",
+        "steps": [
+          "步骤 1：点击「创建空白应用」",
+          "步骤 2：选择「聊天助手」类型",
+          "步骤 3：配置模型和提示词"
+        ]
+      }
+    },
+    {
+      "id": 18,
+      "part": "第四部分：普通智能体",
+      "type": "content",
+      "title": "系统提示词设计",
+      "content": {
+        "structure": [
+          {
+            "name": "角色设定",
+            "description": "定义 AI 的身份和专业领域",
+            "example": "你是一位专业的法律顾问，擅长解答民事法律问题。"
+          },
+          {
+            "name": "规则约束",
+            "description": "设定行为边界和限制",
+            "example": "只回答法律相关问题，不涉及其他领域。"
+          },
+          {
+            "name": "输出格式",
+            "description": "规定回答的结构和格式",
+            "example": "回答需包含：法律依据、分析过程、建议措施。"
+          }
+        ]
+      }
+    },
+    {
+      "id": 19,
+      "part": "第四部分：普通智能体",
+      "type": "content",
+      "title": "工具添加",
+      "content": {
+        "builtinTools": {
+          "description": "Dify 内置 50+ 工具",
+          "examples": [
+            "Google 搜索",
+            "DALL·E 图像生成",
+            "Stable Diffusion",
+            "WolframAlpha 计算",
+            "天气查询"
+          ]
+        },
+        "customTools": {
+          "description": "通过 API 定义自定义工具",
+          "steps": [
+            "定义工具名称和描述",
+            "配置 API 端点",
+            "设置输入输出参数",
+            "测试工具调用"
+          ]
+        }
+      }
+    },
+    {
+      "id": 20,
+      "part": "第四部分：普通智能体",
+      "type": "case",
+      "title": "案例演示：法律知识问答助手",
+      "content": {
+        "scenario": "用户需要一个能解答民事法律问题的智能助手，提供法律依据和建议",
+        "solution": "创建聊天助手，配置系统提示词定义法律专家角色，设定回答格式包含法律依据、分析过程和建议措施",
+        "result": "智能体能准确识别法律问题，引用相关法条，给出专业且易懂的法律建议"
+      }
+    },
+    {
+      "id": 21,
+      "part": "第四部分：普通智能体",
+      "type": "summary",
+      "title": "案例要点总结",
+      "content": {
+        "tips": [
+          "提示词设计要具体明确，避免模糊描述",
+          "设定清晰的边界，防止回答超出范围",
+          "规定输出格式，保证回答质量一致性",
+          "测试边界情况，优化异常处理"
+        ]
+      }
+    },
+    {
+      "id": 22,
+      "part": "第五部分：工作流智能体",
+      "type": "content",
+      "title": "什么是工作流智能体",
+      "content": {
+        "definition": "通过可视化工作流编排实现复杂逻辑的智能体",
+        "comparison": {
+          "普通智能体": "单一 LLM 调用，提示词驱动",
+          "工作流智能体": "多节点编排，流程控制"
+        },
+        "advantages": [
+          "可处理复杂业务逻辑",
+          "支持条件分支",
+          "可组合多种能力",
+          "流程可视化，易于调试"
+        ]
+      }
+    },
+    {
+      "id": 23,
+      "part": "第五部分：工作流智能体",
+      "type": "screenshot",
+      "title": "工作流设计器",
+      "content": {
+        "screenshot": "workflow-designer.png",
+        "description": "工作流可视化设计器",
+        "features": [
+          "画布操作：拖拽节点到画布",
+          "节点连接：连线定义执行顺序",
+          "参数配置：点击节点配置参数",
+          "实时测试：运行测试验证效果"
+        ]
+      }
+    },
+    {
+      "id": 24,
+      "part": "第五部分：工作流智能体",
+      "type": "content",
+      "title": "节点类型",
+      "content": {
+        "nodes": [
+          {
+            "name": "开始节点",
+            "description": "定义工作流输入变量",
+            "icon": "▶️"
+          },
+          {
+            "name": "LLM 节点",
+            "description": "调用大语言模型处理文本",
+            "icon": "🧠"
+          },
+          {
+            "name": "条件节点",
+            "description": "根据条件分支执行",
+            "icon": "🔀"
+          },
+          {
+            "name": "变量节点",
+            "description": "变量赋值和转换",
+            "icon": "📦"
+          },
+          {
+            "name": "结束节点",
+            "description": "定义工作流输出",
+            "icon": "⏹️"
+          }
+        ]
+      }
+    },
+    {
+      "id": 25,
+      "part": "第五部分：工作流智能体",
+      "type": "content",
+      "title": "变量传递",
+      "content": {
+        "types": [
+          {
+            "name": "输入变量",
+            "description": "从开始节点或上游节点接收",
+            "syntax": "{{variable_name}}"
+          },
+          {
+            "name": "输出变量",
+            "description": "节点处理后传递给下游",
+            "syntax": "自动传递"
+          },
+          {
+            "name": "变量引用",
+            "description": "在提示词或代码中引用变量",
+            "syntax": "{{#node_id.output#}}"
+          }
+        ],
+        "tips": [
+          "变量命名要清晰有意义",
+          "注意变量类型匹配",
+          "使用变量面板查看传递关系"
+        ]
+      }
+    },
+    {
+      "id": 26,
+      "part": "第五部分：工作流智能体",
+      "type": "case",
+      "title": "案例演示：信息提取助手",
+      "content": {
+        "scenario": "从非结构化文本中提取关键信息（人名、时间、地点、事件），输出结构化 JSON",
+        "solution": "设计工作流：开始节点接收文本 → LLM 节点提取信息 → 代码节点格式化 JSON → 结束节点输出",
+        "result": "自动从任意文本中提取结构化信息，准确率高，输出格式统一"
+      }
+    },
+    {
+      "id": 27,
+      "part": "第五部分：工作流智能体",
+      "type": "summary",
+      "title": "案例要点总结",
+      "content": {
+        "tips": [
+          "节点编排要逻辑清晰，避免过度复杂",
+          "合理使用条件分支处理不同情况",
+          "输出格式化建议用代码节点精确控制",
+          "测试各种输入情况，确保鲁棒性"
+        ]
+      }
+    },
+    {
+      "id": 28,
+      "part": "第六部分：Chatflow 智能体",
+      "type": "content",
+      "title": "什么是 Chatflow",
+      "content": {
+        "definition": "基于工作流的对话应用，结合多轮对话与工作流编排",
+        "comparison": {
+          "工作流": "单次执行，无对话上下文",
+          "Chatflow": "多轮对话，保持上下文"
+        },
+        "features": [
+          "对话式交互",
+          "工作流式流程控制",
+          "会话记忆",
+          "灵活的节点编排"
+        ]
+      }
+    },
+    {
+      "id": 29,
+      "part": "第六部分：Chatflow 智能体",
+      "type": "content",
+      "title": "对话流设计",
+      "content": {
+        "elements": [
+          {
+            "name": "多轮对话",
+            "description": "支持连续多轮交互"
+          },
+          {
+            "name": "上下文传递",
+            "description": "自动维护对话历史"
+          },
+          {
+            "name": "问题分类",
+            "description": "根据用户意图分支处理"
+          },
+          {
+            "name": "追问引导",
+            "description": "主动引导用户补充信息"
+          }
+        ]
+      }
+    },
+    {
+      "id": 30,
+      "part": "第六部分：Chatflow 智能体",
+      "type": "content",
+      "title": "上下文管理",
+      "content": {
+        "concepts": [
+          {
+            "name": "会话记忆",
+            "description": "保存对话历史，支持上下文理解",
+            "config": "可设置记忆轮数"
+          },
+          {
+            "name": "变量作用域",
+            "description": "会话级变量和全局变量",
+            "usage": "会话变量在对话中持续有效"
+          }
+        ],
+        "tips": [
+          "合理设置记忆轮数，平衡效果和成本",
+          "使用会话变量存储关键信息",
+          "注意上下文窗口限制"
+        ]
+      }
+    },
+    {
+      "id": 31,
+      "part": "第六部分：Chatflow 智能体",
+      "type": "content",
+      "title": "对话开场白",
+      "content": {
+        "purpose": "引导用户开始对话，提升用户体验",
+        "settings": [
+          {
+            "name": "欢迎语",
+            "description": "友好的开场问候"
+          },
+          {
+            "name": "引导问题",
+            "description": "预设常见问题供用户选择"
+          },
+          {
+            "name": "功能说明",
+            "description": "简要介绍助手能力"
+          }
+        ],
+        "example": "你好！我是 XX 助手，可以帮你解答关于...的问题。你可以问我：1. ... 2. ... 3. ..."
+      }
+    },
+    {
+      "id": 32,
+      "part": "第六部分：Chatflow 智能体",
+      "type": "case",
+      "title": "案例演示：多轮问答助手",
+      "content": {
+        "scenario": "构建一个能通过多轮对话收集用户信息并给出建议的助手",
+        "solution": "使用 Chatflow 设计对话流程：开场引导 → 问题分类 → 追问收集 → 综合建议",
+        "result": "助手能自然地引导对话，收集完整信息后给出个性化建议"
+      }
+    },
+    {
+      "id": 33,
+      "part": "第六部分：Chatflow 智能体",
+      "type": "summary",
+      "title": "案例要点总结",
+      "content": {
+        "tips": [
+          "上下文管理是 Chatflow 的核心",
+          "合理设置记忆轮数避免信息丢失",
+          "开场白设计影响用户体验",
+          "测试多轮对话的连贯性"
+        ]
+      }
+    },
+    {
+      "id": 34,
+      "part": "第七部分：普通知识库",
+      "type": "content",
+      "title": "什么是知识库",
+      "content": {
+        "definition": "基于 RAG（检索增强生成）的知识管理系统",
+        "ragPrinciple": {
+          "steps": [
+            "文档分段：将长文档切分为小段",
+            "向量化：将文本转换为向量表示",
+            "存储：将向量存入向量数据库",
+            "检索：根据查询找到相关段落",
+            "生成：将检索结果作为上下文输入 LLM"
+          ]
+        },
+        "benefits": [
+          "利用私有知识回答问题",
+          "减少模型幻觉",
+          "知识可更新维护"
+        ]
+      }
+    },
+    {
+      "id": 35,
+      "part": "第七部分：普通知识库",
+      "type": "screenshot",
+      "title": "创建知识库",
+      "content": {
+        "screenshot": "create-knowledge.png",
+        "description": "创建知识库的步骤",
+        "steps": [
+          "步骤 1：进入知识库页面，点击「创建知识库」",
+          "步骤 2：选择导入方式（文件、Notion、网页等）",
+          "步骤 3：上传文档",
+          "步骤 4：配置分段策略",
+          "步骤 5：等待索引完成"
+        ]
+      }
+    },
+    {
+      "id": 36,
+      "part": "第七部分：普通知识库",
+      "type": "content",
+      "title": "文档上传",
+      "content": {
+        "supportedFormats": [
+          "PDF",
+          "DOCX",
+          "TXT",
+          "Markdown",
+          "CSV",
+          "XLSX"
+        ],
+        "limits": {
+          "fileSize": "单文件最大 15MB",
+          "batchUpload": "支持批量上传",
+          "totalLimit": "根据套餐有不同上限"
+        },
+        "tips": [
+          "文档质量影响检索效果",
+          "建议上传结构清晰的文档",
+          "PDF 需确保是文字版而非扫描版"
+        ]
+      }
+    },
+    {
+      "id": 37,
+      "part": "第七部分：普通知识库",
+      "type": "content",
+      "title": "分段策略",
+      "content": {
+        "strategies": [
+          {
+            "name": "自动分段",
+            "description": "系统自动识别段落边界",
+            "suitable": "结构清晰的文档"
+          },
+          {
+            "name": "自定义分段",
+            "description": "指定分隔符进行分段",
+            "suitable": "有特定格式的文档"
+          },
+          {
+            "name": "分段长度",
+            "description": "控制每段的最大字符数",
+            "recommendation": "建议 500-1000 字符"
+          }
+        ],
+        "tips": [
+          "分段过大会引入噪音",
+          "分段过小会丢失上下文",
+          "可根据检索效果调整"
+        ]
+      }
+    },
+    {
+      "id": 38,
+      "part": "第七部分：普通知识库",
+      "type": "content",
+      "title": "检索模式",
+      "content": {
+        "modes": [
+          {
+            "name": "语义检索",
+            "description": "基于向量相似度匹配",
+            "advantage": "理解语义，适合模糊查询",
+            "disadvantage": "对关键词不敏感"
+          },
+          {
+            "name": "关键词检索",
+            "description": "基于文本关键词匹配",
+            "advantage": "精确匹配关键词",
+            "disadvantage": "不理解语义"
+          },
+          {
+            "name": "混合检索",
+            "description": "结合语义和关键词",
+            "advantage": "综合两者优势",
+            "recommendation": "推荐使用"
+          }
+        ]
+      }
+    },
+    {
+      "id": 39,
+      "part": "第七部分：普通知识库",
+      "type": "case",
+      "title": "案例演示：产品手册问答",
+      "content": {
+        "scenario": "基于产品手册构建问答系统，用户可查询产品功能、使用方法等问题",
+        "solution": "创建知识库上传产品手册，配置混合检索模式，创建聊天助手关联知识库",
+        "result": "用户提问产品相关问题时，系统从手册中检索相关内容并生成准确回答"
+      }
+    },
+    {
+      "id": 40,
+      "part": "第七部分：普通知识库",
+      "type": "summary",
+      "title": "案例要点总结",
+      "content": {
+        "tips": [
+          "分段策略直接影响检索效果",
+          "混合检索通常效果最好",
+          "可通过召回测试优化参数",
+          "定期更新知识库保持内容新鲜"
+        ]
+      }
+    },
+    {
+      "id": 41,
+      "part": "第八部分：工作流知识库",
+      "type": "content",
+      "title": "知识库检索节点",
+      "content": {
+        "description": "在工作流中使用知识库检索节点",
+        "config": {
+          "knowledgeBase": "选择要检索的知识库",
+          "queryVariable": "指定查询变量",
+          "retrievalMode": "选择检索模式",
+          "topK": "返回结果数量",
+          "scoreThreshold": "相似度阈值"
+        }
+      }
+    },
+    {
+      "id": 42,
+      "part": "第八部分：工作流知识库",
+      "type": "content",
+      "title": "检索策略",
+      "content": {
+        "parameters": [
+          {
+            "name": "TopK",
+            "description": "返回最相关的 K 个结果",
+            "recommendation": "通常设置 3-5"
+          },
+          {
+            "name": "Score 阈值",
+            "description": "过滤低相似度结果",
+            "recommendation": "0.5-0.7 之间"
+          },
+          {
+            "name": "重排序",
+            "description": "使用 Rerank 模型重新排序",
+            "benefit": "提升检索精度"
+          }
+        ]
+      }
+    },
+    {
+      "id": 43,
+      "part": "第八部分：工作流知识库",
+      "type": "case",
+      "title": "案例演示：智能问答工作流",
+      "content": {
+        "scenario": "构建一个结合知识库检索和 LLM 生成的智能问答工作流",
+        "solution": "工作流设计：开始节点 → 知识库检索节点 → LLM 节点（结合检索结果生成回答）→ 结束节点",
+        "result": "实现精准的基于知识库的问答，回答有据可依，减少幻觉"
+      }
+    },
+    {
+      "id": 44,
+      "part": "第八部分：工作流知识库",
+      "type": "summary",
+      "title": "案例要点总结",
+      "content": {
+        "tips": [
+          "检索策略需要根据实际效果调优",
+          "TopK 和 Score 阈值需要平衡",
+          "重排序可显著提升效果",
+          "工作流方式更灵活可控"
+        ]
+      }
+    },
+    {
+      "id": 45,
+      "part": "第九部分：外部知识库",
+      "type": "content",
+      "title": "什么是外部知识库",
+      "content": {
+        "definition": "连接外部数据源的知识库，通过 API 对接已有系统",
+        "comparison": {
+          "内部知识库": "文档上传到 Dify 平台存储和检索",
+          "外部知识库": "数据保留在外部系统，Dify 通过 API 调用检索"
+        },
+        "useCases": [
+          "已有知识库系统",
+          "企业私有数据源",
+          "需要实时更新的场景",
+          "数据量超出平台限制"
+        ]
+      }
+    },
+    {
+      "id": 46,
+      "part": "第九部分：外部知识库",
+      "type": "content",
+      "title": "外部知识库 API",
+      "content": {
+        "apiSpec": {
+          "protocol": "RESTful API",
+          "auth": "API Key 或 OAuth",
+          "requestFormat": "JSON"
+        },
+        "endpoints": [
+          {
+            "name": "检索接口",
+            "method": "POST",
+            "description": "根据查询检索相关内容"
+          },
+          {
+            "name": "文档管理",
+            "method": "GET/POST/DELETE",
+            "description": "管理外部知识库文档"
+          }
+        ]
+      }
+    },
+    {
+      "id": 47,
+      "part": "第九部分：外部知识库",
+      "type": "screenshot",
+      "title": "创建外部知识库",
+      "content": {
+        "screenshot": "external-knowledge.png",
+        "description": "创建外部知识库的步骤",
+        "steps": [
+          "步骤 1：准备外部 API 服务",
+          "步骤 2：在 Dify 中选择「外部知识库」",
+          "步骤 3：配置 API 端点和认证",
+          "步骤 4：测试连接",
+          "步骤 5：创建并绑定数据源"
+        ]
+      }
+    },
+    {
+      "id": 48,
+      "part": "第九部分：外部知识库",
+      "type": "content",
+      "title": "检索配置",
+      "content": {
+        "parameters": [
+          {
+            "name": "检索参数",
+            "description": "TopK、Score 阈值等"
+          },
+          {
+            "name": "重排序",
+            "description": "可选的 Rerank 配置"
+          },
+          {
+            "name": "过滤条件",
+            "description": "按元数据过滤检索结果"
+          }
+        ],
+        "tips": [
+          "确保外部 API 响应格式正确",
+          "注意 API 调用延迟",
+          "合理设置超时时间"
+        ]
+      }
+    },
+    {
+      "id": 49,
+      "part": "第九部分：外部知识库",
+      "type": "case",
+      "title": "案例演示：连接企业知识系统",
+      "content": {
+        "scenario": "企业已有内部知识库系统，需要在 Dify 中集成使用",
+        "solution": "开发 API 适配层，在 Dify 中配置外部知识库连接，实现统一检索入口",
+        "result": "员工可通过 Dify 统一访问企业知识系统，无需切换多个平台"
+      }
+    },
+    {
+      "id": 50,
+      "part": "第九部分：外部知识库",
+      "type": "summary",
+      "title": "案例要点总结",
+      "content": {
+        "tips": [
+          "API 设计要符合 Dify 外部知识库规范",
+          "注意性能优化，减少延迟",
+          "做好错误处理和降级方案",
+          "考虑数据安全和权限控制"
+        ]
+      }
+    },
+    {
+      "id": 51,
+      "part": "第十部分：MCP 与自定义工具",
+      "type": "content",
+      "title": "什么是 MCP",
+      "content": {
+        "definition": "Model Context Protocol - 模型上下文协议",
+        "purpose": "标准化模型与外部工具的通信协议",
+        "benefits": [
+          "统一的工具接入标准",
+          "简化工具集成开发",
+          "提高工具复用性",
+          "支持动态工具发现"
+        ]
+      }
+    },
+    {
+      "id": 52,
+      "part": "第十部分：MCP 与自定义工具",
+      "type": "screenshot",
+      "title": "MCP 服务器配置",
+      "content": {
+        "screenshot": "mcp-config.png",
+        "description": "MCP 服务器配置界面",
+        "steps": [
+          "步骤 1：进入工具页面",
+          "步骤 2：选择「MCP 服务器」",
+          "步骤 3：添加服务器配置",
+          "步骤 4：配置认证参数",
+          "步骤 5：测试连接"
+        ]
+      }
+    },
+    {
+      "id": 53,
+      "part": "第十部分：MCP 与自定义工具",
+      "type": "content",
+      "title": "自定义工具",
+      "content": {
+        "description": "通过 API 定义创建自定义工具",
+        "creationSteps": [
+          "定义工具名称和描述",
+          "配置 API 端点（URL、Method）",
+          "设置输入参数（名称、类型、描述）",
+          "设置输出格式",
+          "测试工具调用"
+        ],
+        "tips": [
+          "工具描述要清晰，便于 LLM 理解",
+          "参数描述要详细",
+          "提供示例帮助调试"
+        ]
+      }
+    },
+    {
+      "id": 54,
+      "part": "第十部分：MCP 与自定义工具",
+      "type": "content",
+      "title": "工具授权",
+      "content": {
+        "methods": [
+          {
+            "name": "API Key",
+            "description": "在请求头中传递 API Key",
+            "usage": "最简单的方式"
+          },
+          {
+            "name": "OAuth 认证",
+            "description": "支持 OAuth 2.0 流程",
+            "usage": "需要用户授权的场景"
+          },
+          {
+            "name": "权限管理",
+            "description": "控制工具的访问权限",
+            "usage": "多租户场景"
+          }
+        ]
+      }
+    },
+    {
+      "id": 55,
+      "part": "第十部分：MCP 与自定义工具",
+      "type": "case",
+      "title": "案例演示：集成外部 API 工具",
+      "content": {
+        "scenario": "让智能体能调用企业内部 API 查询订单、库存等业务数据",
+        "solution": "将内部 API 封装为自定义工具，配置认证方式，在智能体中添加工具",
+        "result": "智能体可根据用户问题自动调用相应 API，实时查询业务数据并回答"
+      }
+    },
+    {
+      "id": 56,
+      "part": "第十部分：MCP 与自定义工具",
+      "type": "summary",
+      "title": "案例要点总结",
+      "content": {
+        "tips": [
+          "工具设计要遵循单一职责原则",
+          "描述清晰便于 LLM 理解调用时机",
+          "做好错误处理和超时控制",
+          "考虑工具调用的安全性"
+        ]
+      }
+    },
+    {
+      "id": 57,
+      "part": "第十一部分：API 集成",
+      "type": "content",
+      "title": "后端即服务",
+      "content": {
+        "overview": "Dify 所有功能均提供 API 接口",
+        "apiCategories": [
+          {
+            "name": "应用 API",
+            "description": "对话、文本生成、工作流执行"
+          },
+          {
+            "name": "知识库 API",
+            "description": "文档管理、检索"
+          },
+          {
+            "name": "认证方式",
+            "description": "API Key 认证"
+          }
+        ]
+      }
+    },
+    {
+      "id": 58,
+      "part": "第十一部分：API 集成",
+      "type": "screenshot",
+      "title": "获取 API 密钥",
+      "content": {
+        "screenshot": "api-key.png",
+        "description": "获取 API 密钥的步骤",
+        "steps": [
+          "步骤 1：进入应用详情页",
+          "步骤 2：点击「访问 API」",
+          "步骤 3：创建 API 密钥",
+          "步骤 4：复制保存密钥"
+        ],
+        "warning": "API 密钥请妥善保管，不要泄露"
+      }
+    },
+    {
+      "id": 59,
+      "part": "第十一部分：API 集成",
+      "type": "code",
+      "title": "API 调用示例",
+      "content": {
+        "language": "bash",
+        "code": "curl -X POST 'https://api.dify.ai/v1/chat-messages' \\\n  -H 'Authorization: Bearer {api_key}' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\n    \"inputs\": {},\n    \"query\": \"你好\",\n    \"response_mode\": \"blocking\",\n    \"user\": \"user-123\"\n  }'",
+        "response": {
+          "event": "message",
+          "answer": "你好！有什么可以帮助你的吗？",
+          "conversation_id": "xxx",
+          "message_id": "xxx"
+        }
+      }
+    },
+    {
+      "id": 60,
+      "part": "第十一部分：API 集成",
+      "type": "content",
+      "title": "会话管理",
+      "content": {
+        "concepts": [
+          {
+            "name": "会话 ID",
+            "description": "conversation_id 标识一次对话",
+            "usage": "首次对话不传，后续传入保持上下文"
+          },
+          {
+            "name": "上下文保持",
+            "description": "通过会话 ID 自动维护对话历史",
+            "tip": "同一会话 ID 的请求共享上下文"
+          }
+        ],
+        "tips": [
+          "首次请求不传 conversation_id 创建新会话",
+          "后续请求传入 conversation_id 继续对话",
+          "可通过 API 管理会话列表"
+        ]
+      }
+    },
+    {
+      "id": 61,
+      "part": "第十一部分：API 集成",
+      "type": "case",
+      "title": "案例演示：调用 Dify API",
+      "content": {
+        "scenario": "将 Dify 应用集成到企业微信/钉钉/自有系统中",
+        "solution": "获取 API 密钥，使用 HTTP 请求调用 Dify API，处理响应并展示给用户",
+        "result": "用户可在企业 IM 或自有系统中直接与 Dify 应用交互"
+      }
+    },
+    {
+      "id": 62,
+      "part": "第十一部分：API 集成",
+      "type": "summary",
+      "title": "案例要点总结",
+      "content": {
+        "tips": [
+          "做好错误处理和重试机制",
+          "注意 API 调用频率限制",
+          "使用流式模式提升用户体验",
+          "妥善保管 API 密钥"
+        ]
+      }
+    },
+    {
+      "id": 63,
+      "part": "第十二部分：最佳实践 — 会议纪要助手",
+      "type": "content",
+      "title": "案例场景",
+      "content": {
+        "scenario": "输入会议录音转写内容，输出结构化会议纪要",
+        "input": "会议录音转写的文本内容",
+        "output": {
+          "summary": "会议摘要",
+          "keyPoints": "关键讨论点",
+          "decisions": "决策事项",
+          "actionItems": "待办事项（负责人、截止日期）"
+        }
+      }
+    },
+    {
+      "id": 64,
+      "part": "第十二部分：最佳实践 — 会议纪要助手",
+      "type": "screenshot",
+      "title": "知识库准备",
+      "content": {
+        "screenshot": "meeting-knowledge.png",
+        "description": "上传会议纪要模板到知识库",
+        "steps": [
+          "准备会议纪要模板文档",
+          "创建知识库并上传模板",
+          "测试召回效果",
+          "调整分段策略优化检索"
+        ]
+      }
+    },
+    {
+      "id": 65,
+      "part": "第十二部分：最佳实践 — 会议纪要助手",
+      "type": "screenshot",
+      "title": "工作流设计",
+      "content": {
+        "screenshot": "meeting-workflow.png",
+        "description": "会议纪要生成工作流",
+        "nodes": [
+          "开始节点：接收会议文本",
+          "LLM 节点 1：提取关键信息（议题、决策、待办）",
+          "LLM 节点 2：按模板格式生成纪要",
+          "结束节点：输出结构化纪要"
+        ]
+      }
+    },
+    {
+      "id": 66,
+      "part": "第十二部分：最佳实践 — 会议纪要助手",
+      "type": "content",
+      "title": "智能体配置",
+      "content": {
+        "knowledgeBase": "关联会议纪要模板知识库",
+        "prompt": "你是一位专业的会议纪要整理助手。请根据输入的会议内容，提取关键信息并按照标准格式生成会议纪要。\n\n要求：\n1. 准确识别议题、决策和待办事项\n2. 待办事项需包含负责人和截止日期\n3. 语言简洁专业",
+        "model": "推荐使用 GPT-4 或 Claude 3.5 以获得更好的理解能力"
+      }
+    },
+    {
+      "id": 67,
+      "part": "第十二部分：最佳实践 — 会议纪要助手",
+      "type": "code",
+      "title": "API 集成",
+      "content": {
+        "step1": "获取 API 密钥",
+        "step2": "调用示例",
+        "language": "python",
+        "code": "import requests\n\nresponse = requests.post(\n    'https://api.dify.ai/v1/chat-messages',\n    headers={\n        'Authorization': 'Bearer {api_key}',\n        'Content-Type': 'application/json'\n    },\n    json={\n        'inputs': {},\n        'query': meeting_text,\n        'response_mode': 'blocking',\n        'user': 'meeting-bot'\n    }\n)\nresult = response.json()['answer']"
+      }
+    },
+    {
+      "id": 68,
+      "part": "第十二部分：最佳实践 — 会议纪要助手",
+      "type": "summary",
+      "title": "最佳实践总结",
+      "content": {
+        "tips": [
+          {
+            "category": "提示词技巧",
+            "items": [
+              "明确角色定位和任务目标",
+              "规定输出格式和结构",
+              "提供示例帮助理解"
+            ]
+          },
+          {
+            "category": "性能优化",
+            "items": [
+              "合理设置 TopK 和 Score 阈值",
+              "使用流式响应提升体验"
+            ]
+          },
+          {
+            "category": "成本控制",
+            "items": [
+              "选择合适的模型",
+              "控制输入长度"
+            ]
+          },
+          {
+            "category": "安全考虑",
+            "items": [
+              "敏感信息脱敏",
+              "API 密钥安全存储"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 69,
+      "part": "第十三部分：总结",
+      "type": "content",
+      "title": "内容回顾",
+      "content": {
+        "cases": [
+          "案例 1：法律知识问答助手（普通智能体）",
+          "案例 2：信息提取助手（工作流智能体）",
+          "案例 3：多轮问答助手（Chatflow 智能体）",
+          "案例 4：产品手册问答（普通知识库）",
+          "案例 5：智能问答工作流（工作流知识库）",
+          "案例 6：连接企业知识系统（外部知识库）",
+          "案例 7：集成外部 API 工具（MCP 与自定义工具）",
+          "案例 8：调用 Dify API（API 集成）",
+          "案例 9：会议纪要助手（最佳实践）"
+        ],
+        "coreKnowledge": [
+          "平台基础：模型配置、应用类型",
+          "智能体：普通、工作流、Chatflow",
+          "知识库：普通、工作流、外部",
+          "工具：MCP、自定义工具",
+          "集成：API 调用"
+        ]
+      }
+    },
+    {
+      "id": 70,
+      "part": "第十三部分：总结",
+      "type": "content",
+      "title": "能力检查",
+      "content": {
+        "checklist": [
+          "能独立配置模型供应商",
+          "能创建不同类型的应用",
+          "能设计和配置系统提示词",
+          "能创建和管理知识库",
+          "能设计工作流并配置节点",
+          "能添加和配置工具",
+          "能调用 Dify API 集成到业务系统",
+          "能根据需求选择合适的应用类型和方案"
+        ]
+      }
+    },
+    {
+      "id": 71,
+      "part": "第十三部分：总结",
+      "type": "content",
+      "title": "后续学习资源",
+      "content": {
+        "resources": [
+          {
+            "name": "官方文档",
+            "url": "https://docs.dify.ai",
+            "description": "完整的功能说明和使用指南"
+          },
+          {
+            "name": "GitHub",
+            "url": "https://github.com/langgenius/dify",
+            "description": "源码、Issue 讨论、贡献指南"
+          },
+          {
+            "name": "Discord 社区",
+            "url": "https://discord.gg/FngNHpbcY7",
+            "description": "与其他用户交流、分享应用"
+          },
+          {
+            "name": "示例库",
+            "description": "官方提供的应用模板和案例"
+          }
+        ]
+      }
+    },
+    {
+      "id": 72,
+      "part": "第十三部分：总结",
+      "type": "qa",
+      "title": "答疑环节",
+      "content": {
+        "title": "Q & A",
+        "description": "欢迎提问交流",
+        "prompts": [
+          "使用过程中遇到的问题",
+          "特定场景的实现方案",
+          "最佳实践和经验分享"
+        ]
+      }
+    },
+    {
+      "id": 73,
+      "part": "第十三部分：总结",
+      "type": "end",
+      "title": "感谢参与",
+      "content": {
+        "thanks": "感谢大家的参与！",
+        "contact": {
+          "website": "https://dify.ai",
+          "github": "https://github.com/langgenius/dify",
+          "discord": "https://discord.gg/FngNHpbcY7"
+        }
+      }
+    }
+  ]
+}
