@@ -654,7 +654,7 @@ async function generatePPT() {
   }
   
   // 保存文件
-  const outputPath = "Dify_Training_v3.pptx";
+  const outputPath = "docs/pptx/Dify_Training_v3.pptx";
   await pres.writeFile({ fileName: outputPath });
   console.log(`✓ PPT 生成成功：${outputPath}`);
   console.log(`✓ 总页数：${pres.slides.length} 页`);
