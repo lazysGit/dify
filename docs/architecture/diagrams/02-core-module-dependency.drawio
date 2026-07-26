@@ -1,0 +1,147 @@
+<mxfile host="app.diagrams.net"><diagram id="1sw1mzr3-e2h8" name="Page-1"><mxGraphModel>
+  <root>
+    <mxCell id="0"/>
+    <mxCell id="1" parent="0"/>
+    
+    <!-- Controllers Layer -->
+    <mxCell id="2" value="控制器层" style="rounded=1;whiteSpace=wrap;fillColor=#e1f5ff;strokeColor=#0277bd;fontSize=14;fontStyle=1;verticalAlign=top;" vertex="1" parent="1">
+      <mxGeometry x="40" y="40" width="720" height="80" as="geometry"/>
+    </mxCell>
+    <mxCell id="3" value="Console API" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+      <mxGeometry x="120" y="60" width="200" height="40" as="geometry"/>
+    </mxCell>
+    <mxCell id="4" value="Service API" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+      <mxGeometry x="400" y="60" width="200" height="40" as="geometry"/>
+    </mxCell>
+    
+    <!-- Services Layer -->
+    <mxCell id="5" value="服务层" style="rounded=1;whiteSpace=wrap;fillColor=#fff4e1;strokeColor=#e65100;fontSize=14;fontStyle=1;verticalAlign=top;" vertex="1" parent="1">
+      <mxGeometry x="40" y="150" width="720" height="80" as="geometry"/>
+    </mxCell>
+    <mxCell id="6" value="App Service" style="rounded=1;whiteSpace=wrap;fillColor=#e8f5e9;strokeColor=#2e7d32;" vertex="1" parent="1">
+      <mxGeometry x="60" y="170" width="150" height="40" as="geometry"/>
+    </mxCell>
+    <mxCell id="7" value="Workflow Service" style="rounded=1;whiteSpace=wrap;fillColor=#e8f5e9;strokeColor=#2e7d32;" vertex="1" parent="1">
+      <mxGeometry x="230" y="170" width="150" height="40" as="geometry"/>
+    </mxCell>
+    <mxCell id="8" value="Dataset Service" style="rounded=1;whiteSpace=wrap;fillColor=#e8f5e9;strokeColor=#2e7d32;" vertex="1" parent="1">
+      <mxGeometry x="400" y="170" width="150" height="40" as="geometry"/>
+    </mxCell>
+    <mxCell id="9" value="Model Service" style="rounded=1;whiteSpace=wrap;fillColor=#e8f5e9;strokeColor=#2e7d32;" vertex="1" parent="1">
+      <mxGeometry x="570" y="170" width="150" height="40" as="geometry"/>
+    </mxCell>
+    
+    <!-- Core Layer -->
+    <mxCell id="10" value="核心层" style="rounded=1;whiteSpace=wrap;fillColor=#e8f5e9;strokeColor=#1b5e20;fontSize=14;fontStyle=1;verticalAlign=top;" vertex="1" parent="1">
+      <mxGeometry x="40" y="260" width="720" height="80" as="geometry"/>
+    </mxCell>
+    <mxCell id="11" value="App Runner" style="rounded=1;whiteSpace=wrap;fillColor=#f3e5f5;strokeColor=#6a1b9a;" vertex="1" parent="1">
+      <mxGeometry x="50" y="280" width="120" height="40" as="geometry"/>
+    </mxCell>
+    <mxCell id="12" value="Workflow Engine" style="rounded=1;whiteSpace=wrap;fillColor=#f3e5f5;strokeColor=#6a1b9a;" vertex="1" parent="1">
+      <mxGeometry x="185" y="280" width="130" height="40" as="geometry"/>
+    </mxCell>
+    <mxCell id="13" value="RAG Pipeline" style="rounded=1;whiteSpace=wrap;fillColor=#f3e5f5;strokeColor=#6a1b9a;" vertex="1" parent="1">
+      <mxGeometry x="330" y="280" width="120" height="40" as="geometry"/>
+    </mxCell>
+    <mxCell id="14" value="Agent Framework" style="rounded=1;whiteSpace=wrap;fillColor=#f3e5f5;strokeColor=#6a1b9a;" vertex="1" parent="1">
+      <mxGeometry x="465" y="280" width="140" height="40" as="geometry"/>
+    </mxCell>
+    <mxCell id="15" value="Model Runtime" style="rounded=1;whiteSpace=wrap;fillColor=#f3e5f5;strokeColor=#6a1b9a;" vertex="1" parent="1">
+      <mxGeometry x="620" y="280" width="120" height="40" as="geometry"/>
+    </mxCell>
+    
+    <!-- Models Layer -->
+    <mxCell id="16" value="数据模型层" style="rounded=1;whiteSpace=wrap;fillColor=#f3e5f5;strokeColor=#4a148c;fontSize=14;fontStyle=1;verticalAlign=top;" vertex="1" parent="1">
+      <mxGeometry x="40" y="370" width="720" height="80" as="geometry"/>
+    </mxCell>
+    <mxCell id="17" value="App Model" style="rounded=1;whiteSpace=wrap;fillColor=#fce4ec;strokeColor=#c62828;" vertex="1" parent="1">
+      <mxGeometry x="80" y="390" width="140" height="40" as="geometry"/>
+    </mxCell>
+    <mxCell id="18" value="Workflow Model" style="rounded=1;whiteSpace=wrap;fillColor=#fce4ec;strokeColor=#c62828;" vertex="1" parent="1">
+      <mxGeometry x="240" y="390" width="140" height="40" as="geometry"/>
+    </mxCell>
+    <mxCell id="19" value="Dataset Model" style="rounded=1;whiteSpace=wrap;fillColor=#fce4ec;strokeColor=#c62828;" vertex="1" parent="1">
+      <mxGeometry x="400" y="390" width="140" height="40" as="geometry"/>
+    </mxCell>
+    <mxCell id="20" value="Message Model" style="rounded=1;whiteSpace=wrap;fillColor=#fce4ec;strokeColor=#c62828;" vertex="1" parent="1">
+      <mxGeometry x="560" y="390" width="140" height="40" as="geometry"/>
+    </mxCell>
+    
+    <!-- Infrastructure Layer -->
+    <mxCell id="21" value="基础设施层" style="rounded=1;whiteSpace=wrap;fillColor=#e0f2f1;strokeColor=#004d40;fontSize=14;fontStyle=1;verticalAlign=top;" vertex="1" parent="1">
+      <mxGeometry x="40" y="480" width="720" height="80" as="geometry"/>
+    </mxCell>
+    <mxCell id="22" value="PostgreSQL" style="shape=cylinder;whiteSpace=wrap;fillColor=#b2dfdb;strokeColor=#004d40;" vertex="1" parent="1">
+      <mxGeometry x="80" y="500" width="120" height="40" as="geometry"/>
+    </mxCell>
+    <mxCell id="23" value="Redis" style="shape=cylinder;whiteSpace=wrap;fillColor=#b2dfdb;strokeColor=#004d40;" vertex="1" parent="1">
+      <mxGeometry x="240" y="500" width="120" height="40" as="geometry"/>
+    </mxCell>
+    <mxCell id="24" value="Vector DB" style="shape=cylinder;whiteSpace=wrap;fillColor=#b2dfdb;strokeColor=#004d40;" vertex="1" parent="1">
+      <mxGeometry x="400" y="500" width="120" height="40" as="geometry"/>
+    </mxCell>
+    <mxCell id="25" value="Object Storage" style="shape=cylinder;whiteSpace=wrap;fillColor=#b2dfdb;strokeColor=#004d40;" vertex="1" parent="1">
+      <mxGeometry x="560" y="500" width="120" height="40" as="geometry"/>
+    </mxCell>
+    
+    <!-- Edges: Controllers -> Services -->
+    <mxCell id="26" style="endArrow=classic;edgeStyle=orthogonalEdgeStyle;" edge="1" source="3" target="6" parent="1">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="27" style="endArrow=classic;edgeStyle=orthogonalEdgeStyle;" edge="1" source="3" target="7" parent="1">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="28" style="endArrow=classic;edgeStyle=orthogonalEdgeStyle;" edge="1" source="4" target="8" parent="1">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="29" style="endArrow=classic;edgeStyle=orthogonalEdgeStyle;" edge="1" source="4" target="9" parent="1">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    
+    <!-- Edges: Services -> Core -->
+    <mxCell id="30" style="endArrow=classic;edgeStyle=orthogonalEdgeStyle;" edge="1" source="6" target="11" parent="1">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="31" style="endArrow=classic;edgeStyle=orthogonalEdgeStyle;" edge="1" source="7" target="12" parent="1">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="32" style="endArrow=classic;edgeStyle=orthogonalEdgeStyle;" edge="1" source="8" target="13" parent="1">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="33" style="endArrow=classic;edgeStyle=orthogonalEdgeStyle;" edge="1" source="9" target="14" parent="1">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="34" style="endArrow=classic;edgeStyle=orthogonalEdgeStyle;" edge="1" source="9" target="15" parent="1">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    
+    <!-- Edges: Core -> Models -->
+    <mxCell id="35" style="endArrow=classic;edgeStyle=orthogonalEdgeStyle;" edge="1" source="11" target="17" parent="1">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="36" style="endArrow=classic;edgeStyle=orthogonalEdgeStyle;" edge="1" source="12" target="18" parent="1">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="37" style="endArrow=classic;edgeStyle=orthogonalEdgeStyle;" edge="1" source="13" target="19" parent="1">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="38" style="endArrow=classic;edgeStyle=orthogonalEdgeStyle;" edge="1" source="14" target="20" parent="1">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    
+    <!-- Edges: Models -> Infrastructure -->
+    <mxCell id="39" style="endArrow=classic;edgeStyle=orthogonalEdgeStyle;" edge="1" source="17" target="22" parent="1">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="40" style="endArrow=classic;edgeStyle=orthogonalEdgeStyle;" edge="1" source="18" target="23" parent="1">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="41" style="endArrow=classic;edgeStyle=orthogonalEdgeStyle;" edge="1" source="19" target="24" parent="1">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="42" style="endArrow=classic;edgeStyle=orthogonalEdgeStyle;" edge="1" source="20" target="25" parent="1">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+  </root>
+</mxGraphModel></diagram></mxfile>

@@ -1,26 +1,28 @@
 ---
 title: 知识库隔离与共享审核方案
-version: 1.0
-last_updated: 2026-07-19
+version: 1.1
+last_updated: 2026-07-20
 author: AI Assistant
 status: draft
 related_docs:
   - [数据架构](domains/data.md)
   - [安全架构](domains/security.md)
+  - [权限模型](permission-model.md)
 ---
 
 # 知识库隔离与共享审核方案
 
-> **TL;DR**: Dify 知识库通过租户级数据隔离、向量集合隔离和三级权限模型（仅自己/全团队/部分成员）实现数据安全，本文档分析现状并提出跨租户共享、审核流程和细粒度权限控制的增强方案。
+> **TL;DR**: Dify 知识库通过租户级数据隔离、部门级数据隔离、向量集合隔离和三级权限模型（仅自己/全团队/部分成员）实现数据安全。企业版新增部门管理功能，支持按部门组织知识库，实现部门级数据隔离和权限管理。本文档分析现状并提出跨租户共享、审核流程和细粒度权限控制的增强方案。
 
 ## 概述
 
-知识库（Dataset）是 Dify 的核心数据资产，存储企业文档、产品手册、技术规范等关键信息。在多租户和多团队场景下，需要解决两个核心问题：
+知识库（Dataset）是 Dify 的核心数据资产，存储企业文档、产品手册、技术规范等关键信息。在多租户和多团队场景下，需要解决三个核心问题：
 
-1. **隔离**：确保不同租户、不同团队的知识库数据互不可见、互不干扰
+1. **隔离**：确保不同租户、不同部门、不同团队的知识库数据互不可见、互不干扰
 2. **共享**：在安全可控的前提下，支持知识库在授权范围内跨团队复用
+3. **部门管理**：企业版支持按部门组织知识库，实现部门级数据隔离和权限管理
 
-本文档基于 Dify 现有代码实现，分析知识库隔离现状，设计共享机制和审核流程。
+本文档基于 Dify 现有代码实现，分析知识库隔离现状，设计部门级隔离方案、共享机制和审核流程。
 
 ## 详细设计
 
@@ -32,11 +34,12 @@ related_docs:
 
 | 实体 | 表名 | 隔离字段 | 说明 |
 |------|------|---------|------|
-| `Dataset` | `datasets` | `tenant_id` | 知识库定义，包含名称、索引策略、检索配置 |
+| `Dataset` | `datasets` | `tenant_id`, `department_id` | 知识库定义，包含名称、索引策略、检索配置 |
 | `Document` | `documents` | `tenant_id`, `dataset_id` | 知识库中的文档，记录处理状态和元数据 |
 | `DocumentSegment` | `document_segments` | `tenant_id`, `dataset_id` | 文档分段（Chunk），存储文本内容和向量索引 |
 | `DatasetPermission` | `dataset_permissions` | `tenant_id`, `dataset_id`, `account_id` | 细粒度权限记录，控制哪些用户可以访问 |
 | `AppDatasetJoin` | `app_dataset_joins` | `dataset_id`, `app_id` | 应用与知识库的关联关系 |
+| `Department` | `departments` | `tenant_id` | 部门表，支持多级树形结构（企业版） |
 
 **Dataset 核心字段：**
 
@@ -46,12 +49,31 @@ class Dataset(Base):
     
     id: Mapped[str]                              # UUID 主键
     tenant_id: Mapped[str]                       # 租户隔离标识
+    department_id: Mapped[str | None]            # 部门隔离标识（企业版）
     name: Mapped[str]                            # 知识库名称
     permission: Mapped[DatasetPermissionEnum]    # 权限模式
     embedding_model: Mapped[str]                 # 嵌入模型
     collection_binding_id: Mapped[str]           # 向量集合绑定 ID
     indexing_technique: Mapped[IndexTechniqueType]  # 索引技术
     retrieval_model: Mapped[dict]                # 检索配置（JSON）
+```
+
+**Department 核心字段（企业版）：**
+
+```python
+class Department(Base):
+    __tablename__ = "departments"
+    
+    id: Mapped[str]                              # UUID 主键
+    tenant_id: Mapped[str]                       # 租户 ID
+    parent_id: Mapped[str | None]                # 父部门 ID（NULL 表示根部门）
+    name: Mapped[str]                            # 部门名称
+    description: Mapped[str]                     # 部门描述
+    level: Mapped[int]                           # 层级深度（1-10）
+    path: Mapped[str]                            # 物化路径（如 /tenant_id/root_id/...）
+    is_default: Mapped[bool]                     # 是否默认部门
+    created_at: Mapped[datetime]
+    updated_at: Mapped[datetime]
 ```
 
 #### 1.2 访问控制现状
@@ -163,7 +185,113 @@ datasets = db.session.scalars(
 2. **SQL 注入防护**：使用 SQLAlchemy ORM 的参数化查询，禁止拼接 SQL
 3. **跨租户访问审计**：记录所有跨租户访问尝试，触发告警
 
-#### 2.2 项目级隔离
+#### 2.2 部门级隔离（企业版）
+
+部门级隔离在租户内部按部门组织知识库，实现部门级数据隔离和权限管理。
+
+**数据模型设计：**
+
+```python
+# Dataset 表新增字段
+class Dataset(Base):
+    __tablename__ = "datasets"
+    # ... 现有字段 ...
+    department_id: Mapped[str | None]  # 所属部门 ID（NULL 表示未分配）
+
+# Department 表（企业版新增）
+class Department(Base):
+    __tablename__ = "departments"
+    
+    id: Mapped[str]
+    tenant_id: Mapped[str]
+    parent_id: Mapped[str | None]      # 父部门 ID
+    name: Mapped[str]
+    path: Mapped[str]                  # 物化路径，如 /tenant_id/parent_id/id
+    level: Mapped[int]                 # 层级（1-10）
+    is_default: Mapped[bool]           # 是否默认部门
+```
+
+**部门级隔离规则：**
+
+| 用户角色 | 可见知识库范围 | 说明 |
+|---------|--------------|------|
+| 租户管理员 (Owner/Admin) | 租户内所有部门的知识库 | 不受部门限制 |
+| 部门管理员 | 本部门及所有子部门的知识库 | 可管理部门结构 |
+| 普通成员 | 仅所属部门的知识库 | 受 `permission` 字段约束 |
+
+**部门层级结构：**
+
+```mermaid
+graph TB
+    subgraph Tenant["租户工作空间"]
+        Default["默认部门<br/>is_default=true"]
+        
+        subgraph Dept1["技术部 (level=1)"]
+            Dept1A["前端组 (level=2)"]
+            Dept1B["后端组 (level=2)"]
+        end
+        
+        subgraph Dept2["产品部 (level=1)"]
+            Dept2A["设计组 (level=2)"]
+        end
+    end
+
+    Default --> Dept1
+    Default --> Dept2
+    Dept1 --> Dept1A
+    Dept1 --> Dept1B
+    Dept2 --> Dept2A
+
+    style Default fill:#94a3b8,color:#fff
+    style Dept1 fill:#dbeafe,stroke:#3b82f6
+    style Dept2 fill:#dcfce7,stroke:#22c55e
+```
+
+**部门权限矩阵：**
+
+| 操作 | 租户管理员 | 部门管理员 | 普通成员 |
+|------|:----------:|:----------:|:--------:|
+| 查看本部门知识库 | ✅ | ✅ | ✅ |
+| 查看子部门知识库 | ✅ | ✅ | ❌ |
+| 创建知识库到本部门 | ✅ | ✅ | ✅（需编辑权限） |
+| 转移知识库到本部门 | ✅ | ✅ | ❌ |
+| 转移知识库出本部门 | ✅ | ❌ | ❌ |
+| 删除部门知识库 | ✅ | ✅（本部门） | ❌ |
+
+**知识库查询逻辑（部门级过滤）：**
+
+```python
+def get_visible_datasets(user, tenant_id):
+    """获取用户可见的知识库列表"""
+    query = Dataset.query.filter(Dataset.tenant_id == tenant_id)
+    
+    if user.is_admin_or_owner:
+        # 租户管理员：可见所有知识库
+        pass
+    elif user.is_department_admin:
+        # 部门管理员：可见本部门及子部门的知识库
+        dept_ids = get_department_and_children(user.department_id)
+        query = query.filter(Dataset.department_id.in_(dept_ids))
+    else:
+        # 普通成员：仅可见所属部门的知识库
+        query = query.filter(Dataset.department_id == user.department_id)
+    
+    # 叠加 permission 字段过滤
+    query = query.filter(
+        or_(
+            Dataset.permission == 'all_team_members',
+            Dataset.created_by == user.id,
+            and_(
+                Dataset.permission == 'partial_members',
+                Dataset.id.in_(get_partial_member_dataset_ids(user.id))
+            )
+        )
+    )
+    
+    return query.all()
+```
+
+#### 2.3 项目级隔离
 
 项目级隔离在租户内部进一步按团队或项目划分知识库可见性。当前通过 `DatasetPermissionEnum.PARTIAL_TEAM` + `DatasetPermission` 表实现。
 
@@ -206,7 +334,7 @@ class ProjectDatasetJoin(Base):
 3. 未关联项目的知识库遵循原有的三级权限模型
 4. 项目管理员可以管理项目内的知识库分配
 
-#### 2.3 向量数据库隔离策略
+#### 2.4 向量数据库隔离策略
 
 向量数据库隔离在现有集合级隔离基础上，增加命名空间（Namespace）和访问控制层。
 
@@ -309,7 +437,68 @@ class ProjectSharing(Base):
 3. 共享后，目标项目成员可以按权限级别访问知识库
 4. 共享可以随时撤销
 
-#### 3.3 共享权限控制
+#### 3.3 部门间转移（企业版）
+
+部门间转移允许在部门之间移动知识库，实现知识库的重新组织。
+
+**转移流程：**
+
+```mermaid
+sequenceDiagram
+    participant Admin as 管理员
+    participant API as Console API
+    participant Dept as 部门服务
+    participant DB as 数据库
+
+    Admin->>API: POST /datasets/{id}/transfer
+    API->>Dept: 验证转移权限
+    Dept->>Dept: 检查操作者权限
+    
+    alt 租户管理员
+        Dept-->>API: 允许转移到任何部门
+    else 部门管理员
+        Dept->>DB: 验证源部门和目标部门在管理范围内
+        Dept-->>API: 允许（仅限管理范围）
+    end
+
+    API->>DB: 更新 datasets.department_id
+    Note over DB: 知识库转移不改变其权限设置<br/>仅变更部门归属
+    DB-->>API: 更新成功
+
+    API->>API: 记录审计日志
+    API-->>Admin: 200 OK
+```
+
+**转移规则：**
+
+| 规则 | 说明 |
+|------|------|
+| 权限要求 | 租户管理员可转移到任何部门；部门管理员仅限本部门及子部门 |
+| 数据完整性 | 转移仅变更 `department_id`，不改变知识库内容、权限设置、关联应用 |
+| 可见性变更 | 转移后，原部门成员可能失去访问权限（取决于新部门的权限策略） |
+| 应用关联 | 知识库关联的应用不受影响，但应用运行时检索需验证部门权限 |
+| 审计日志 | 记录转移操作，包括操作人、源部门、目标部门、时间戳 |
+
+**转移 API：**
+
+```
+POST /console/api/workspaces/current/datasets/<dataset_id>/transfer
+
+Request:
+{
+    "target_department_id": "def456"
+}
+
+Response:
+{
+    "result": "success",
+    "dataset_id": "<dataset_id>",
+    "source_department_id": "abc123",
+    "target_department_id": "def456"
+}
+```
+
+#### 3.4 共享权限控制
 
 共享权限控制确保共享过程安全可控。
 
@@ -602,23 +791,31 @@ class PermissionAuditLog(Base):
 ```mermaid
 graph TB
     subgraph "租户 A"
-        A1[项目 A1] --> A2[知识库 A1-1]
-        A1 --> A3[知识库 A1-2]
-        A4[项目 A2] --> A5[知识库 A2-1]
+        subgraph "部门 A1"
+            A1[知识库 A1-1]
+            A2[知识库 A1-2]
+        end
+        subgraph "部门 A2"
+            A3[知识库 A2-1]
+        end
     end
     
     subgraph "租户 B"
-        B1[项目 B1] --> B2[知识库 B1-1]
-        B3[项目 B2] --> B4[知识库 B2-1]
+        subgraph "部门 B1"
+            B1[知识库 B1-1]
+        end
+        subgraph "部门 B2"
+            B2[知识库 B2-1]
+        end
     end
     
     subgraph "共享层"
         C1[跨租户共享记录]
-        C2[跨项目共享记录]
+        C2[跨部门共享记录]
     end
     
-    A2 -.->|共享| B2
-    A3 -.->|共享| A5
+    A1 -.->|共享| B1
+    A2 -.->|共享| A3
     
     subgraph "向量数据库"
         D1[Collection A1-1]
@@ -628,11 +825,11 @@ graph TB
         D5[Collection B2-1]
     end
     
-    A2 --> D1
-    A3 --> D2
-    A5 --> D3
-    B2 --> D4
-    B4 --> D5
+    A1 --> D1
+    A2 --> D2
+    A3 --> D3
+    B1 --> D4
+    B2 --> D5
     
     style C1 fill:#fff9c4
     style C2 fill:#fff9c4
@@ -715,4 +912,5 @@ sequenceDiagram
 
 | 版本 | 日期 | 变更内容 |
 |------|------|---------|
+| 1.1 | 2026-07-20 | 新增部门级隔离（企业版）：部门数据模型、部门权限矩阵、部门层级结构、知识库部门转移流程、部门间共享机制 |
 | 1.0 | 2026-07-19 | 初始版本，涵盖现状分析、隔离方案、共享机制、审核流程、权限控制 |

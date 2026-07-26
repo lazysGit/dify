@@ -1,7 +1,7 @@
 ---
 title: 权限模型设计
-version: 1.0
-last_updated: 2026-07-19
+version: 1.1
+last_updated: 2026-07-20
 author: AI Assistant
 status: draft
 related_docs:
@@ -10,7 +10,7 @@ related_docs:
 
 # 权限模型设计
 
-> **TL;DR**: Dify 采用基于租户隔离的 RBAC 五级角色模型，结合资源级 ABAC 属性控制，通过装饰器链实现分层权限检查，覆盖认证、授权、资源访问和 API 调用全链路。
+> **TL;DR**: Dify 采用基于租户隔离的 RBAC 五级角色模型，结合资源级 ABAC 属性控制，通过装饰器链实现分层权限检查，覆盖认证、授权、资源访问和 API 调用全链路。企业版新增部门管理功能，支持多级树形部门结构、部门管理员角色和基于部门的数据隔离。
 
 ## 概述
 
@@ -295,6 +295,117 @@ graph LR
 3. **装饰器链 > 业务逻辑**：任何业务逻辑执行前，装饰器链的认证和授权检查必须先通过
 4. **显式拒绝 > 隐式允许**：当多个规则冲突时，拒绝优先
 
+#### 2.5 部门管理（企业版）
+
+为支持企业级组织架构管理，Dify 企业版引入部门管理功能，使租户能够按部门组织成员、应用和知识库。
+
+**核心目标：**
+
+- 支持租户内部的多级部门树形结构，最多支持 10 级层级
+- 实现基于部门的数据隔离（应用、知识库），确保数据安全
+- 引入部门管理员角色，支持部门级权限管理，减轻租户管理员负担
+- 保持向后兼容，现有数据自动迁移到默认部门，用户无感知
+- 支持成员、应用、知识库在部门间的灵活转移
+
+**部门数据模型：**
+
+```mermaid
+erDiagram
+    Tenant ||--o{ Department : "拥有部门"
+    Department ||--o{ Department : "包含子部门"
+    Department ||--o{ TenantAccountJoin : "部门成员"
+    Department ||--o{ App : "部门应用"
+    Department ||--o{ Dataset : "部门知识库"
+
+    Department {
+        uuid id PK
+        uuid tenant_id FK
+        uuid parent_id FK "NULL for root"
+        string name
+        string description
+        int level "1-10"
+        string path "materialized path"
+        bool is_default
+        datetime created_at
+        datetime updated_at
+    }
+
+    TenantAccountJoin {
+        uuid department_id FK "新增字段"
+        bool is_department_admin "新增字段"
+    }
+
+    App {
+        uuid department_id FK "新增字段"
+    }
+
+    Dataset {
+        uuid department_id FK "新增字段"
+    }
+```
+
+**部门层级结构：**
+
+```mermaid
+graph TB
+    subgraph Tenant["租户工作空间"]
+        Default["默认部门<br/>is_default=true<br/>不可删除"]
+        
+        subgraph Dept1["技术部 (level=1)"]
+            Dept1A["前端组 (level=2)"]
+            Dept1B["后端组 (level=2)"]
+            Dept1A --> Dept1A1["移动端小组 (level=3)"]
+        end
+        
+        subgraph Dept2["产品部 (level=1)"]
+            Dept2A["设计组 (level=2)"]
+        end
+    end
+
+    style Default fill:#94a3b8,color:#fff
+    style Dept1 fill:#dbeafe,stroke:#3b82f6
+    style Dept2 fill:#dcfce7,stroke:#22c55e
+```
+
+**三级权限体系：**
+
+| 权限维度 | 租户管理员 (Owner/Admin) | 部门管理员 | 普通成员 |
+|---------|:------------------------:|:----------:|:--------:|
+| 创建/删除部门 | ✅ | ❌ | ❌ |
+| 设置/取消部门管理员 | ✅ | ❌ | ❌ |
+| 管理部门结构（重命名等） | ✅ | ❌ | ❌ |
+| 管理本部门及子部门成员 | ✅ | ✅ | ❌ |
+| 创建本部门及子部门成员 | ✅ | ✅ | ❌ |
+| 移动本部门及子部门成员 | ✅ | ✅ | ❌ |
+| 转移数据到本部门及子部门 | ✅ | ✅ | ❌ |
+| 查看本部门及子部门数据 | ✅ | ✅ | ✅（仅自己的） |
+
+**部门管理员规则：**
+
+- 一个部门可以有多个部门管理员
+- 部门管理员必须是该部门的成员
+- 只有租户管理员可以设置/取消部门管理员
+- 部门管理员可以管理部门成员，但不能管理部门结构
+- 只有 `owner`/`admin`/`editor` 角色可以被设置为部门管理员
+- 部门管理员可以看到和管理本部门及子部门的数据和成员
+- 部门管理员不能移出自己
+- 如果部门管理员的角色从 `owner`/`admin`/`editor` 变为 `normal` 或 `dataset_operator`，系统自动取消其部门管理员权限
+
+**默认部门规则：**
+
+- 每个租户有且仅有一个默认部门（`is_default = true`）
+- 默认部门不可删除，但可以重命名
+- 新租户创建时自动创建默认部门
+- 数据迁移时，现有数据自动归属到默认部门
+- 默认部门不能有子部门（前端创建部门时，父部门选择器中过滤掉默认部门）
+
+**path 字段说明：**
+
+- 格式：`/租户ID/根部门ID/子部门ID/孙部门ID`
+- 示例：`/tenant1/abc123/def456/ghi789`
+- 用途：通过 `path LIKE '/tenant1/abc123%'` 快速查询某部门的所有子部门
+- 支持高效查询部门树、子部门列表、部门层级深度
+
 ### 3. 数据模型
 
 #### 3.1 用户-角色-权限关系图
@@ -304,8 +415,14 @@ erDiagram
     Account ||--o{ TenantAccountJoin : "在租户中拥有角色"
     Tenant ||--o{ TenantAccountJoin : "包含成员及角色"
     Tenant ||--o{ TenantPluginPermission : "拥有插件权限配置"
+    Tenant ||--o{ Department : "拥有部门"
     Tenant ||--o{ Dataset : "拥有知识库"
     Tenant ||--o{ App : "拥有应用"
+
+    Department ||--o{ Department : "包含子部门"
+    Department ||--o{ TenantAccountJoin : "部门成员"
+    Department ||--o{ App : "部门应用"
+    Department ||--o{ Dataset : "部门知识库"
 
     Dataset ||--o{ DatasetMemberJoin : "部分成员可见"
     Account ||--o{ DatasetMemberJoin : "被授权访问知识库"
@@ -325,6 +442,19 @@ erDiagram
         text encrypt_public_key
     }
 
+    Department {
+        uuid id PK
+        uuid tenant_id FK
+        uuid parent_id FK "NULL for root"
+        string name
+        string description
+        int level "1-10"
+        string path "materialized path"
+        bool is_default
+        datetime created_at
+        datetime updated_at
+    }
+
     TenantAccountJoin {
         uuid id PK
         uuid tenant_id FK
@@ -332,14 +462,25 @@ erDiagram
         enum role "owner/admin/editor/normal/dataset_operator"
         bool current
         uuid invited_by
+        uuid department_id FK "所属部门"
+        bool is_department_admin "是否部门管理员"
     }
 
     Dataset {
         uuid id PK
         uuid tenant_id FK
+        uuid department_id FK "所属部门"
         string name
         enum permission "only_me/all_team_members/partial_members"
         uuid created_by
+    }
+
+    App {
+        uuid id PK
+        uuid tenant_id FK
+        uuid department_id FK "所属部门"
+        string name
+        string mode
     }
 
     TenantPluginPermission {
@@ -365,9 +506,11 @@ erDiagram
 |------|------|---------|
 | `accounts` | 用户账户 | `id`, `email`, `status`, `password`, `password_salt` |
 | `tenants` | 工作空间 | `id`, `name`, `plan`, `status`, `encrypt_public_key` |
-| `tenant_account_joins` | 用户-租户关联 + 角色 | `tenant_id`, `account_id`, `role`, `current` |
+| `departments` | 部门（树形结构） | `tenant_id`, `parent_id`, `name`, `level`, `path`, `is_default` |
+| `tenant_account_joins` | 用户-租户关联 + 角色 + 部门 | `tenant_id`, `account_id`, `role`, `current`, `department_id`, `is_department_admin` |
 | `account_plugin_permissions` | 插件权限配置 | `tenant_id`, `install_permission`, `debug_permission` |
-| `datasets` | 知识库（含权限字段） | `tenant_id`, `permission`, `created_by` |
+| `apps` | 应用（含部门归属） | `tenant_id`, `department_id`, `name`, `mode` |
+| `datasets` | 知识库（含权限字段） | `tenant_id`, `department_id`, `permission`, `created_by` |
 | `operation_log` | 操作审计日志 | `tenant_id`, `account_id`, `action`, `content` |
 
 **索引设计：**
@@ -377,7 +520,14 @@ erDiagram
 | `tenant_account_join_account_id_idx` | `tenant_account_joins` | `account_id` | 按用户查询所属工作空间 |
 | `tenant_account_join_tenant_id_idx` | `tenant_account_joins` | `tenant_id` | 按工作空间查询成员 |
 | `unique_tenant_account_join` | `tenant_account_joins` | `(tenant_id, account_id)` | 唯一约束，防止重复关联 |
+| `department_tenant_idx` | `departments` | `tenant_id` | 按工作空间查询部门 |
+| `department_parent_idx` | `departments` | `parent_id` | 查询子部门 |
+| `department_path_idx` | `departments` | `path` (前缀索引) | 快速查询子部门树 |
+| `unique_tenant_department_name` | `departments` | `(tenant_id, parent_id, name)` | 同一父部门下名称唯一 |
 | `dataset_tenant_idx` | `datasets` | `tenant_id` | 按工作空间查询知识库 |
+| `app_tenant_idx` | `apps` | `tenant_id` | 按工作空间查询应用 |
+| `app_department_idx` | `apps` | `department_id` | 按部门查询应用 |
+| `dataset_department_idx` | `datasets` | `department_id` | 按部门查询知识库 |
 | `operation_log_account_action_idx` | `operation_log` | `(tenant_id, account_id, action)` | 按租户和用户查询操作历史 |
 
 ### 4. 核心场景
@@ -503,6 +653,138 @@ flowchart LR
 - `api_rph`：每小时请求数限制
 - `max_active_requests`：最大并发请求数
 
+#### 4.5 部门数据隔离（企业版）
+
+企业版中，应用和知识库按部门隔离，查询时同时过滤 `tenant_id` 和 `department_id`：
+
+```mermaid
+sequenceDiagram
+    participant User as 用户
+    participant API as Console API
+    participant Auth as 认证层
+    participant Dept as 部门服务
+    participant DB as 数据库
+
+    User->>API: GET /apps?department_id=xxx
+    API->>Auth: @login_required
+    Auth->>Auth: 验证 JWT + CSRF
+    Auth->>Auth: current_account_with_tenant()
+    Auth-->>API: current_user + tenant_id
+
+    API->>Dept: 验证部门权限
+    Dept->>Dept: 检查用户是否有权访问该部门
+    alt 租户管理员
+        Dept-->>API: 允许（可访问所有部门）
+    else 部门管理员
+        Dept->>DB: 查询用户管理的部门及子部门
+        Dept-->>API: 允许（仅限管理的部门范围）
+    else 普通成员
+        Dept->>DB: 查询用户所属部门
+        Dept-->>API: 允许（仅限所属部门）
+    end
+
+    API->>DB: SELECT * FROM apps WHERE tenant_id = ? AND department_id IN (...)
+    Note over DB: 强制 tenant_id + department_id 过滤
+    DB-->>API: 符合条件的应用列表
+    API-->>User: 200 OK
+```
+
+**数据隔离规则：**
+
+| 用户角色 | 可见应用/知识库范围 |
+|---------|-------------------|
+| 租户管理员 (Owner/Admin) | 租户内所有部门的数据 |
+| 部门管理员 | 本部门及所有子部门的数据 |
+| 普通成员 | 仅所属部门的数据（且受 `permission` 字段约束） |
+
+#### 4.6 部门管理流程（企业版）
+
+**创建部门流程：**
+
+```mermaid
+flowchart TD
+    A[租户管理员请求创建部门] --> B{验证权限}
+    B -->|非管理员| C[403 Forbidden]
+    B -->|管理员| D{验证部门名称}
+    D -->|重复| E[400 名称已存在]
+    D -->|唯一| F{检查层级深度}
+    F -->|超过10级| G[400 层级超限]
+    F -->|正常| H[创建部门记录]
+    H --> I[生成 path 字段]
+    I --> J[返回部门信息]
+
+    style C fill:#fee2e2
+    style E fill:#fee2e2
+    style G fill:#fee2e2
+    style J fill:#dcfce7,stroke:#22c55e
+```
+
+**删除部门流程：**
+
+```mermaid
+flowchart TD
+    A[租户管理员请求删除部门] --> B{验证权限}
+    B -->|非管理员| C[403 Forbidden]
+    B -->|管理员| D{是否默认部门?}
+    D -->|是| E[400 默认部门不可删除]
+    D -->|否| F{部门下有成员?}
+    F -->|是| G[400 请先移除成员]
+    F -->|否| H{部门下有子部门?}
+    H -->|是| I[400 请先删除子部门]
+    H -->|否| J{部门下有应用/知识库?}
+    J -->|是| K[400 请先转移数据]
+    J -->|否| L[删除部门记录]
+    L --> M[返回成功]
+
+    style C fill:#fee2e2
+    style E fill:#fee2e2
+    style G fill:#fee2e2
+    style I fill:#fee2e2
+    style K fill:#fee2e2
+    style M fill:#dcfce7,stroke:#22c55e
+```
+
+#### 4.7 成员部门转移（企业版）
+
+成员可在部门间转移，转移后对原部门数据不再可见：
+
+```mermaid
+sequenceDiagram
+    participant Admin as 管理员
+    participant API as Console API
+    participant Dept as 部门服务
+    participant DB as 数据库
+
+    Admin->>API: POST /members/{id}/transfer
+    API->>Dept: 验证转移权限
+    Dept->>Dept: 检查操作者权限
+    
+    alt 租户管理员
+        Dept-->>API: 允许转移到任何部门
+    else 部门管理员
+        Dept->>DB: 验证源部门和目标部门在管理范围内
+        Dept-->>API: 允许（仅限管理范围）
+    end
+
+    API->>DB: 更新 tenant_account_joins.department_id
+    Note over DB: 成员转移不移动其创建的数据<br/>数据留在原部门
+    DB-->>API: 更新成功
+
+    alt 被转移成员是原部门管理员
+        API->>DB: 取消 is_department_admin = false
+        API->>API: 发送通知邮件给租户管理员
+    end
+
+    API-->>Admin: 200 OK
+```
+
+**转移规则：**
+
+- 成员转移时，其创建的应用/知识库留在原部门（不随成员移动）
+- 成员转移后，对原部门的数据不再可见
+- 如果被转移的成员是部门管理员，系统自动取消其管理员权限并通知租户管理员
+- 部门管理员不能移出自己
+
 ### 5. 实现方案
 
 #### 5.1 权限检查中间件
@@ -578,6 +860,14 @@ flowchart TD
 | 知识库权限变更 | `update_dataset_permission` | 知识库 ID、新权限值 |
 | 插件权限变更 | `update_plugin_permission` | 新安装/调试权限 |
 | 所有权转让 | `transfer_owner` | 新所有者邮箱 |
+| 部门创建 | `create_department` | 部门 ID、名称、父部门 ID |
+| 部门删除 | `delete_department` | 部门 ID、名称 |
+| 部门更新 | `update_department` | 部门 ID、变更字段 |
+| 设置部门管理员 | `set_department_admin` | 部门 ID、成员 ID |
+| 取消部门管理员 | `remove_department_admin` | 部门 ID、成员 ID |
+| 成员部门转移 | `transfer_member_department` | 成员 ID、源部门、目标部门 |
+| 应用部门转移 | `transfer_app_department` | 应用 ID、源部门、目标部门 |
+| 知识库部门转移 | `transfer_dataset_department` | 知识库 ID、源部门、目标部门 |
 
 **登录审计字段（`Account` 模型）：**
 
@@ -603,6 +893,24 @@ flowchart TD
 1. 在资源模型中添加权限字段（如 `permission` 枚举列）
 2. 设置合理的 `server_default` 值，确保现有数据自动获得默认权限
 3. 更新查询逻辑，添加权限过滤条件
+
+**部门管理数据迁移（企业版）：**
+
+引入部门管理功能时，需要对现有数据进行迁移，确保向后兼容：
+
+1. **创建 `departments` 表**：执行数据库迁移脚本创建部门表
+2. **为每个租户创建默认部门**：遍历所有租户，为每个租户创建一个 `is_default = true` 的默认部门
+3. **更新 `tenant_account_joins` 表**：将所有成员的 `department_id` 设置为所属租户的默认部门 ID，`is_department_admin` 设置为 `false`
+4. **更新 `apps` 表**：将所有应用的 `department_id` 设置为所属租户的默认部门 ID
+5. **更新 `datasets` 表**：将所有知识库的 `department_id` 设置为所属租户的默认部门 ID
+
+**回滚策略：**
+
+如果需要回滚，执行以下操作：
+1. 清空 `tenant_account_joins` 表的 `department_id` 和 `is_department_admin` 字段
+2. 清空 `apps` 表的 `department_id` 字段
+3. 清空 `datasets` 表的 `department_id` 字段
+4. 删除 `departments` 表的所有记录
 
 #### 6.2 向后兼容策略
 
@@ -658,6 +966,7 @@ graph TB
         Editor["Editor<br/>编辑权限"]
         Normal["Normal<br/>使用权限"]
         DatasetOp["Dataset Operator<br/>知识库权限"]
+        DeptAdmin["部门管理员<br/>部门级管理权限"]
     end
 
     subgraph ABAC["ABAC 资源属性控制层"]
@@ -665,6 +974,7 @@ graph TB
         DatasetPerm["知识库权限<br/>only_me / all_team_members / partial_members"]
         AppAccess["应用访问模式<br/>public / internal / sso_verified"]
         PluginPerm["插件权限<br/>install / debug"]
+        DeptPerm["部门数据隔离<br/>department_id 过滤"]
     end
 
     subgraph Guards["装饰器守卫链"]
@@ -703,6 +1013,21 @@ graph TB
 | `PUT /datasets/<id>` | ✅ | ✅ | ✅ | ❌ | ✅ |
 | `POST /workspaces/current/model-providers` | ✅ | ✅ | ❌ | ❌ | ❌ |
 | `POST /workspaces/current/plugins/install` | 可配置 | 可配置 | 可配置 | 可配置 | ❌ |
+
+**部门管理 API（企业版）：**
+
+| API 端点 | 租户管理员 | 部门管理员 | 普通成员 |
+|---------|:----------:|:----------:|:--------:|
+| `GET /workspaces/current/departments` | ✅ | ✅ | ✅ |
+| `POST /workspaces/current/departments` | ✅ | ❌ | ❌ |
+| `PUT /workspaces/current/departments/<id>` | ✅ | ❌ | ❌ |
+| `DELETE /workspaces/current/departments/<id>` | ✅ | ❌ | ❌ |
+| `POST /workspaces/current/members/create` | ✅ | ✅（本部门及子部门） | ❌ |
+| `POST /workspaces/current/members/<id>/transfer` | ✅ | ✅（本部门及子部门） | ❌ |
+| `PUT /workspaces/current/departments/<id>/set-admin` | ✅ | ❌ | ❌ |
+| `PUT /workspaces/current/departments/<id>/remove-admin` | ✅ | ❌ | ❌ |
+| `POST /workspaces/current/apps/<id>/transfer` | ✅ | ✅（本部门及子部门） | ❌ |
+| `POST /workspaces/current/datasets/<id>/transfer` | ✅ | ✅（本部门及子部门） | ❌ |
 
 ### API 接口定义
 
@@ -778,8 +1103,92 @@ Request:
 }
 ```
 
+**部门管理（企业版）：**
+
+```
+GET /console/api/workspaces/current/departments
+
+Response:
+{
+    "departments": [
+        {
+            "id": "abc123",
+            "name": "技术部",
+            "parent_id": null,
+            "level": 1,
+            "member_count": 10,
+            "app_count": 5,
+            "dataset_count": 3
+        }
+    ],
+    "tree": [
+        {
+            "id": "abc123",
+            "name": "技术部",
+            "children": [
+                {
+                    "id": "def456",
+                    "name": "前端组",
+                    "children": []
+                }
+            ]
+        }
+    ]
+}
+```
+
+```
+POST /console/api/workspaces/current/departments
+
+Request:
+{
+    "name": "产品部",
+    "parent_id": "abc123",
+    "description": "负责产品设计"
+}
+
+Response:
+{
+    "id": "ghi789",
+    "name": "产品部",
+    "parent_id": "abc123",
+    "level": 2,
+    "path": "/abc123/ghi789",
+    "created_at": "2026-07-08T10:00:00Z"
+}
+```
+
+```
+PUT /console/api/workspaces/current/departments/<department_id>/set-admin
+
+Request:
+{
+    "account_id": "user123"
+}
+
+Response:
+{
+    "result": "success"
+}
+```
+
+```
+POST /console/api/workspaces/current/members/<member_id>/transfer
+
+Request:
+{
+    "target_department_id": "def456"
+}
+
+Response:
+{
+    "result": "success"
+}
+```
+
 ## 变更日志
 
 | 日期 | 版本 | 变更内容 |
 |------|------|---------|
+| 2026-07-20 | 1.1 | 新增部门管理（企业版）章节：部门数据模型、三级权限体系、部门管理员规则、默认部门规则、部门数据隔离场景、部门管理流程、成员部门转移流程、部门管理 API |
 | 2026-07-19 | 1.0 | 初始版本，覆盖现有权限模型分析、RBAC + ABAC 混合设计、数据模型、核心场景、实现方案和迁移方案 |
