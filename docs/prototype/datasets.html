@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>知识库 - Dify</title>
+  <link rel="stylesheet" href="assets/tailwind.min.css">
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    .nav-btn { display: flex; align-items: center; padding: 0 12px; height: 32px; border-radius: 12px; font-weight: 500; font-size: 14px; cursor: pointer; color: #344054; }
+    .nav-btn.active { background: #fff; color: #1570ef; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+    .nav-btn:not(.active):hover { background: rgba(255,255,255,0.5); }
+    .dataset-card { height: 190px; border-radius: 12px; border: 0.5px solid #eaecf0; background: #fff; display: flex; flex-direction: column; cursor: pointer; transition: all 0.2s; position: relative; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+    .dataset-card:hover { background: #fafbfc; box-shadow: 0 4px 8px rgba(0,0,0,0.08); }
+  </style>
+</head>
+<body class="bg-[#f5f8ff] min-h-screen">
+  <!-- Header 56px -->
+  <header class="bg-white border-b border-[#eaecf0] sticky top-0 z-20">
+    <div class="flex items-center h-14 px-3">
+      <div class="flex items-center flex-1 min-w-0">
+        <div class="flex items-center h-8 px-0.5 shrink-0">
+          <div class="w-12 h-[22px] bg-gradient-to-r from-[#2563eb] to-[#7c3aed] rounded flex items-center justify-center">
+            <span class="text-white text-[10px] font-bold tracking-wide">Dify</span>
+          </div>
+        </div>
+        <div class="mx-1.5 text-[#cfd4dc] font-light text-sm">/</div>
+        <button class="flex items-center h-7 px-2 rounded-lg hover:bg-[#f2f4f7] text-sm font-medium text-[#101828] shrink-0">
+          <span>我的工作空间</span>
+          <svg class="w-3 h-3 ml-1 text-[#667085]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+        </button>
+      </div>
+      <div class="flex items-center gap-0.5 bg-[#f2f4f7] rounded-xl p-0.5">
+        <a href="apps.html" class="nav-btn">
+          <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+          <span>工作室</span>
+        </a>
+        <a href="datasets.html" class="nav-btn active">
+          <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+          <span>知识库</span>
+        </a>
+        <a href="#" class="nav-btn">
+          <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z"/></svg>
+          <span>工具</span>
+        </a>
+        <a href="#" class="nav-btn">
+          <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 14v6m-3-3h6M6 10h2a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v2a2 2 0 002 2zm10 0h2a2 2 0 002-2V6a2 2 0 00-2-2h-2a2 2 0 00-2 2v2a2 2 0 002 2zM6 20h2a2 2 0 002-2v-2a2 2 0 00-2-2H6a2 2 0 00-2 2v2a2 2 0 002 2z"/></svg>
+          <span>插件</span>
+        </a>
+      </div>
+      <div class="flex items-center flex-1 justify-end gap-2">
+        <div class="flex items-center h-7 px-2.5 rounded-lg bg-[#f2f4f7] text-xs text-[#344054]">
+          <div class="w-1.5 h-1.5 rounded-full bg-[#12b76a] mr-1.5"></div>
+          <span>开发环境</span>
+        </div>
+        <a href="members.html" class="w-7 h-7 rounded-full bg-gradient-to-br from-[#f97066] to-[#f79009] flex items-center justify-center text-white text-xs font-medium cursor-pointer hover:opacity-80">A</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- 主内容区 -->
+  <div class="flex flex-col min-h-[calc(100vh-56px)]">
+    <!-- 顶部操作栏 -->
+    <div class="sticky top-14 z-10 bg-[#f5f8ff] px-12 pb-5 pt-7">
+      <div class="flex items-center justify-between">
+        <h1 class="text-xl font-semibold text-[#101828]">知识库</h1>
+        <div class="flex items-center gap-2">
+          <button class="flex items-center h-8 px-3 rounded-lg border border-[#d0d5dd] text-sm text-[#344054] hover:bg-[#f9fafb]">
+            <svg class="w-4 h-4 mr-1.5 text-[#667085]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>
+            标签
+          </button>
+          <div class="relative">
+            <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#667085]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            <input type="text" placeholder="搜索..." class="w-[200px] h-8 pl-8 pr-3 rounded-lg border border-[#d0d5dd] text-sm text-[#101828] placeholder:text-[#667085] focus:outline-none focus:ring-2 focus:ring-[#1570ef] focus:border-transparent">
+          </div>
+          <button class="flex items-center h-8 px-4 rounded-lg bg-[#1570ef] text-sm text-white font-medium hover:bg-[#1259c3]">
+            <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            创建知识库
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 卡片网格 px-12 pt-2 gap-3 -->
+    <div class="flex-1 px-12 pt-2 pb-8">
+      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+        <!-- 新建知识库卡片 -->
+        <div class="dataset-card items-center justify-center border-2 border-dashed border-[#d0d5dd] hover:border-[#1570ef] hover:bg-[#eff4ff]">
+          <div class="flex flex-col items-center">
+            <div class="w-10 h-10 rounded-full bg-[#f2f4f7] flex items-center justify-center mb-2">
+              <svg class="w-5 h-5 text-[#475467]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            </div>
+            <span class="text-sm text-[#475467]">创建知识库</span>
+          </div>
+        </div>
+
+        <!-- 知识库卡片 1 -->
+        <div class="dataset-card p-3.5">
+          <div class="flex items-start justify-between mb-2">
+            <div class="flex items-center gap-2">
+              <div class="w-8 h-8 rounded-lg bg-[#eff4ff] flex items-center justify-center">
+                <svg class="w-4 h-4 text-[#1570ef]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="text-sm font-semibold text-[#101828] truncate">产品手册知识库</div>
+                <div class="text-[10px] text-[#667085]">3 个文档 · 12,450 字符</div>
+              </div>
+            </div>
+            <button class="shrink-0 w-5 h-5 flex items-center justify-center text-[#667085] hover:text-[#344054]">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01"/></svg>
+            </button>
+          </div>
+          <div class="text-xs text-[#667085] line-clamp-2 leading-relaxed mb-2">XX 智能手表产品手册，包含功能说明、使用指南和常见问题</div>
+          <div class="flex-1"></div>
+          <div class="flex items-center justify-between pt-2 border-t border-[#f2f4f7]">
+            <div class="flex items-center gap-1">
+              <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-[#ecfdf3] text-[#067647]">已索引</span>
+            </div>
+            <div class="text-[10px] text-[#667085]">2026-07-01</div>
+          </div>
+        </div>
+
+        <!-- 知识库卡片 2 -->
+        <div class="dataset-card p-3.5">
+          <div class="flex items-start justify-between mb-2">
+            <div class="flex items-center gap-2">
+              <div class="w-8 h-8 rounded-lg bg-[#f4f3ff] flex items-center justify-center">
+                <svg class="w-4 h-4 text-[#7a5af8]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="text-sm font-semibold text-[#101828] truncate">法律知识库</div>
+                <div class="text-[10px] text-[#667085]">8 个文档 · 156,780 字符</div>
+              </div>
+            </div>
+            <button class="shrink-0 w-5 h-5 flex items-center justify-center text-[#667085] hover:text-[#344054]">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01"/></svg>
+            </button>
+          </div>
+          <div class="text-xs text-[#667085] line-clamp-2 leading-relaxed mb-2">民法典、劳动法等基础法律文档，用于法律知识问答</div>
+          <div class="flex-1"></div>
+          <div class="flex items-center justify-between pt-2 border-t border-[#f2f4f7]">
+            <div class="flex items-center gap-1">
+              <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-[#ecfdf3] text-[#067647]">已索引</span>
+            </div>
+            <div class="text-[10px] text-[#667085]">2026-06-28</div>
+          </div>
+        </div>
+
+        <!-- 知识库卡片 3 -->
+        <div class="dataset-card p-3.5">
+          <div class="flex items-start justify-between mb-2">
+            <div class="flex items-center gap-2">
+              <div class="w-8 h-8 rounded-lg bg-[#fff6ed] flex items-center justify-center">
+                <svg class="w-4 h-4 text-[#f79009]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="text-sm font-semibold text-[#101828] truncate">会议纪要模板</div>
+                <div class="text-[10px] text-[#667085]">1 个文档 · 2,340 字符</div>
+              </div>
+            </div>
+            <button class="shrink-0 w-5 h-5 flex items-center justify-center text-[#667085] hover:text-[#344054]">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01"/></svg>
+            </button>
+          </div>
+          <div class="text-xs text-[#667085] line-clamp-2 leading-relaxed mb-2">标准化会议纪要模板文档，用于自动提取会议信息</div>
+          <div class="flex-1"></div>
+          <div class="flex items-center justify-between pt-2 border-t border-[#f2f4f7]">
+            <div class="flex items-center gap-1">
+              <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-[#ecfdf3] text-[#067647]">已索引</span>
+            </div>
+            <div class="text-[10px] text-[#667085]">2026-06-25</div>
+          </div>
+        </div>
+
+        <!-- 知识库卡片 4 -->
+        <div class="dataset-card p-3.5">
+          <div class="flex items-start justify-between mb-2">
+            <div class="flex items-center gap-2">
+              <div class="w-8 h-8 rounded-lg bg-[#fef3f2] flex items-center justify-center">
+                <svg class="w-4 h-4 text-[#f04438]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="text-sm font-semibold text-[#101828] truncate">技术文档库</div>
+                <div class="text-[10px] text-[#667085]">12 个文档 · 89,230 字符</div>
+              </div>
+            </div>
+            <button class="shrink-0 w-5 h-5 flex items-center justify-center text-[#667085] hover:text-[#344054]">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01"/></svg>
+            </button>
+          </div>
+          <div class="text-xs text-[#667085] line-clamp-2 leading-relaxed mb-2">API 文档、开发指南、技术架构说明</div>
+          <div class="flex-1"></div>
+          <div class="flex items-center justify-between pt-2 border-t border-[#f2f4f7]">
+            <div class="flex items-center gap-1">
+              <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-[#fef3f2] text-[#b42318]">处理中</span>
+            </div>
+            <div class="text-[10px] text-[#667085]">2026-07-07</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
