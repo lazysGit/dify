@@ -1,12 +1,19 @@
-# PROJECT KNOWLEDGE BASE
+# AGENTS.md
 
-**Generated:** 2026-07-04
-**Commit:** Latest
-**Branch:** main
+**生成日期**: 2026-07-04
+**分支**: main
 
-## OVERVIEW
+## 用户约束
 
-Dify is an open-source LLM app development platform combining AI workflows, RAG pipelines, agent capabilities, and model management. Monorepo with Python Flask backend (DDD) and Next.js frontend.
+- **沟通语言**: 使用简体中文
+- **文档格式**: 不使用 emoji 字符
+- **GitHub 访问**: 失败时使用 gh-proxy 重试
+- **Python 运行/测试**: 全部使用 `uv`，初始化虚拟环境使用 `uv venv` 或 `uv sync --group dev`
+- **Python 包管理**: 全部使用 `uv`，统一使用 `uv run --project api` 执行 Python 命令
+
+## 概述
+
+Dify 是开源 LLM 应用开发平台，集成 AI 工作流、RAG 管道、Agent 能力和模型管理。Monorepo 架构：Python Flask 后端 (DDD) + Next.js 前端。
 
 ## STRUCTURE
 
@@ -14,53 +21,38 @@ Dify is an open-source LLM app development platform combining AI workflows, RAG 
 dify/
 ├── api/            # Python Flask backend (DDD: controllers → services → core → models)
 ├── web/            # Next.js App Router frontend (TypeScript, React)
-├── docker/         # Docker Compose deployment (auto-generated!)
+├── docker/         # Docker Compose 部署（自动生成！）
 ├── sdks/           # Client SDKs (nodejs-client, php-client)
-├── dev/            # Development shell scripts
-├── scripts/        # Misc scripts (stress-test)
-├── docs/           # Translated READMEs (23 languages)
-├── images/         # Marketing images
-├── .github/        # CI/CD (22 workflows)
-├── .agents/        # AI agent configs
-├── .claude/        # Claude-specific config
-├── .gemini/        # Gemini-specific config
-├── .omo/           # OpenCode config
-└── .codegraph/     # Index artifact (checked in!)
+├── dev/            # 开发脚本
+├── scripts/        # 杂项脚本（压力测试等）
+├── docs/           # 多语言 README（23 种语言）
+├── images/         # 营销图片
+├── .github/        # CI/CD（22 个工作流）
+├── .agents/        # AI agent 配置
+├── .claude/        # Claude 专用配置
+├── .gemini/        # Gemini 专用配置
+└── .codegraph/     # IDE 索引产物（已提交！）
 ```
 
 ## WHERE TO LOOK
 
 | Task | Location | Notes |
 |------|----------|-------|
-| Backend API | `api/` | Flask + DDD, read `api/AGENTS.md` |
-| Frontend UI | `web/` | Next.js App Router, read `web/AGENTS.md` |
-| Docker deployment | `docker/` | Auto-generated compose, read `docker/AGENTS.md` |
-| SDK development | `sdks/` | Node.js + PHP clients, read `sdks/AGENTS.md` |
-| Dev scripts | `dev/` | Shell scripts for local development |
-| CI/CD | `.github/workflows/` | 22 GitHub Actions workflows |
-| Configuration | `api/configs/`, `web/env.ts` | Pydantic settings (backend), t3/env (frontend) |
-| Database migrations | `api/migrations/` | Alembic/Flask-Migrate |
-| Async tasks | `api/tasks/`, `api/schedule/` | Celery tasks + beat schedules |
-| Frontend components | `web/app/components/` | 108 base components, workflow canvas |
-| i18n | `web/i18n/` | 23 languages |
-
-## CODE MAP
-
-| Symbol | Type | Location | Role |
-|--------|------|----------|------|
-| `create_app()` | Factory | `api/app_factory.py` | Flask app creation + 20 extensions |
-| `DifyApp` | Class | `api/dify_app.py` | Custom Flask subclass |
-| `dify_config` | Singleton | `api/configs/__init__.py` | Pydantic settings (all env vars) |
-| `celery` | Instance | `api/extensions/ext_celery.py` | Celery app (broker: Redis) |
-| `ext_blueprints` | Module | `api/extensions/ext_blueprints.py` | 7 Flask blueprints registration |
-| Root Layout | Component | `web/app/layout.tsx` | Providers: Jotai, themes, query, i18n |
-| `env.ts` | Config | `web/env.ts` | Frontend env validation (t3/env) |
-| `contract/` | Module | `web/contract/` | API contracts (console + marketplace) |
-| `service/` | Module | `web/service/` | API service layer (55 composables) |
+| Backend API | `api/` | Flask + DDD，详见 `api/AGENTS.md` |
+| Frontend UI | `web/` | Next.js App Router，详见 `web/AGENTS.md` |
+| Docker 部署 | `docker/` | 自动生成的 compose，详见 `docker/AGENTS.md` |
+| SDK 开发 | `sdks/` | Node.js + PHP 客户端，详见 `sdks/AGENTS.md` |
+| 开发脚本 | `dev/` | 本地开发 Shell 脚本 |
+| CI/CD | `.github/workflows/` | 22 个 GitHub Actions 工作流 |
+| 配置 | `api/configs/`、`web/env.ts` | Pydantic settings（后端）、t3/env（前端） |
+| 数据库迁移 | `api/migrations/` | Alembic/Flask-Migrate |
+| 异步任务 | `api/tasks/`、`api/schedule/` | Celery 任务 + beat 调度 |
+| 前端组件 | `web/app/components/` | 108 个基础组件，workflow 画布 |
+| i18n | `web/i18n/` | 23 种语言 |
 
 ## CONVENTIONS
 
-### Documentation
+### 文档
 - **All generated docs go under `docs/`**: Training materials, PPTs, design docs, specs, and other generated documentation must be placed in `docs/` or its subdirectories (e.g., `docs/pptx/`, `docs/superpowers/specs/`). Never generate documentation files in the project root.
 
 ### Python (Backend)
@@ -96,22 +88,11 @@ dify/
 | Circular imports | Use lazy imports (acknowledged anti-pattern) |
 | Files >800 lines | Split into modules |
 | `.codegraph/` in .gitignore | IDE indexing artifact committed to repo |
-| Multiple AI agent configs | `.agents/`, `.claude/`, `.gemini/`, `.omo/` all exist |
+| Multiple AI agent configs | `.agents/`, `.claude/`, `.gemini/` all exist |
 
 **Backend-specific**: See `api/AGENTS.md`
 **Frontend-specific**: See `web/AGENTS.md`
 **Docker-specific**: See `docker/AGENTS.md`
-
-## UNIQUE STYLES
-
-1. **Triple type checking**: basedpyright + pyrefly + mypy (unprecedented strictness)
-2. **Auto-generated Docker Compose**: Template → generator → production compose
-3. **LLM-driven i18n**: Claude Code Action translates en-US JSON to 23 languages
-4. **Anti-slop CI**: AI code quality checks in PR workflow
-5. **Vite+ build system**: vite/vitest aliased to @voidzero-dev packages
-6. **Single Docker image, 3 processes**: API image serves api/worker/beat via MODE env var
-7. **20+ vector databases**: Supported via docker-compose + env vars
-8. **680+ environment variables**: Massive configuration surface area
 
 ## COMMANDS
 
@@ -144,14 +125,86 @@ dev/start-worker                               # Start Celery worker
 dev/start-beat                                 # Start Celery beat
 ```
 
+## LOCAL DEV ENVIRONMENT
+
+### Quick Start
+
+```bash
+dev/start-dev-env                    # 启动完整调试环境
+dev/start-dev-env --skip-middleware  # 跳过中间件（已运行时）
+dev/start-dev-env --skip-deps        # 跳过依赖安装
+dev/status-dev-env                   # 查看服务状态
+dev/stop-dev-env                     # 停止应用（保留中间件）
+dev/stop-dev-env --include-middleware # 完全停止
+```
+
+### Architecture
+
+1. **Middleware (podman/docker)**: PostgreSQL, Redis, Weaviate, Sandbox, Plugin Daemon, SSRF Proxy
+2. **Backend (Python)**: Flask API :5001, Celery Worker, Celery Beat
+3. **Frontend (Node.js)**: vinext :3000 (省资源模式)
+
+### Log Files
+
+| Service | Log File |
+|---------|----------|
+| API | `/tmp/dify-api.log` |
+| Worker | `/tmp/dify-worker.log` |
+| Beat | `/tmp/dify-beat.log` |
+| Frontend | `/tmp/dify-web.log` |
+
+### Podman Compatibility
+
+使用 podman socket 兼容 docker compose:
+
+```bash
+systemctl --user start podman.socket
+export DOCKER_HOST="unix:///run/user/$(id -u)/podman/podman.sock"
+```
+
+### Memory Optimization
+
+前端使用 vinext (Vite+) 而非 Next.js dev:
+
+- `NODE_OPTIONS="--max-old-space-size=2048"`
+- 原生 ESM，无全量打包，内存占用显著降低
+- 启动更快，HMR 更轻量
+
+### Manual Startup (without scripts)
+
+```bash
+# 1. 初始化环境
+cp api/.env.example api/.env
+cp web/.env.example web/.env.local
+cp docker/middleware.env.example docker/middleware.env
+
+# 2. 安装依赖
+cd api && uv sync --group dev
+cd web && pnpm install
+
+# 3. 启动中间件
+export DOCKER_HOST="unix:///run/user/$(id -u)/podman/podman.sock"
+docker compose -f docker/docker-compose.middleware.yaml --env-file docker/middleware.env up -d
+
+# 4. 启动后端 (各终端)
+cd api && uv run flask db upgrade
+cd api && setsid uv run flask run --host 0.0.0.0 --port=5001 --debug > /tmp/dify-api.log 2>&1 < /dev/null &
+cd api && setsid uv run celery -A celery_entrypoint.celery worker -P gevent -c 1 --loglevel INFO > /tmp/dify-worker.log 2>&1 < /dev/null &
+cd api && setsid uv run celery -A celery_entrypoint.celery beat --loglevel INFO > /tmp/dify-beat.log 2>&1 < /dev/null &
+
+# 5. 启动前端
+cd web && NODE_OPTIONS="--max-old-space-size=2048" setsid pnpm dev:vinext > /tmp/dify-web.log 2>&1 < /dev/null &
+```
+
 ## NOTES
 
 - **Docker Compose is auto-generated**: Never edit `docker/docker-compose.yaml` directly. Edit `docker-compose-template.yaml` + `.env.example`, then run `docker/generate_docker_compose`.
 - **Integration tests are CI-only**: Don't expect to run them locally (need Docker middleware).
 - **`.codegraph/` is checked in**: IDE indexing artifact committed to repo.
-- **Multiple AI agent configs**: `.agents/`, `.claude/`, `.gemini/`, `.omo/` all exist.
+- **Multiple AI agent configs**: `.agents/`, `.claude/`, `.gemini/` all exist.
 - **`context/` vs `contexts/`**: Two directories with similar names in `api/` — confusing.
 - **`next/` wrapper**: Non-standard indirection around Next.js imports in `web/`.
 - **Core domain is monolithic**: 40 subdirectories in `api/core/` for separate bounded contexts.
 - **Enums scattered**: Across `api/enums/`, `api/models/enums.py`, `api/core/entities/`.
 - **`fields/` is framework leak**: Flask-RESTx serialization coupled to domain layer.
+- **GitHub 访问**: 失败时使用 gh-proxy 重试（https://gh-proxy.com/）

@@ -244,3 +244,6 @@ scripts/stress-test/reports/
 /package.json
 /package-lock.json
 /.omo/
+
+# uv package manager
+uv.lock

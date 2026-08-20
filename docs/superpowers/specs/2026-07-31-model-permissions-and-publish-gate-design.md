@@ -31,8 +31,7 @@
 
 当前系统只有租户级的模型配置（`providers` + `provider_models` 表），所有用户共享同一套模型和 API 密钥。需要新增：
 
-1. **管理员级模型白名单**：在成员管理页面，系统管理员可以为每个用户设置允许使用的模型白名单（粒度：提供商 + 模型 + 模型类型）
-2. **用户级个人模型设置**：每个用户新增一个个人模型设置页面，可以添加个人 API 密钥（覆盖系统密钥），个人模型默认使用系统级配置，用户可自行修改
+**管理员级模型白名单**：在成员管理页面，系统管理员可以为每个用户设置允许使用的模型白名单（粒度：提供商 + 模型 + 模型类型）。无白名单的用户可使用所有系统模型；有白名单的用户只能使用白名单中的模型。
 
 ### Feature 2: 发布审批权限控制
 
@@ -49,12 +48,10 @@
 
 | 决策项 | 选择 | 理由 |
 |--------|------|------|
-| 权限模型 | 白名单 + 个人密钥 | 白名单控制可见范围，个人密钥支持成本独立核算 |
+| 权限模型 | 白名单 | 白名单控制模型可见范围 |
 | 白名单粒度 | 提供商 + 模型 + 模型类型 | 最大灵活性，精确控制每种用途 |
 | 默认行为 | 无白名单 = 全部允许 | 向后兼容，现有用户无感知 |
-| 密钥优先级 | 个人密钥覆盖系统密钥 | 简单可预测，个人密钥存在时系统密钥完全忽略 |
 | 执行点 | 选择时过滤（非运行时拦截） | 防止误配置，无需在每次 LLM 调用时检查 |
-| 个人密钥权限 | 所有角色可添加 | 最大灵活性 |
 | 数据存储方案 | 独立新表 | 清晰分离，遵循 DDD 分层 |
 
 ### Feature 2 决策
@@ -97,33 +94,6 @@
 - 如果 `account_model_whitelist` 表中该用户**无任何记录** → 用户可使用所有系统配置的模型（向后兼容）
 - 如果该用户**有记录** → 用户只能使用记录中列出的模型
 
-### 新增表：account_provider_credentials
-
-**表名**: `account_provider_credentials`
-**用途**: 存储用户的个人 API 密钥。每个用户每个提供商最多一条记录。
-
-| 字段名 | 类型 | 约束 | 说明 |
-|--------|------|------|------|
-| `id` | UUID | PRIMARY KEY | 记录 ID |
-| `tenant_id` | UUID | NOT NULL, INDEX | 租户 ID |
-| `account_id` | UUID | NOT NULL, INDEX | 用户 ID |
-| `provider_name` | VARCHAR(255) | NOT NULL | 提供商名称 |
-| `encrypted_config` | TEXT | NOT NULL | 加密的凭证 JSON（API key, base_url 等） |
-| `is_valid` | BOOLEAN | NOT NULL, DEFAULT false | 密钥是否验证通过 |
-| `last_used` | TIMESTAMP | NULLABLE | 最后使用时间 |
-| `created_at` | TIMESTAMP | NOT NULL | 创建时间 |
-| `updated_at` | TIMESTAMP | NOT NULL | 更新时间 |
-
-**唯一约束**:
-- `unique_account_provider`: (account_id, provider_name) — 每用户每提供商一条凭证
-
-**索引**:
-- `account_provider_cred_account_idx`: (account_id, provider_name)（查用户密钥）
-
-**加密说明**:
-- `encrypted_config` 使用租户的 `encrypt_public_key` 加密，与现有 `providers.encrypted_config` 使用相同加密机制
-- 存储格式与 `providers` 表的 `encrypted_config` 一致
-
 ### DDL
 
 ```sql
@@ -142,23 +112,6 @@ CREATE TABLE account_model_whitelist (
 
 CREATE INDEX account_model_whitelist_account_idx ON account_model_whitelist (account_id);
 CREATE INDEX account_model_whitelist_tenant_idx ON account_model_whitelist (tenant_id);
-
-CREATE TABLE account_provider_credentials (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    tenant_id UUID NOT NULL,
-    account_id UUID NOT NULL,
-    provider_name VARCHAR(255) NOT NULL,
-    encrypted_config TEXT NOT NULL,
-    is_valid BOOLEAN NOT NULL DEFAULT false,
-    last_used TIMESTAMP,
-    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
-
-    CONSTRAINT unique_account_provider UNIQUE (account_id, provider_name)
-);
-
-CREATE INDEX account_provider_cred_account_idx ON account_provider_credentials (account_id, provider_name);
-CREATE INDEX account_provider_cred_tenant_idx ON account_provider_credentials (tenant_id);
 ```
 
 ### 现有表无需修改
@@ -167,7 +120,7 @@ Feature 2（发布审批）不新增表、不修改现有表。仅通过 Service
 
 | 表 | 关联 | 说明 |
 |----|------|------|
-| `providers` | 系统级密钥来源 | 个人密钥覆盖时不查此表 |
+| `providers` | 系统级密钥来源 | 所有用户共享同一套系统密钥 |
 | `provider_models` | 系统级模型列表 | 白名单过滤的基础数据源 |
 | `app_published_departments` | 发布记录 | Feature 2 复用，无修改 |
 
@@ -181,47 +134,33 @@ Feature 2（发布审批）不新增表、不修改现有表。仅通过 Service
 ┌──────────────────────────────────────────────────────────────────┐
 │  前端层                                                           │
 │  - 成员管理页面（管理员设置白名单）                                 │
-│  - 个人模型设置页面（用户管理个人密钥）                             │
+│  - 我的可用模型页面（用户查看，只读）                               │
 │  - 应用/工作流模型选择器（按白名单过滤）                            │
 └────────────────────────────────────┬─────────────────────────────┘
-                                     │
-                                     ▼
+                                      │
+                                      ▼
 ┌──────────────────────────────────────────────────────────────────┐
 │  Controller 层                                                    │
 │  - MemberModelWhitelistApi (GET/PUT)                             │
 │  - AccountModelSettingsApi (GET)                                 │
-│  - AccountProviderCredentialApi (POST/DELETE)                    │
 └────────────────────────────────────┬─────────────────────────────┘
-                                     │
-                                     ▼
+                                      │
+                                      ▼
 ┌──────────────────────────────────────────────────────────────────┐
 │  Service 层                                                       │
 │  ModelPermissionService                                           │
 │  - get_whitelist(account_id) → list[WhitelistEntry]              │
 │  - set_whitelist(account_id, models[])                           │
 │  - get_filtered_models(account_id) → filtered model list         │
-│  - has_personal_credential(account_id, provider_name) → bool     │
-│                                                                   │
-│  PersonalCredentialService                                        │
-│  - add_credential(account_id, provider_name, config)             │
-│  - update_credential(account_id, provider_name, config)          │
-│  - delete_credential(account_id, provider_name)                  │
-│  - validate_credential(account_id, provider_name) → bool         │
-│  - get_credential(account_id, provider_name) → encrypted_config  │
 └────────────────────────────────────┬─────────────────────────────┘
-                                     │
-                                     ▼
+                                      │
+                                      ▼
 ┌──────────────────────────────────────────────────────────────────┐
 │  Repository 层                                                    │
 │  AccountModelWhitelistRepository                                  │
 │  - find_by_account(account_id) → list[Model]                     │
 │  - replace_for_account(account_id, models[]) (DELETE + INSERT)   │
 │  - exists_for_account(account_id) → bool                         │
-│                                                                   │
-│  AccountProviderCredentialRepository                              │
-│  - find_by_account_provider(account_id, provider) → Credential   │
-│  - save(credential)                                              │
-│  - delete(account_id, provider)                                  │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
@@ -281,51 +220,7 @@ def get_filtered_models(account_id: str, tenant_id: str, user: Account) -> list[
     ]
 ```
 
-### 4.3 凭证解析流程（密钥覆盖）
 
-当用户的实际调用 LLM 时，凭证解析逻辑：
-
-```
-应用请求模型凭证 (account_id, provider_name)
-       │
-       ▼
-查询 account_provider_credentials
-WHERE account_id = ? AND provider_name = ?
-       │
-       ├── 记录存在且 is_valid = true
-       │     → 使用个人密钥（解密 encrypted_config）
-       │       系统密钥完全忽略
-       │
-       └── 无记录（或 is_valid = false）
-             → 使用系统级 providers 表的密钥
-```
-
-**凭证解析伪代码**:
-
-```python
-def resolve_credentials(account_id: str, provider_name: str, tenant_id: str) -> dict:
-    """解析模型凭证：个人密钥优先，无则用系统密钥"""
-
-    # 先查个人密钥
-    personal_cred = AccountProviderCredentialRepository.find_by_account_provider(
-        account_id, provider_name
-    )
-
-    if personal_cred and personal_cred.is_valid:
-        return decrypt_config(personal_cred.encrypted_config)
-
-    # 回退到系统密钥
-    system_provider = ProviderRepository.find_by_tenant_and_name(
-        tenant_id, provider_name
-    )
-
-    if system_provider and system_provider.encrypted_config:
-        return decrypt_config(system_provider.encrypted_config)
-
-    raise CredentialsNotFoundError(f"No credentials for provider {provider_name}")
-```
-
-**集成点**: 现有的模型凭证获取逻辑（`model_provider_factory` 或 `provider_service`）需要修改，在获取凭证时传入 `account_id`，按上述逻辑解析。
 
 ### 4.4 管理员设置白名单流程
 
@@ -354,28 +249,18 @@ PUT /workspaces/current/members/{account_id}/model-whitelist
   4. 记录审计日志
 ```
 
-### 4.5 用户管理个人密钥流程
+### 4.5 用户查看可用模型流程
 
 ```
-用户打开个人模型设置页面
-       │
-       ▼
-后端返回：可用模型列表（经白名单过滤）+ 个人密钥列表
+用户打开"我的可用模型"页面
+        │
+        ▼
+后端返回：可用模型列表（经白名单过滤）+ 是否受限
 GET /account/model-settings
-       │
-       ▼
-用户点击"添加密钥" → 填写提供商凭证（API key 等）
-       │
-       ▼
-后端加密存储 → 验证密钥有效性
-POST /account/provider-credentials
-       │
-       ▼
-验证通过 → is_valid = true → 返回成功
-验证失败 → is_valid = false → 返回错误信息
-       │
-       ▼
-此后该用户的所有该提供商模型调用使用个人密钥
+        │
+        ▼
+前端只读展示模型列表 + 限制状态
+（无任何编辑按钮）
 ```
 
 ---
@@ -527,14 +412,11 @@ def _check_publish_permission(
 }
 ```
 
-### 6.2 个人模型设置（用户）
+### 6.2 我的可用模型（用户只读）
 
 | 方法 | 路径 | 权限 | 说明 |
 |------|------|------|------|
-| GET | `/console/api/account/model-settings` | 已登录用户 | 获取可用模型 + 个人密钥列表 |
-| POST | `/console/api/account/provider-credentials` | 已登录用户 | 添加/更新个人密钥 |
-| DELETE | `/console/api/account/provider-credentials/{provider_name}` | 已登录用户 | 删除个人密钥 |
-| POST | `/console/api/account/provider-credentials/{provider_name}/validate` | 已登录用户 | 验证密钥有效性 |
+| GET | `/console/api/account/model-settings` | 已登录用户 | 获取可用模型列表（只读） |
 
 #### GET /account/model-settings 响应示例
 
@@ -544,56 +426,11 @@ def _check_publish_permission(
     {"provider": "openai", "model": "gpt-4", "model_type": "llm", "label": "GPT-4"},
     {"provider": "openai", "model": "gpt-4o", "model_type": "llm", "label": "GPT-4o"}
   ],
-  "is_restricted": true,
-  "personal_credentials": [
-    {
-      "provider_name": "openai",
-      "is_valid": true,
-      "last_used": "2026-07-30T10:00:00Z",
-      "created_at": "2026-07-28T14:00:00Z"
-    }
-  ]
+  "is_restricted": true
 }
 ```
 
-注意：`personal_credentials` 不返回实际的 API key（仅返回元信息）。
-
-#### POST /account/provider-credentials 请求体
-
-```json
-{
-  "provider_name": "openai",
-  "credentials": {
-    "api_key": "sk-xxxxxxxxxxxx",
-    "base_url": "https://api.openai.com/v1"
-  }
-}
-```
-
-后端使用租户公钥加密 `credentials` 后存入 `encrypted_config`。
-
-#### POST 响应示例（成功）
-
-```json
-{
-  "result": "success",
-  "provider_name": "openai",
-  "is_valid": true
-}
-```
-
-#### POST 响应示例（密钥无效）
-
-```json
-{
-  "result": "success",
-  "provider_name": "openai",
-  "is_valid": false,
-  "message": "API key 验证失败：Invalid API key"
-}
-```
-
-注意：即使密钥无效也保存记录（`is_valid = false`），凭证解析时会跳过无效密钥。
+`is_restricted = false` 表示该用户无白名单记录（所有模型可用）。`is_restricted = true` 表示有白名单记录，仅显示白名单中的模型。
 
 ### 6.3 可发布部门列表（Feature 2 辅助）
 
@@ -690,16 +527,14 @@ def _check_publish_permission(
 - 管理员取消勾选所有模型并保存 → DELETE 所有记录 → 用户回到"全部可用"
 - 管理员勾选部分模型并保存 → 替换为新白名单
 
-### 7.3 个人模型设置页面
+### 7.3 我的可用模型页面（只读）
 
 **路径**: `/console/account/model-settings`（或集成在账户设置中）
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│  个人模型设置                                                      │
+│  我的可用模型（只读）                                              │
 ├──────────────────────────────────────────────────────────────────┤
-│                                                                    │
-│  ── 可用模型（只读）─────────────────────────────────────────    │
 │                                                                    │
 │  状态: ✅ 可使用所有系统模型                                       │
 │  （或：⚠️ 管理员已限制可用模型范围）                                │
@@ -710,18 +545,6 @@ def _check_publish_permission(
 │                                                                    │
 │  Text Embedding:                                                   │
 │  • OpenAI: text-embedding-3-small                                 │
-│                                                                    │
-│  ── 个人 API 密钥 ──────────────────────────────────────────     │
-│  添加个人密钥后，对应提供商的模型调用将使用个人密钥（覆盖系统密钥） │
-│                                                                    │
-│  ┌──────────────────────────────────────────────────────────┐    │
-│  │ OpenAI                                          [有效 ✓] │    │
-│  │ 密钥: sk-****...1234                                      │    │
-│  │ 最后使用: 2026-07-30 10:00                                │    │
-│  │ [验证] [编辑] [删除]                                      │    │
-│  ├──────────────────────────────────────────────────────────┤    │
-│  │ + 添加密钥                                                │    │
-│  └──────────────────────────────────────────────────────────┘    │
 │                                                                    │
 └──────────────────────────────────────────────────────────────────┘
 ```
@@ -801,9 +624,6 @@ def _check_publish_permission(
 |------|:-----------:|:----------------:|:------:|:------:|:----------------:|
 | 设置成员白名单 | Y（所有成员） | N | N | N | N |
 | 查看成员白名单 | Y（所有成员） | N | N | N | N |
-| 添加个人密钥 | Y | Y | Y | Y | Y |
-| 删除个人密钥 | Y（自己的） | Y（自己的） | Y（自己的） | Y（自己的） | Y（自己的） |
-| 验证个人密钥 | Y | Y | Y | Y | Y |
 | 查看可用模型 | Y（全部） | Y（按白名单） | Y（按白名单） | Y（按白名单） | Y（按白名单） |
 
 注意：owner/admin 的模型列表不受白名单限制（管理员始终可使用所有模型）。
@@ -830,9 +650,6 @@ def _check_publish_permission(
 | 管理员删除白名单所有记录 | DELETE 所有记录，用户回到"全部可用" |
 | 管理员设置白名单后，系统新增了模型 | 新模型不在白名单中，用户不可见（白名单是精确匹配） |
 | 用户已有应用配置了某模型，管理员从白名单移除了该模型 | 应用配置中的模型保留（不强制修改），但模型选择器不再显示该模型。应用仍可运行（选择时过滤，非运行时拦截） |
-| 用户的个人密钥 is_valid = false | 凭证解析跳过个人密钥，回退到系统密钥 |
-| 用户删除个人密钥 | 回退到系统密钥 |
-| 用户同时有个人密钥和系统密钥 | 个人密钥优先（覆盖系统密钥） |
 | owner/admin 的模型权限 | 管理员始终可使用所有模型，白名单不限制管理员 |
 | 用户被移动到新部门 | 白名单不受部门影响，白名单是租户级用户级配置 |
 | 系统未配置任何提供商/模型 | 所有用户模型列表为空（无论白名单） |
@@ -854,9 +671,7 @@ def _check_publish_permission(
 |---------|:-----------:|--------|------|
 | 非管理员尝试设置白名单 | 403 | `forbidden` | 只有 owner/admin 可操作 |
 | 白名单包含系统未配置的模型 | 400 | `invalid_model` | 模型必须在系统配置范围内 |
-| 个人密钥验证失败 | 200 | — | 保存但 `is_valid=false`，不返回错误 |
 | 普通用户跨部门发布 | 403 | `forbidden` | 权限不足 |
-| 凭证解密失败 | 500 | `internal_error` | 记录日志，回退系统密钥 |
 
 ---
 
@@ -866,9 +681,8 @@ def _check_publish_permission(
 
 ```sql
 -- 无需迁移现有数据
--- account_model_whitelist 和 account_provider_credentials 新建为空表
+-- account_model_whitelist 新建为空表
 -- 现有用户无白名单记录 = 全部可用（向后兼容）
--- 现有用户无个人密钥 = 使用系统密钥（向后兼容）
 ```
 
 ### 10.2 向后兼容
@@ -876,7 +690,6 @@ def _check_publish_permission(
 | 场景 | 处理方式 |
 |------|---------|
 | 现有用户的模型列表 | 不受影响（无白名单 = 全部可用） |
-| 现有用户的模型凭证 | 不受影响（无个人密钥 = 使用系统密钥） |
 | 现有发布记录 | 不受影响（权限检查只作用于新发布操作） |
 | 现有 API 接口 | 模型列表接口新增白名单过滤逻辑，无白名单时行为不变 |
 | 新增 API 接口 | 全部为新增接口，不修改现有接口路径 |
@@ -886,7 +699,6 @@ def _check_publish_permission(
 ```sql
 -- 删除新增表
 DROP TABLE IF EXISTS account_model_whitelist;
-DROP TABLE IF EXISTS account_provider_credentials;
 
 -- 现有系统逻辑不受影响（白名单过滤逻辑在 Service 层，
 -- 如果表不存在则视为无白名单 = 全部可用）
@@ -902,9 +714,6 @@ DROP TABLE IF EXISTS account_provider_credentials;
 |------|---------|---------|
 | 管理员设置白名单 | `set_model_whitelist` | 用户 ID、白名单模型列表、操作者 |
 | 管理员删除白名单 | `remove_model_whitelist` | 用户 ID、操作者 |
-| 用户添加个人密钥 | `add_personal_credential` | 用户 ID、提供商名称 |
-| 用户删除个人密钥 | `remove_personal_credential` | 用户 ID、提供商名称 |
-| 个人密钥验证失败 | `personal_credential_invalid` | 用户 ID、提供商名称、错误信息 |
 
 ### Feature 2 审计日志
 
@@ -926,19 +735,11 @@ DROP TABLE IF EXISTS account_provider_credentials;
 - 白名单包含系统未配置的模型时忽略（不报错）
 - owner/admin 不受白名单限制
 
-**PersonalCredentialService 测试**:
-- 有个人密钥且有效时使用个人密钥
-- 有个人密钥但无效时回退系统密钥
-- 无个人密钥时使用系统密钥
-- 删除个人密钥后回退系统密钥
-- 密钥加密/解密正确性
-
 **API 层测试**:
 - 非管理员设置白名单返回 403
 - 管理员设置白名单成功
 - 白名单包含无效模型返回 400
-- 用户添加/删除个人密钥成功
-- 个人密钥验证流程
+- 用户查询可用模型成功
 
 ### 12.2 Feature 2 单元测试
 
@@ -954,7 +755,6 @@ DROP TABLE IF EXISTS account_provider_credentials;
 ### 12.3 集成测试
 
 - 端到端：管理员设置白名单 → 用户模型选择器仅显示白名单模型
-- 端到端：用户添加个人密钥 → 用户应用调用使用个人密钥
 - 端到端：普通用户发布应用 → 发布对话框仅可选本部门
 - 端到端：部门管理员发布应用 → 发布对话框可选管辖范围部门
 
@@ -973,10 +773,9 @@ DROP TABLE IF EXISTS account_provider_credentials;
 
 **Feature 1: 模型调用权限控制**
 - `account_model_whitelist` 表：管理员级模型白名单（隐式限制规则）
-- `account_provider_credentials` 表：用户级个人 API 密钥（覆盖系统密钥）
-- ModelPermissionService + PersonalCredentialService 双 Service 架构
+- ModelPermissionService 单一 Service 架构
 - 选择时过滤的白名单执行策略
-- 个人密钥覆盖系统密钥的凭证解析策略
+- 所有用户统一使用系统级密钥
 
 **Feature 2: 发布审批权限控制**
 - 复用现有 `app_published_departments` 表，无新增表
@@ -985,7 +784,6 @@ DROP TABLE IF EXISTS account_provider_credentials;
 
 **核心设计决策**:
 - 白名单采用隐式限制规则（无记录=不限制），确保向后兼容
-- 个人密钥覆盖系统密钥（非降级回退），简单可预测
 - 权限检查在 Service 层执行，与现有代码模式一致
 - 发布审批为权限门控（非审批工作流），简单直接
 
