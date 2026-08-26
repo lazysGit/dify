@@ -191,6 +191,17 @@ class CodeExecutionSandboxConfig(BaseSettings):
     )
 
 
+class DepartmentConfig(BaseSettings):
+    """
+    Configuration for department access control
+    """
+
+    DEPARTMENT_ACCESS_CONTROL_ENABLED: bool = Field(
+        description="Enable or disable department-based access control for explore listings",
+        default=False,
+    )
+
+
 class TriggerConfig(BaseSettings):
     """
     Configuration for trigger
@@ -1372,6 +1383,7 @@ class FeatureConfig(
     AuthConfig,  # Changed from OAuthConfig to AuthConfig
     BillingConfig,
     CodeExecutionSandboxConfig,
+    DepartmentConfig,
     TriggerConfig,
     AsyncWorkflowConfig,
     PluginConfig,

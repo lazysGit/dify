@@ -4,9 +4,10 @@ from typing import Any
 from flask import request
 from flask_restx import Resource, fields, marshal_with
 from pydantic import BaseModel, Field
-from sqlalchemy import and_, select
+from sqlalchemy import and_, exists, select
 from werkzeug.exceptions import BadRequest, Forbidden, NotFound
 
+from configs import dify_config
 from controllers.common.schema import get_or_create_model
 from controllers.console import console_ns
 from controllers.console.explore.wraps import InstalledAppResource
@@ -16,7 +17,9 @@ from fields.installed_app_fields import app_fields, installed_app_fields, instal
 from libs.datetime_utils import naive_utc_now
 from libs.login import current_account_with_tenant, login_required
 from models import App, InstalledApp, RecommendedApp
+from models.department import AppPublishedDepartment
 from services.account_service import TenantService
+from services.department_service import DepartmentService
 from services.enterprise.enterprise_service import EnterpriseService
 from services.feature_service import FeatureService
 
@@ -117,6 +120,23 @@ class InstalledAppsListApi(Resource):
             installed_app_list = res
             logger.debug("installed_app_list: %s, user_id: %s", installed_app_list, user_id)
 
+        if dify_config.DEPARTMENT_ACCESS_CONTROL_ENABLED:
+            accessible = DepartmentService.get_accessible_department_ids(current_user, current_tenant_id)
+            if accessible is not None:
+                if not accessible:
+                    installed_app_list = []
+                else:
+                    visible_app_ids = set(
+                        db.session.execute(
+                            select(AppPublishedDepartment.app_id).where(
+                                AppPublishedDepartment.department_id.in_(accessible)
+                            )
+                        )
+                        .scalars()
+                        .all()
+                    )
+                    installed_app_list = [item for item in installed_app_list if item["app"].id in visible_app_ids]
+
         installed_app_list.sort(
             key=lambda app: (
                 -app["is_pinned"],
@@ -133,21 +153,39 @@ class InstalledAppsListApi(Resource):
     def post(self):
         payload = InstalledAppCreatePayload.model_validate(console_ns.payload or {})
 
-        recommended_app = db.session.scalar(
-            select(RecommendedApp).where(RecommendedApp.app_id == payload.app_id).limit(1)
-        )
-        if recommended_app is None:
-            raise NotFound("Recommended app not found")
-
-        _, current_tenant_id = current_account_with_tenant()
+        current_user, current_tenant_id = current_account_with_tenant()
 
         app = db.session.get(App, payload.app_id)
 
         if app is None:
             raise NotFound("App entity not found")
 
-        if not app.is_public:
-            raise Forbidden("You can't install a non-public app")
+        if dify_config.DEPARTMENT_ACCESS_CONTROL_ENABLED:
+            accessible = DepartmentService.get_accessible_department_ids(current_user, current_tenant_id)
+            if accessible is not None:
+                if not accessible:
+                    raise Forbidden("You can't install this app")
+                published_to_accessible = db.session.scalar(
+                    select(
+                        exists().where(
+                            and_(
+                                AppPublishedDepartment.app_id == payload.app_id,
+                                AppPublishedDepartment.department_id.in_(accessible),
+                            )
+                        )
+                    )
+                )
+                if not published_to_accessible:
+                    raise Forbidden("You can't install this app")
+        else:
+            recommended_app = db.session.scalar(
+                select(RecommendedApp).where(RecommendedApp.app_id == payload.app_id).limit(1)
+            )
+            if recommended_app is None:
+                raise NotFound("Recommended app not found")
+
+            if not app.is_public:
+                raise Forbidden("You can't install a non-public app")
 
         installed_app = db.session.scalar(
             select(InstalledApp)
@@ -156,8 +194,12 @@ class InstalledAppsListApi(Resource):
         )
 
         if installed_app is None:
-            # todo: position
-            recommended_app.install_count += 1
+            if not dify_config.DEPARTMENT_ACCESS_CONTROL_ENABLED:
+                recommended_app = db.session.scalar(
+                    select(RecommendedApp).where(RecommendedApp.app_id == payload.app_id).limit(1)
+                )
+                if recommended_app is not None:
+                    recommended_app.install_count += 1
 
             new_installed_app = InstalledApp(
                 app_id=payload.app_id,

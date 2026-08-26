@@ -176,6 +176,7 @@ class SystemFeatureModel(BaseModel):
     trial_models: list[str] = []
     enable_trial_app: bool = False
     enable_explore_banner: bool = False
+    department_access_control: bool = False
 
 
 class FeatureService:
@@ -250,6 +251,7 @@ class FeatureService:
         system_features.trial_models = cls._fulfill_trial_models_from_env()
         system_features.enable_trial_app = dify_config.ENABLE_TRIAL_APP
         system_features.enable_explore_banner = dify_config.ENABLE_EXPLORE_BANNER
+        system_features.department_access_control = dify_config.DEPARTMENT_ACCESS_CONTROL_ENABLED
 
     @classmethod
     def _fulfill_trial_models_from_env(cls) -> list[str]:

@@ -260,9 +260,7 @@ class TestInstalledAppsCreateApi:
         app_entity.tenant_id = "t2"
 
         session = MagicMock()
-        # scalar() is called for recommended_app and installed_app lookups
-        session.scalar.side_effect = [recommended, None]
-        # get() is called for app PK lookup
+        session.scalar.side_effect = [recommended, None, recommended]
         session.get.return_value = app_entity
 
         with (
@@ -280,13 +278,20 @@ class TestInstalledAppsCreateApi:
         api = module.InstalledAppsListApi()
         method = unwrap(api.post)
 
+        app_entity = MagicMock()
+        app_entity.id = "a1"
+        app_entity.is_public = True
+        app_entity.tenant_id = "t2"
+
         session = MagicMock()
         session.scalar.return_value = None
+        session.get.return_value = app_entity
 
         with (
             app.test_request_context("/", json={"app_id": "a1"}),
             payload_patch({"app_id": "a1"}),
             patch.object(module.db, "session", session),
+            patch.object(module, "current_account_with_tenant", return_value=(None, "t1")),
         ):
             with pytest.raises(NotFound):
                 method(api)
@@ -296,12 +301,10 @@ class TestInstalledAppsCreateApi:
         method = unwrap(api.post)
 
         recommended = MagicMock()
-        app_entity = MagicMock(is_public=False)
+        app_entity = MagicMock(is_public=False, tenant_id="t2")
 
         session = MagicMock()
-        # scalar() returns recommended_app
         session.scalar.return_value = recommended
-        # get() returns the app entity
         session.get.return_value = app_entity
 
         with (
