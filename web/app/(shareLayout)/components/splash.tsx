@@ -2,8 +2,10 @@
 import type { FC, PropsWithChildren } from 'react'
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import ChatAccessGuard from '@/app/(shareLayout)/components/chat-access-guard'
 import AppUnavailable from '@/app/components/base/app-unavailable'
 import Loading from '@/app/components/base/loading'
+import { useGlobalPublicStore } from '@/context/global-public-context'
 import { useWebAppStore } from '@/context/web-app-context'
 import { useRouter, useSearchParams } from '@/next/navigation'
 import { fetchAccessToken } from '@/service/share'
@@ -11,6 +13,7 @@ import { setWebAppAccessToken, setWebAppPassport, webAppLoginStatus, webAppLogou
 
 const Splash: FC<PropsWithChildren> = ({ children }) => {
   const { t } = useTranslation()
+  const systemFeatures = useGlobalPublicStore(s => s.systemFeatures)
   const shareCode = useWebAppStore(s => s.shareCode)
   const webAppAccessMode = useWebAppStore(s => s.webAppAccessMode)
   const embeddedUserId = useWebAppStore(s => s.embeddedUserId)
@@ -107,6 +110,14 @@ const Splash: FC<PropsWithChildren> = ({ children }) => {
       </div>
     )
   }
+  if (systemFeatures.department_access_control.enabled && shareCode) {
+    return (
+      <ChatAccessGuard appCode={shareCode}>
+        {children}
+      </ChatAccessGuard>
+    )
+  }
+
   return <>{children}</>
 }
 

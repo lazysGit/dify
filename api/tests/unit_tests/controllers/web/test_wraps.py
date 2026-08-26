@@ -221,11 +221,13 @@ class TestDecodeJwtToken:
             "app_id": "app-1",
             "end_user_id": "eu-1",
         }
-        mock_features.return_value = SimpleNamespace(webapp_auth=SimpleNamespace(enabled=False))
+        mock_features.return_value = SimpleNamespace(
+            webapp_auth=SimpleNamespace(enabled=False), department_access_control=False
+        )
 
         app_model = SimpleNamespace(id="app-1", enable_site=True)
         site = SimpleNamespace(code="code1")
-        end_user = SimpleNamespace(id="eu-1", session_id="sess-1")
+        end_user = SimpleNamespace(id="eu-1", session_id="sess-1", is_anonymous=True)
 
         # Configure session mock to return correct objects via scalar()
         session_mock = MagicMock()
@@ -247,7 +249,9 @@ class TestDecodeJwtToken:
     def test_missing_token_raises_unauthorized(
         self, mock_extract: MagicMock, mock_features: MagicMock, app: Flask
     ) -> None:
-        mock_features.return_value = SimpleNamespace(webapp_auth=SimpleNamespace(enabled=False))
+        mock_features.return_value = SimpleNamespace(
+            webapp_auth=SimpleNamespace(enabled=False), department_access_control=False
+        )
         mock_extract.return_value = None
 
         with app.test_request_context("/", headers={"X-App-Code": "code1"}):
@@ -272,7 +276,9 @@ class TestDecodeJwtToken:
             "app_id": "app-1",
             "end_user_id": "eu-1",
         }
-        mock_features.return_value = SimpleNamespace(webapp_auth=SimpleNamespace(enabled=False))
+        mock_features.return_value = SimpleNamespace(
+            webapp_auth=SimpleNamespace(enabled=False), department_access_control=False
+        )
 
         session_mock = MagicMock()
         session_mock.scalar.return_value = None  # No app found
@@ -304,7 +310,9 @@ class TestDecodeJwtToken:
             "app_id": "app-1",
             "end_user_id": "eu-1",
         }
-        mock_features.return_value = SimpleNamespace(webapp_auth=SimpleNamespace(enabled=False))
+        mock_features.return_value = SimpleNamespace(
+            webapp_auth=SimpleNamespace(enabled=False), department_access_control=False
+        )
 
         app_model = SimpleNamespace(id="app-1", enable_site=False)
 
@@ -339,7 +347,9 @@ class TestDecodeJwtToken:
             "app_id": "app-1",
             "end_user_id": "eu-1",
         }
-        mock_features.return_value = SimpleNamespace(webapp_auth=SimpleNamespace(enabled=False))
+        mock_features.return_value = SimpleNamespace(
+            webapp_auth=SimpleNamespace(enabled=False), department_access_control=False
+        )
 
         app_model = SimpleNamespace(id="app-1", enable_site=True)
         site = SimpleNamespace(code="code1")
@@ -374,7 +384,9 @@ class TestDecodeJwtToken:
             "app_id": "app-1",
             "end_user_id": "eu-1",
         }
-        mock_features.return_value = SimpleNamespace(webapp_auth=SimpleNamespace(enabled=False))
+        mock_features.return_value = SimpleNamespace(
+            webapp_auth=SimpleNamespace(enabled=False), department_access_control=False
+        )
 
         app_model = SimpleNamespace(id="app-1", enable_site=True)
         site = SimpleNamespace(code="code1")
@@ -391,3 +403,145 @@ class TestDecodeJwtToken:
             with app.test_request_context("/", headers={"X-App-Code": "code1"}):
                 with pytest.raises(Unauthorized, match="expired"):
                     decode_jwt_token(user_id="different-user")
+
+    @patch("controllers.web.wraps._validate_user_accessibility")
+    @patch("controllers.web.wraps._validate_webapp_token")
+    @patch("controllers.web.wraps.EnterpriseService.WebAppAuth.get_app_access_mode_by_id")
+    @patch("controllers.web.wraps.AppService.get_app_id_by_code")
+    @patch("controllers.web.wraps.FeatureService.get_system_features")
+    @patch("controllers.web.wraps.PassportService")
+    @patch("controllers.web.wraps.extract_webapp_passport")
+    @patch("controllers.web.wraps.db")
+    def test_flag_on_anonymous_user_raises_unauthorized(
+        self,
+        mock_db: MagicMock,
+        mock_extract: MagicMock,
+        mock_passport_cls: MagicMock,
+        mock_features: MagicMock,
+        mock_app_id: MagicMock,
+        mock_access_mode: MagicMock,
+        mock_validate_token: MagicMock,
+        mock_validate_user: MagicMock,
+        app: Flask,
+    ) -> None:
+        mock_extract.return_value = "jwt-token"
+        mock_passport_cls.return_value.verify.return_value = {
+            "app_code": "code1",
+            "app_id": "app-1",
+            "end_user_id": "eu-1",
+        }
+        mock_features.return_value = SimpleNamespace(
+            webapp_auth=SimpleNamespace(enabled=False), department_access_control=True
+        )
+
+        app_model = SimpleNamespace(id="app-1", enable_site=True)
+        site = SimpleNamespace(code="code1")
+        end_user = SimpleNamespace(id="eu-1", session_id="sess-1", is_anonymous=True)
+
+        session_mock = MagicMock()
+        session_mock.scalar.side_effect = [app_model, site, end_user]
+        session_ctx = MagicMock()
+        session_ctx.__enter__ = MagicMock(return_value=session_mock)
+        session_ctx.__exit__ = MagicMock(return_value=False)
+        mock_db.engine = "engine"
+
+        with patch("controllers.web.wraps.Session", return_value=session_ctx):
+            with app.test_request_context("/", headers={"X-App-Code": "code1"}):
+                with pytest.raises(Unauthorized, match="Anonymous access"):
+                    decode_jwt_token()
+
+    @patch("controllers.web.wraps._validate_user_accessibility")
+    @patch("controllers.web.wraps._validate_webapp_token")
+    @patch("controllers.web.wraps.EnterpriseService.WebAppAuth.get_app_access_mode_by_id")
+    @patch("controllers.web.wraps.AppService.get_app_id_by_code")
+    @patch("controllers.web.wraps.FeatureService.get_system_features")
+    @patch("controllers.web.wraps.PassportService")
+    @patch("controllers.web.wraps.extract_webapp_passport")
+    @patch("controllers.web.wraps.db")
+    def test_flag_on_non_anonymous_user_passes(
+        self,
+        mock_db: MagicMock,
+        mock_extract: MagicMock,
+        mock_passport_cls: MagicMock,
+        mock_features: MagicMock,
+        mock_app_id: MagicMock,
+        mock_access_mode: MagicMock,
+        mock_validate_token: MagicMock,
+        mock_validate_user: MagicMock,
+        app: Flask,
+    ) -> None:
+        mock_extract.return_value = "jwt-token"
+        mock_passport_cls.return_value.verify.return_value = {
+            "app_code": "code1",
+            "app_id": "app-1",
+            "end_user_id": "eu-1",
+        }
+        mock_features.return_value = SimpleNamespace(
+            webapp_auth=SimpleNamespace(enabled=False), department_access_control=True
+        )
+
+        app_model = SimpleNamespace(id="app-1", enable_site=True)
+        site = SimpleNamespace(code="code1")
+        end_user = SimpleNamespace(id="eu-1", session_id="console:acc-1", is_anonymous=False)
+
+        session_mock = MagicMock()
+        session_mock.scalar.side_effect = [app_model, site, end_user]
+        session_ctx = MagicMock()
+        session_ctx.__enter__ = MagicMock(return_value=session_mock)
+        session_ctx.__exit__ = MagicMock(return_value=False)
+        mock_db.engine = "engine"
+
+        with patch("controllers.web.wraps.Session", return_value=session_ctx):
+            with app.test_request_context("/", headers={"X-App-Code": "code1"}):
+                result_app, result_user = decode_jwt_token()
+
+        assert result_app.id == "app-1"
+        assert result_user.id == "eu-1"
+
+    @patch("controllers.web.wraps._validate_user_accessibility")
+    @patch("controllers.web.wraps._validate_webapp_token")
+    @patch("controllers.web.wraps.EnterpriseService.WebAppAuth.get_app_access_mode_by_id")
+    @patch("controllers.web.wraps.AppService.get_app_id_by_code")
+    @patch("controllers.web.wraps.FeatureService.get_system_features")
+    @patch("controllers.web.wraps.PassportService")
+    @patch("controllers.web.wraps.extract_webapp_passport")
+    @patch("controllers.web.wraps.db")
+    def test_flag_off_anonymous_user_passes(
+        self,
+        mock_db: MagicMock,
+        mock_extract: MagicMock,
+        mock_passport_cls: MagicMock,
+        mock_features: MagicMock,
+        mock_app_id: MagicMock,
+        mock_access_mode: MagicMock,
+        mock_validate_token: MagicMock,
+        mock_validate_user: MagicMock,
+        app: Flask,
+    ) -> None:
+        mock_extract.return_value = "jwt-token"
+        mock_passport_cls.return_value.verify.return_value = {
+            "app_code": "code1",
+            "app_id": "app-1",
+            "end_user_id": "eu-1",
+        }
+        mock_features.return_value = SimpleNamespace(
+            webapp_auth=SimpleNamespace(enabled=False), department_access_control=False
+        )
+
+        app_model = SimpleNamespace(id="app-1", enable_site=True)
+        site = SimpleNamespace(code="code1")
+        end_user = SimpleNamespace(id="eu-1", session_id="sess-1", is_anonymous=True)
+
+        session_mock = MagicMock()
+        session_mock.scalar.side_effect = [app_model, site, end_user]
+        session_ctx = MagicMock()
+        session_ctx.__enter__ = MagicMock(return_value=session_mock)
+        session_ctx.__exit__ = MagicMock(return_value=False)
+        mock_db.engine = "engine"
+
+        with patch("controllers.web.wraps.Session", return_value=session_ctx):
+            with app.test_request_context("/", headers={"X-App-Code": "code1"}):
+                result_app, result_user = decode_jwt_token()
+
+        assert result_app.id == "app-1"
+        assert result_user.is_anonymous is True

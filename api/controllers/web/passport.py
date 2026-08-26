@@ -4,7 +4,7 @@ from datetime import UTC, datetime, timedelta
 from flask import make_response, request
 from flask_restx import Resource
 from sqlalchemy import func, select
-from werkzeug.exceptions import NotFound, Unauthorized
+from werkzeug.exceptions import Forbidden, NotFound, Unauthorized
 
 from configs import dify_config
 from constants import HEADER_NAME_APP_CODE
@@ -12,8 +12,10 @@ from controllers.web import web_ns
 from controllers.web.error import WebAppAuthRequiredError
 from extensions.ext_database import db
 from libs.passport import PassportService
-from libs.token import extract_webapp_access_token
+from libs.token import extract_access_token, extract_webapp_access_token
+from models.account import Account
 from models.model import App, EndUser, Site
+from services.app_publish_service import AppPublishService
 from services.feature_service import FeatureService
 from services.webapp_auth_service import WebAppAuthService, WebAppAuthType
 
@@ -38,6 +40,50 @@ class PassportResource(Resource):
         access_token = extract_webapp_access_token(request)
         if app_code is None:
             raise Unauthorized("X-App-Code header is missing.")
+
+        if system_features.department_access_control:
+            account = _resolve_console_account(request)
+            if not account:
+                raise Unauthorized("Console login state is required.")
+
+            site_for_gate = db.session.scalar(select(Site).where(Site.code == app_code, Site.status == "normal"))
+            if not site_for_gate:
+                raise NotFound()
+            app_for_gate = db.session.scalar(select(App).where(App.id == site_for_gate.app_id))
+            if not app_for_gate or app_for_gate.status != "normal" or not app_for_gate.enable_site:
+                raise NotFound()
+
+            if not AppPublishService.can_access(account, app_for_gate.tenant_id, app_for_gate.id):
+                raise Forbidden("You do not have permission to access this app.")
+
+            session_id = f"console:{account.id}"
+            end_user = db.session.scalar(
+                select(EndUser).where(
+                    EndUser.app_id == app_for_gate.id,
+                    EndUser.session_id == session_id,
+                )
+            )
+            if not end_user:
+                end_user = EndUser(
+                    tenant_id=app_for_gate.tenant_id,
+                    app_id=app_for_gate.id,
+                    type="browser",
+                    is_anonymous=False,
+                    session_id=session_id,
+                )
+                db.session.add(end_user)
+                db.session.commit()
+
+            payload = {
+                "iss": site_for_gate.app_id,
+                "sub": "Web API Passport",
+                "app_id": site_for_gate.app_id,
+                "app_code": app_code,
+                "end_user_id": end_user.id,
+            }
+            tk = PassportService().issue(payload)
+            return make_response({"access_token": tk})
+
         if system_features.webapp_auth.enabled:
             enterprise_user_decoded = decode_enterprise_webapp_user_id(access_token)
             app_auth_type = WebAppAuthService.get_app_auth_type(app_code=app_code)
@@ -230,6 +276,20 @@ def _exchange_for_public_app_token(app_model, site, token_decoded):
         }
     )
     return resp
+
+
+def _resolve_console_account(req) -> Account | None:
+    token = extract_access_token(req)
+    if not token:
+        return None
+    try:
+        payload = PassportService().verify(token)
+    except Unauthorized:
+        return None
+    account_id = payload.get("account_id")
+    if not account_id:
+        return None
+    return db.session.scalar(select(Account).where(Account.id == account_id))
 
 
 def generate_session_id():

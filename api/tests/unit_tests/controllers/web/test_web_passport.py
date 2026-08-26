@@ -117,7 +117,9 @@ class TestExchangeTokenForExistingWebUser:
 class TestPassportResource:
     @patch("controllers.web.passport.FeatureService.get_system_features")
     def test_missing_app_code_raises_unauthorized(self, mock_features: MagicMock, app: Flask) -> None:
-        mock_features.return_value = SimpleNamespace(webapp_auth=SimpleNamespace(enabled=False))
+        mock_features.return_value = SimpleNamespace(
+            webapp_auth=SimpleNamespace(enabled=False), department_access_control=False
+        )
         with app.test_request_context("/passport"):
             with pytest.raises(Unauthorized, match="X-App-Code"):
                 PassportResource().get()
@@ -134,7 +136,9 @@ class TestPassportResource:
         mock_passport_cls: MagicMock,
         app: Flask,
     ) -> None:
-        mock_features.return_value = SimpleNamespace(webapp_auth=SimpleNamespace(enabled=False))
+        mock_features.return_value = SimpleNamespace(
+            webapp_auth=SimpleNamespace(enabled=False), department_access_control=False
+        )
         site = SimpleNamespace(app_id="app-1", code="code1")
         app_model = SimpleNamespace(id="app-1", status="normal", enable_site=True, tenant_id="t1")
         mock_db.session.scalar.side_effect = [site, app_model]
@@ -157,7 +161,9 @@ class TestPassportResource:
         mock_passport_cls: MagicMock,
         app: Flask,
     ) -> None:
-        mock_features.return_value = SimpleNamespace(webapp_auth=SimpleNamespace(enabled=False))
+        mock_features.return_value = SimpleNamespace(
+            webapp_auth=SimpleNamespace(enabled=False), department_access_control=False
+        )
         site = SimpleNamespace(app_id="app-1", code="code1")
         app_model = SimpleNamespace(id="app-1", status="normal", enable_site=True, tenant_id="t1")
         existing_user = SimpleNamespace(id="eu-1", session_id="sess-existing")
@@ -174,7 +180,9 @@ class TestPassportResource:
     @patch("controllers.web.passport.db")
     @patch("controllers.web.passport.FeatureService.get_system_features")
     def test_site_not_found_raises(self, mock_features: MagicMock, mock_db: MagicMock, app: Flask) -> None:
-        mock_features.return_value = SimpleNamespace(webapp_auth=SimpleNamespace(enabled=False))
+        mock_features.return_value = SimpleNamespace(
+            webapp_auth=SimpleNamespace(enabled=False), department_access_control=False
+        )
         mock_db.session.scalar.return_value = None
         with app.test_request_context("/passport", headers={"X-App-Code": "code1"}):
             with pytest.raises(NotFound):
@@ -183,7 +191,9 @@ class TestPassportResource:
     @patch("controllers.web.passport.db")
     @patch("controllers.web.passport.FeatureService.get_system_features")
     def test_disabled_app_raises_not_found(self, mock_features: MagicMock, mock_db: MagicMock, app: Flask) -> None:
-        mock_features.return_value = SimpleNamespace(webapp_auth=SimpleNamespace(enabled=False))
+        mock_features.return_value = SimpleNamespace(
+            webapp_auth=SimpleNamespace(enabled=False), department_access_control=False
+        )
         site = SimpleNamespace(app_id="app-1", code="code1")
         disabled_app = SimpleNamespace(id="app-1", status="normal", enable_site=False)
         mock_db.session.scalar.side_effect = [site, disabled_app]

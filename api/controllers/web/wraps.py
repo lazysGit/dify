@@ -82,6 +82,9 @@ def decode_jwt_token(app_code: str | None = None, user_id: str | None = None):
             decoded, app_code, app_web_auth_enabled, system_features.webapp_auth.enabled, webapp_settings
         )
 
+        if system_features.department_access_control and end_user.is_anonymous:
+            raise Unauthorized("Anonymous access is not allowed under department access control.")
+
         return app_model, end_user
     except Unauthorized as e:
         if system_features.webapp_auth.enabled:
