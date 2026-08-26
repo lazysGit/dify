@@ -131,6 +131,12 @@ const DatasetCardHeader = ({ dataset }: DatasetCardHeaderProps) => {
           {dataset.name}
         </div>
         <div className="flex items-center gap-1 text-[10px] font-medium leading-[18px] text-text-tertiary">
+          {dataset.department_name && (
+            <>
+              <div className="truncate" title={dataset.department_name}>{dataset.department_name}</div>
+              <div>·</div>
+            </>
+          )}
           <div className="truncate" title={dataset.author_name}>{dataset.author_name}</div>
           <div>·</div>
           <div className="truncate" title={editTimeText}>{editTimeText}</div>

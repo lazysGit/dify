@@ -296,9 +296,11 @@ describe('DatasetCard Integration', () => {
     const defaultProps = {
       showDelete: true,
       showExportPipeline: true,
+      showTransferDepartment: false,
       openRenameModal: vi.fn(),
       handleExportPipeline: vi.fn(),
       detectIsUsedByApp: vi.fn(),
+      openTransferDepartment: vi.fn(),
     }
 
     describe('Rendering', () => {

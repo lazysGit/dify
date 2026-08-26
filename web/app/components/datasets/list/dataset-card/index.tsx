@@ -1,8 +1,9 @@
 'use client'
 import type { DataSet } from '@/models/datasets'
 import { useHover } from 'ahooks'
-import { useMemo, useRef } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useSelector as useAppContextWithSelector } from '@/context/app-context'
+import dynamic from '@/next/dynamic'
 import { useRouter } from '@/next/navigation'
 import CornerLabels from './components/corner-labels'
 import DatasetCardFooter from './components/dataset-card-footer'
@@ -12,6 +13,10 @@ import Description from './components/description'
 import OperationsPopover from './components/operations-popover'
 import TagArea from './components/tag-area'
 import { useDatasetCardState } from './hooks/use-dataset-card-state'
+
+const TransferDepartmentModal = dynamic(() => import('@/app/components/apps/transfer-department-modal'), {
+  ssr: false,
+})
 
 const EXTERNAL_PROVIDER = 'external'
 
@@ -27,8 +32,10 @@ const DatasetCard = ({
   const { push } = useRouter()
 
   const isCurrentWorkspaceDatasetOperator = useAppContextWithSelector(state => state.isCurrentWorkspaceDatasetOperator)
+  const isCurrentWorkspaceManager = useAppContextWithSelector(state => state.isCurrentWorkspaceManager)
   const tagSelectorRef = useRef<HTMLDivElement>(null)
   const isHoveringTagSelector = useHover(tagSelectorRef)
+  const [showTransferDepartment, setShowTransferDepartment] = useState(false)
 
   const {
     tags,
@@ -85,9 +92,11 @@ const DatasetCard = ({
         <OperationsPopover
           dataset={dataset}
           isCurrentWorkspaceDatasetOperator={isCurrentWorkspaceDatasetOperator}
+          showTransferDepartment={isCurrentWorkspaceManager}
           openRenameModal={openRenameModal}
           handleExportPipeline={handleExportPipeline}
           detectIsUsedByApp={detectIsUsedByApp}
+          openTransferDepartment={() => setShowTransferDepartment(true)}
         />
       </div>
       <DatasetCardModals
@@ -98,6 +107,19 @@ const DatasetCard = ({
         onConfirmDelete={onConfirmDelete}
         onSuccess={onSuccess}
       />
+      {showTransferDepartment && (
+        <TransferDepartmentModal
+          show={showTransferDepartment}
+          resourceId={dataset.id}
+          resourceType="dataset"
+          currentDepartmentId={dataset.department_id}
+          onClose={() => setShowTransferDepartment(false)}
+          onSuccess={() => {
+            setShowTransferDepartment(false)
+            onSuccess?.()
+          }}
+        />
+      )}
     </>
   )
 }

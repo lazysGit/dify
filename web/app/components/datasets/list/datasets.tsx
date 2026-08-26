@@ -12,12 +12,14 @@ type Props = {
   tags: string[]
   keywords: string
   includeAll: boolean
+  departmentId?: string
 }
 
 const Datasets = ({
   tags,
   keywords,
   includeAll,
+  departmentId,
 }: Props) => {
   const { t } = useTranslation()
   const isCurrentWorkspaceEditor = useAppContextWithSelector(state => state.isCurrentWorkspaceEditor)
@@ -33,6 +35,7 @@ const Datasets = ({
     limit: 30,
     include_all: includeAll,
     keyword: keywords,
+    department_id: departmentId,
   })
   const invalidDatasetList = useInvalidDatasetList()
   const anchorRef = useRef<HTMLDivElement>(null)

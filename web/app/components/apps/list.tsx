@@ -20,6 +20,7 @@ import { AppModeEnum, AppModes } from '@/types/app'
 import { cn } from '@/utils/classnames'
 import AppCard from './app-card'
 import { AppCardSkeleton } from './app-card-skeleton'
+import DepartmentFilterTabs from './department-filter-tabs'
 import Empty from './empty'
 import Footer from './footer'
 import useAppsQueryState from './hooks/use-apps-query-state'
@@ -60,7 +61,7 @@ const List: FC<Props> = ({
     parseAsAppListCategory,
   )
 
-  const { query: { tagIDs = [], keywords = '', isCreatedByMe: queryIsCreatedByMe = false }, setQuery } = useAppsQueryState()
+  const { query: { tagIDs = [], keywords = '', isCreatedByMe: queryIsCreatedByMe = false, departmentId }, setQuery } = useAppsQueryState()
   const [isCreatedByMe, setIsCreatedByMe] = useState(queryIsCreatedByMe)
   const [tagFilterValue, setTagFilterValue] = useState<string[]>(tagIDs)
   const [searchKeywords, setSearchKeywords] = useState(keywords)
@@ -93,6 +94,7 @@ const List: FC<Props> = ({
     tag_ids: tagIDs,
     is_created_by_me: isCreatedByMe,
     ...(activeTab !== 'all' ? { mode: activeTab } : {}),
+    ...(departmentId ? { department_id: departmentId } : {}),
   }
 
   const {
@@ -196,14 +198,22 @@ const List: FC<Props> = ({
         )}
 
         <div className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-y-2 bg-background-body px-12 pb-5 pt-7">
-          <TabSliderNew
-            value={activeTab}
-            onChange={(nextValue) => {
-              if (isAppListCategory(nextValue))
-                setActiveTab(nextValue)
-            }}
-            options={options}
-          />
+          <div className="flex flex-col gap-2">
+            <TabSliderNew
+              value={activeTab}
+              onChange={(nextValue) => {
+                if (isAppListCategory(nextValue))
+                  setActiveTab(nextValue)
+              }}
+              options={options}
+            />
+            <DepartmentFilterTabs
+              selectedDepartmentId={departmentId}
+              onDepartmentChange={(deptId) => {
+                setQuery(prev => ({ ...prev, departmentId: deptId }))
+              }}
+            />
+          </div>
           <div className="flex items-center gap-2">
             <label className="mr-2 flex h-7 items-center space-x-2">
               <Checkbox checked={isCreatedByMe} onCheck={handleCreatedByMeChange} />

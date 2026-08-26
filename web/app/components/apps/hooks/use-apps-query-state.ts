@@ -5,6 +5,7 @@ type AppsQuery = {
   tagIDs?: string[]
   keywords?: string
   isCreatedByMe?: boolean
+  departmentId?: string
 }
 
 const normalizeKeywords = (value: string | null) => value || undefined
@@ -15,6 +16,7 @@ function useAppsQueryState() {
       tagIDs: parseAsArrayOf(parseAsString, ';'),
       keywords: parseAsString,
       isCreatedByMe: parseAsBoolean,
+      departmentId: parseAsString,
     },
     {
       history: 'push',
@@ -25,7 +27,8 @@ function useAppsQueryState() {
     tagIDs: urlQuery.tagIDs ?? undefined,
     keywords: normalizeKeywords(urlQuery.keywords),
     isCreatedByMe: urlQuery.isCreatedByMe ?? false,
-  }), [urlQuery.isCreatedByMe, urlQuery.keywords, urlQuery.tagIDs])
+    departmentId: urlQuery.departmentId ?? undefined,
+  }), [urlQuery.departmentId, urlQuery.isCreatedByMe, urlQuery.keywords, urlQuery.tagIDs])
 
   const setQuery = useCallback((next: AppsQuery | ((prev: AppsQuery) => AppsQuery)) => {
     const buildPatch = (patch: AppsQuery) => {
@@ -36,6 +39,8 @@ function useAppsQueryState() {
         result.keywords = patch.keywords ? patch.keywords : null
       if ('isCreatedByMe' in patch)
         result.isCreatedByMe = patch.isCreatedByMe ? true : null
+      if ('departmentId' in patch)
+        result.departmentId = patch.departmentId || null
       return result
     }
 
@@ -44,6 +49,7 @@ function useAppsQueryState() {
         tagIDs: prev.tagIDs ?? undefined,
         keywords: normalizeKeywords(prev.keywords),
         isCreatedByMe: prev.isCreatedByMe ?? false,
+        departmentId: prev.departmentId ?? undefined,
       })))
       return
     }

@@ -32,6 +32,7 @@ type AppListParams = {
   mode?: AppModeEnum | 'all'
   tag_ids?: string[]
   is_created_by_me?: boolean
+  department_id?: string
 }
 
 type DateRangeParams = {
@@ -57,6 +58,7 @@ const normalizeAppListParams = (params: AppListParams) => {
     mode,
     tag_ids,
     is_created_by_me,
+    department_id,
   } = params
 
   const safeMode = allowedModes.has((mode as any)) ? mode : undefined
@@ -68,6 +70,7 @@ const normalizeAppListParams = (params: AppListParams) => {
     ...(safeMode && safeMode !== 'all' ? { mode: safeMode } : {}),
     ...(tag_ids?.length ? { tag_ids } : {}),
     ...(is_created_by_me ? { is_created_by_me } : {}),
+    ...(department_id ? { department_id } : {}),
   }
 }
 

@@ -31,9 +31,11 @@ describe('OperationsPopover', () => {
   const defaultProps = {
     dataset: createMockDataset(),
     isCurrentWorkspaceDatasetOperator: false,
+    showTransferDepartment: false,
     openRenameModal: vi.fn(),
     handleExportPipeline: vi.fn(),
     detectIsUsedByApp: vi.fn(),
+    openTransferDepartment: vi.fn(),
   }
 
   beforeEach(() => {
