@@ -367,6 +367,12 @@ class AppService:
         Delete app
         :param app: App instance
         """
+        from models.department import AppPublishedDepartment
+
+        db.session.execute(
+            sa.delete(AppPublishedDepartment).where(AppPublishedDepartment.app_id == app.id)
+        )
+
         app_was_deleted.send(app)
 
         db.session.delete(app)

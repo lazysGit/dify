@@ -9,7 +9,7 @@ from extensions.ext_database import db
 from extensions.ext_mail import mail
 from models.account import Account, TenantAccountJoin, TenantAccountRole
 from models.dataset import Dataset
-from models.department import Department
+from models.department import AppPublishedDepartment, Department
 from models.model import App, OperationLog
 from services.errors.department import (
     DepartmentNotFoundError,
@@ -218,6 +218,12 @@ class DepartmentService:
             (
                 db.session.query(Dataset).filter(Dataset.department_id == department_id).count(),
                 "部门下有知识库，请先转移知识库",
+            ),
+            (
+                db.session.query(AppPublishedDepartment)
+                .filter(AppPublishedDepartment.department_id == department_id)
+                .count(),
+                "部门作为发布目标，请先取消发布",
             ),
         ]
         for blocked, message in checks:
