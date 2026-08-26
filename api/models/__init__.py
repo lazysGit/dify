@@ -26,6 +26,7 @@ from .dataset import (
     TidbAuthBinding,
     Whitelist,
 )
+from .department import Department
 from .enums import (
     AppTriggerStatus,
     AppTriggerType,
