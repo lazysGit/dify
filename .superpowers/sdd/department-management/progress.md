@@ -15,3 +15,6 @@ Scan result: Clean. All cross-task interfaces align with plan text.
 
 ## Progress
 Task 1: complete (commits 5a231c2..24757a1, review clean)
+Task 2: complete (commits 24757a1..239af53, review clean)
+Task 3: complete (commits 239af53..13924b4, review clean)
+Task 4: complete (commits 13924b4..d3ff664, review clean)

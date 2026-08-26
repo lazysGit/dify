@@ -379,3 +379,139 @@ class DepartmentService:
     def resource_department_filter(resource_model: Any, tenant_id: str, accessible: list[str]):
         default_dept_id = DepartmentService.get_default_department(tenant_id).id
         return func.coalesce(resource_model.department_id, default_dept_id).in_(accessible)
+
+    @staticmethod
+    def get_department_members(tenant_id: str, department_id: str) -> list[dict]:
+        from models.account import Account
+
+        joins = (
+            db.session.query(TenantAccountJoin)
+            .filter(
+                TenantAccountJoin.tenant_id == tenant_id,
+                TenantAccountJoin.department_id == department_id,
+            )
+            .all()
+        )
+        result = []
+        for join in joins:
+            account = db.session.query(Account).filter(Account.id == join.account_id).first()
+            if account:
+                result.append(
+                    {
+                        "account_id": account.id,
+                        "name": account.name,
+                        "email": account.email,
+                        "role": join.role,
+                        "is_department_admin": join.is_department_admin,
+                        "joined_at": join.created_at,
+                    }
+                )
+        return result
+
+    @staticmethod
+    def move_member_to_department(
+        tenant_id: str,
+        member_account_id: str,
+        target_department_id: str,
+        operator_id: str,
+        operator_ip: str | None = None,
+    ) -> None:
+        target_dept = (
+            db.session.query(Department)
+            .filter(Department.id == target_department_id, Department.tenant_id == tenant_id)
+            .first()
+        )
+        if not target_dept:
+            raise DepartmentNotFoundError("Target department not found")
+
+        join = (
+            db.session.query(TenantAccountJoin)
+            .filter(
+                TenantAccountJoin.tenant_id == tenant_id,
+                TenantAccountJoin.account_id == member_account_id,
+            )
+            .first()
+        )
+        if not join:
+            raise DepartmentNotFoundError("Member not found in tenant")
+
+        join.department_id = target_department_id
+        join.is_department_admin = False
+        db.session.commit()
+
+        DepartmentAuditLog.log(
+            tenant_id,
+            operator_id,
+            operator_ip,
+            "move_member",
+            {"member_id": member_account_id, "target_department_id": target_department_id},
+        )
+
+    @staticmethod
+    def set_department_admin(
+        tenant_id: str,
+        department_id: str,
+        member_account_id: str,
+        operator_id: str,
+        operator_ip: str | None = None,
+    ) -> None:
+        dept = (
+            db.session.query(Department)
+            .filter(Department.id == department_id, Department.tenant_id == tenant_id)
+            .first()
+        )
+        if not dept:
+            raise DepartmentNotFoundError("Department not found")
+
+        join = (
+            db.session.query(TenantAccountJoin)
+            .filter(
+                TenantAccountJoin.tenant_id == tenant_id,
+                TenantAccountJoin.account_id == member_account_id,
+            )
+            .first()
+        )
+        if not join:
+            raise DepartmentNotFoundError("Member not found in tenant")
+
+        join.department_id = department_id
+        join.is_department_admin = True
+        db.session.commit()
+
+        DepartmentAuditLog.log(
+            tenant_id,
+            operator_id,
+            operator_ip,
+            "set_department_admin",
+            {"department_id": department_id, "member_id": member_account_id},
+        )
+
+    @staticmethod
+    def remove_department_admin(
+        tenant_id: str,
+        department_id: str,
+        member_account_id: str,
+        operator_id: str,
+        operator_ip: str | None = None,
+    ) -> None:
+        join = (
+            db.session.query(TenantAccountJoin)
+            .filter(
+                TenantAccountJoin.tenant_id == tenant_id,
+                TenantAccountJoin.account_id == member_account_id,
+            )
+            .first()
+        )
+        if not join:
+            raise DepartmentNotFoundError("Member not found in tenant")
+
+        join.is_department_admin = False
+        db.session.commit()
+
+        DepartmentAuditLog.log(
+            tenant_id,
+            operator_id,
+            operator_ip,
+            "remove_department_admin",
+            {"department_id": department_id, "member_id": member_account_id},
+        )

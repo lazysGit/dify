@@ -124,6 +124,7 @@ from .tag import tags
 from .workspace import (
     account,
     agent_providers,
+    department,
     endpoint,
     load_balancing_config,
     members,

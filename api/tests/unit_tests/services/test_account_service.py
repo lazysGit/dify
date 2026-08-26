@@ -624,8 +624,17 @@ class TestTenantService:
                     mock_credit_pool_db.session.add = MagicMock()
                     mock_credit_pool_db.session.commit = MagicMock()
 
-                    # Execute test
-                    TenantService.create_owner_tenant_if_not_exist(mock_account)
+                    # Mock DepartmentService to avoid database connection
+                    from services.department_service import DepartmentService
+
+                    mock_default_dept = MagicMock()
+                    mock_default_dept.id = "default-dept-id"
+                    with (
+                        patch.object(DepartmentService, "create_default_department"),
+                        patch.object(DepartmentService, "get_default_department", return_value=mock_default_dept),
+                    ):
+                        # Execute test
+                        TenantService.create_owner_tenant_if_not_exist(mock_account)
 
         # Verify tenant was created with correct parameters
         mock_db_dependencies["db"].session.add.assert_called()
@@ -683,8 +692,15 @@ class TestTenantService:
         # Mock database operations
         mock_db_dependencies["db"].session.add = MagicMock()
 
-        # Execute test
-        result = TenantService.create_tenant_member(mock_tenant, mock_account, "normal")
+        # Mock DepartmentService to provide a default department
+        mock_default_dept = MagicMock()
+        mock_default_dept.id = "default-dept-id"
+        with patch(
+            "services.department_service.DepartmentService.get_default_department",
+            return_value=mock_default_dept,
+        ):
+            # Execute test
+            result = TenantService.create_tenant_member(mock_tenant, mock_account, "normal")
 
         # Verify member was created with correct parameters
         assert result is not None
@@ -695,6 +711,7 @@ class TestTenantService:
         assert added_tenant_account_join.tenant_id == "tenant-456"
         assert added_tenant_account_join.account_id == "user-123"
         assert added_tenant_account_join.role == "normal"
+        assert added_tenant_account_join.department_id == "default-dept-id"
 
         self._assert_database_operations_called(mock_db_dependencies["db"])
 

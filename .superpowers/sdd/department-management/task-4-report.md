@@ -4,7 +4,7 @@
 DONE
 
 ## Commits
-- (pending commit)
+- d3ff6645bf feat(department): add DepartmentService with tree CRUD, scope helpers and audit
 
 ## Test Summary
 23 passed, 0 failed in ~29s

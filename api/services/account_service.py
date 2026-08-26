@@ -1047,6 +1047,10 @@ class TenantService:
 
         CreditPoolService.create_default_pool(tenant.id)
 
+        from services.department_service import DepartmentService
+
+        DepartmentService.create_default_department(tenant.id, tenant.id)
+
         return tenant
 
     @staticmethod
@@ -1080,18 +1084,36 @@ class TenantService:
         tenant_was_created.send(tenant)
 
     @staticmethod
-    def create_tenant_member(tenant: Tenant, account: Account, role: str = "normal") -> TenantAccountJoin:
+    def create_tenant_member(
+        tenant: Tenant, account: Account, role: str = "normal", department_id: str | None = None
+    ) -> TenantAccountJoin:
         """Create tenant member"""
         if role == TenantAccountRole.OWNER:
             if TenantService.has_roles(tenant, [TenantAccountRole.OWNER]):
                 logger.error("Tenant %s has already an owner.", tenant.id)
                 raise Exception("Tenant already has an owner.")
 
+        if department_id is None:
+            from services.department_service import DepartmentNotFoundError as _DeptNotFoundError
+            from services.department_service import DepartmentService as _DeptSvc
+
+            try:
+                default_dept = _DeptSvc.get_default_department(tenant.id)
+            except _DeptNotFoundError:
+                default_dept = _DeptSvc.create_default_department(tenant.id, account.id)
+            department_id = default_dept.id
+
         ta = db.session.query(TenantAccountJoin).filter_by(tenant_id=tenant.id, account_id=account.id).first()
         if ta:
             ta.role = TenantAccountRole(role)
+            ta.department_id = department_id
         else:
-            ta = TenantAccountJoin(tenant_id=tenant.id, account_id=account.id, role=TenantAccountRole(role))
+            ta = TenantAccountJoin(
+                tenant_id=tenant.id,
+                account_id=account.id,
+                role=TenantAccountRole(role),
+                department_id=department_id,
+            )
             db.session.add(ta)
 
         db.session.commit()
