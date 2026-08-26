@@ -44,6 +44,19 @@ class DepartmentMemberMovePayload(BaseModel):
     department_id: str
 
 
+class DepartmentMovePayload(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    parent_id: str | None = None
+
+    @field_validator("parent_id")
+    @classmethod
+    def validate_parent_id(cls, v: str | None) -> str | None:
+        if v is not None and v == "":
+            return None
+        return v
+
+
 class DepartmentAdminPayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -57,6 +70,7 @@ def reg(cls: type[BaseModel]):
 reg(DepartmentCreatePayload)
 reg(DepartmentUpdatePayload)
 reg(DepartmentMemberMovePayload)
+reg(DepartmentMovePayload)
 reg(DepartmentAdminPayload)
 
 
@@ -170,6 +184,35 @@ class DepartmentApi(Resource):
             DepartmentService.delete_department(
                 tenant_id=tenant_id,
                 department_id=str(department_id),
+                operator_ip=request.remote_addr,
+            )
+        except (DepartmentNotFoundError, DepartmentValidationError, DepartmentPermissionDeniedError) as e:
+            _translate_error(e)
+            return
+
+        return {"result": "success"}
+
+
+@console_ns.route("/departments/<uuid:department_id>/move")
+class DepartmentMoveApi(Resource):
+    @setup_required
+    @login_required
+    @account_initialization_required
+    @console_ns.expect(console_ns.models[DepartmentMovePayload.__name__])
+    def put(self, department_id):
+        user, tenant_id = current_account_with_tenant()
+        if not user.is_admin_or_owner:
+            console_ns.abort(403, description="Only admin or owner can move department")
+
+        payload = console_ns.payload or {}
+        args = DepartmentMovePayload.model_validate(payload)
+
+        try:
+            DepartmentService.move_department(
+                tenant_id=tenant_id,
+                department_id=str(department_id),
+                new_parent_id=args.parent_id,
+                operator_id=user.id,
                 operator_ip=request.remote_addr,
             )
         except (DepartmentNotFoundError, DepartmentValidationError, DepartmentPermissionDeniedError) as e:

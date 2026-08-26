@@ -1,6 +1,7 @@
 import logging
 from typing import Any
 
+import sqlalchemy as sa
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 
@@ -231,6 +232,81 @@ class DepartmentService:
             operator_ip,
             "delete_department",
             {"department_id": department_id},
+        )
+
+    @staticmethod
+    def move_department(
+        tenant_id: str,
+        department_id: str,
+        new_parent_id: str | None,
+        operator_id: str,
+        operator_ip: str | None = None,
+    ) -> None:
+        department = (
+            db.session.query(Department)
+            .filter(Department.id == department_id, Department.tenant_id == tenant_id)
+            .first()
+        )
+        if not department:
+            raise DepartmentNotFoundError("Department not found")
+
+        if department.is_default:
+            raise DepartmentValidationError("默认部门不能移动")
+
+        new_parent = None
+        if new_parent_id:
+            if new_parent_id == department_id:
+                raise DepartmentValidationError("不能将部门移动到自身下")
+            new_parent = (
+                db.session.query(Department)
+                .filter(Department.id == new_parent_id, Department.tenant_id == tenant_id)
+                .first()
+            )
+            if not new_parent:
+                raise DepartmentNotFoundError("Parent department not found")
+            if new_parent.is_default:
+                raise DepartmentValidationError("默认部门不能有子部门")
+            if new_parent.path.startswith(department.path):
+                raise DepartmentValidationError("不能将部门移动到其子孙部门下")
+
+            subtree_max_level = (
+                db.session.query(func.max(Department.level))
+                .filter(
+                    Department.tenant_id == tenant_id,
+                    Department.path.like(f"{department.path}%"),
+                )
+                .scalar()
+            ) or department.level
+            projected_depth = new_parent.level + 1 + (subtree_max_level - department.level)
+            if projected_depth > DepartmentService.MAX_DEPTH:
+                raise DepartmentValidationError("部门层级不能超过 10 级")
+
+        old_prefix = department.path
+        new_prefix = f"{(new_parent.path if new_parent else '/' + tenant_id)}/{department.id}"
+        level_diff = (new_parent.level + 1 if new_parent else 1) - department.level
+
+        db.session.execute(
+            sa.update(Department)
+            .where(Department.tenant_id == tenant_id, Department.path.like(old_prefix + "%"))
+            .values(
+                path=func.replace(Department.path, old_prefix, new_prefix),
+                level=Department.level + level_diff,
+                updated_at=func.now(),
+            )
+        )
+        db.session.execute(
+            sa.update(Department)
+            .where(Department.id == department_id)
+            .values(parent_id=new_parent_id)
+        )
+        db.session.commit()
+
+        DepartmentAuditLog.log(
+            tenant_id,
+            operator_id,
+            operator_ip,
+            "move_department",
+            {"department_id": department_id, "old_path": old_prefix, "new_path": new_prefix},
         )
 
     @staticmethod
