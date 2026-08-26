@@ -37,6 +37,7 @@ from models.model import DifySetup
 from services.billing_service import BillingService
 from services.errors.account import (
     AccountAlreadyInTenantError,
+    AccountEmailAlreadyInUseError,
     AccountLoginError,
     AccountNotLinkTenantError,
     AccountPasswordError,
@@ -60,6 +61,7 @@ from tasks.mail_change_mail_task import (
 )
 from tasks.mail_email_code_login import send_email_code_login_mail_task
 from tasks.mail_invite_member_task import send_invite_member_mail_task
+from tasks.mail_member_created_task import send_member_created_mail_task
 from tasks.mail_owner_transfer_task import (
     send_new_owner_transfer_notify_email_task,
     send_old_owner_transfer_notify_email_task,
@@ -1466,6 +1468,102 @@ class RegisterService:
             raise AccountRegisterError(f"Registration failed: {e}") from e
 
         return account
+
+    @classmethod
+    def create_member_by_admin(
+        cls,
+        operator: Account,
+        tenant_id: str,
+        *,
+        name: str,
+        email: str,
+        password: str,
+        department_id: str,
+        role: TenantAccountRole,
+    ) -> Account:
+        normalized_email = email.lower()
+
+        existing = Account.query.filter_by(email=normalized_email).first()
+        if not existing and normalized_email != email:
+            existing = Account.query.filter_by(email=email).first()
+        if existing:
+            raise AccountEmailAlreadyInUseError(f"Email {normalized_email} is already in use.")
+
+        valid_password(password)
+
+        operator_is_tenant_admin = cls._operator_is_tenant_admin(operator, tenant_id)
+        if not operator_is_tenant_admin:
+            allowed_roles = {
+                TenantAccountRole.EDITOR,
+                TenantAccountRole.NORMAL,
+                TenantAccountRole.DATASET_OPERATOR,
+            }
+            if role not in allowed_roles:
+                raise NoPermissionError("Department admin can only assign editor, normal, or dataset_operator roles.")
+
+            from services.department_service import DepartmentService
+
+            manageable = DepartmentService.get_manageable_department_ids(operator, tenant_id)
+            if department_id not in manageable:
+                raise NoPermissionError("Department not in operator's manageable scope.")
+
+        salt = secrets.token_bytes(16)
+        base64_salt = base64.b64encode(salt).decode()
+        password_hashed = hash_password(password, salt)
+        base64_password_hashed = base64.b64encode(password_hashed).decode()
+
+        account = Account(
+            name=name,
+            email=normalized_email,
+            password=base64_password_hashed,
+            password_salt=base64_salt,
+            interface_language=operator.interface_language or "en-US",
+            interface_theme="light",
+            timezone=language_timezone_mapping.get(operator.interface_language or "en-US", "UTC"),
+            status=AccountStatus.ACTIVE,
+        )
+        db.session.add(account)
+        db.session.commit()
+
+        tenant = db.session.query(Tenant).filter_by(id=tenant_id).first()
+        if not tenant:
+            raise TenantNotFoundError("Tenant not found.")
+
+        TenantService.create_tenant_member(tenant, account, role=role.value, department_id=department_id)
+        TenantService.switch_tenant(account, tenant.id)
+
+        from services.department_service import DepartmentAuditLog
+
+        DepartmentAuditLog.log(
+            tenant_id=tenant_id,
+            operator_id=operator.id,
+            operator_ip=None,
+            action="create_member",
+            content={
+                "member_account_id": account.id,
+                "member_email": normalized_email,
+                "member_name": name,
+                "role": role.value,
+                "department_id": department_id,
+            },
+        )
+
+        send_member_created_mail_task.delay(
+            language=account.interface_language or "en-US",
+            to=account.email,
+            member_name=name,
+            workspace_name=tenant.name,
+            initial_password=password,
+        )
+
+        return account
+
+    @staticmethod
+    def _operator_is_tenant_admin(operator: Account, tenant_id: str) -> bool:
+        ta = db.session.query(TenantAccountJoin).filter_by(tenant_id=tenant_id, account_id=operator.id).first()
+        if not ta:
+            return False
+        return ta.role in {TenantAccountRole.OWNER, TenantAccountRole.ADMIN}
 
     @classmethod
     def invite_new_member(

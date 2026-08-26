@@ -55,3 +55,7 @@ class MemberNotInTenantError(BaseServiceError):
 
 class RoleAlreadyAssignedError(BaseServiceError):
     pass
+
+
+class AccountEmailAlreadyInUseError(BaseServiceError):
+    pass
