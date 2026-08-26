@@ -31,6 +31,7 @@ from dify_graph.file import helpers as file_helpers
 from extensions.ext_database import db
 from libs.login import current_account_with_tenant, login_required
 from models import App, DatasetPermissionEnum, Workflow
+from models.department import Department
 from models.model import IconType
 from services.app_dsl_service import AppDslService, ImportMode
 from services.app_service import AppService
@@ -68,6 +69,7 @@ class AppListQuery(BaseModel):
     name: str | None = Field(default=None, description="Filter by app name")
     tag_ids: list[str] | None = Field(default=None, description="Comma-separated tag IDs")
     is_created_by_me: bool | None = Field(default=None, description="Filter by creator")
+    department_id: str | None = Field(default=None, description="Filter by department ID (exact match)")
 
     @field_validator("tag_ids", mode="before")
     @classmethod
@@ -98,6 +100,7 @@ class CreateAppPayload(BaseModel):
     icon_type: IconType | None = Field(default=None, description="Icon type")
     icon: str | None = Field(default=None, description="Icon")
     icon_background: str | None = Field(default=None, description="Icon background color")
+    department_id: str | None = Field(default=None, description="Target department ID for app ownership")
 
 
 class UpdateAppPayload(BaseModel):
@@ -116,6 +119,10 @@ class CopyAppPayload(BaseModel):
     icon_type: IconType | None = Field(default=None, description="Icon type")
     icon: str | None = Field(default=None, description="Icon")
     icon_background: str | None = Field(default=None, description="Icon background color")
+
+
+class TransferDepartmentPayload(BaseModel):
+    department_id: str = Field(..., min_length=1, description="Target department ID")
 
 
 class AppExportQuery(BaseModel):
@@ -348,6 +355,8 @@ class AppPartial(ResponseModel):
     create_user_name: str | None = None
     author_name: str | None = None
     has_draft_trigger: bool | None = None
+    department_id: str | None = None
+    department_name: str | None = None
 
     @computed_field(return_type=str | None)  # type: ignore
     @property
@@ -423,6 +432,7 @@ register_schema_models(
     CreateAppPayload,
     UpdateAppPayload,
     CopyAppPayload,
+    TransferDepartmentPayload,
     AppExportQuery,
     AppNamePayload,
     AppIconPayload,
@@ -478,7 +488,7 @@ class AppListApi(Resource):
 
         # get app list
         app_service = AppService()
-        app_pagination = app_service.get_paginate_apps(current_user.id, current_tenant_id, args_dict)
+        app_pagination = app_service.get_paginate_apps(current_user, current_tenant_id, args_dict)
         if not app_pagination:
             empty = AppPagination(page=args.page, limit=args.limit, total=0, has_more=False, data=[])
             return empty.model_dump(mode="json"), 200
@@ -523,6 +533,25 @@ class AppListApi(Resource):
 
         for app in app_pagination.items:
             app.has_draft_trigger = str(app.id) in draft_trigger_app_ids
+
+        dept_ids = {app.department_id for app in app_pagination.items if app.department_id}
+        dept_name_map: dict[str, str] = {}
+        if dept_ids:
+            from models.department import Department
+
+            depts = db.session.query(Department).filter(Department.id.in_(dept_ids)).all()
+            dept_name_map = {d.id: d.name for d in depts}
+
+        default_dept_id: str | None = None
+        null_dept_apps = [app for app in app_pagination.items if not app.department_id]
+        if null_dept_apps:
+            from services.department_service import DepartmentService
+
+            default_dept_id = DepartmentService.get_default_department(current_tenant_id).id
+
+        for app in app_pagination.items:
+            effective_dept_id = app.department_id or default_dept_id
+            app.department_name = dept_name_map.get(effective_dept_id, "") if effective_dept_id else ""
 
         pagination_model = AppPagination.model_validate(app_pagination, from_attributes=True)
         return pagination_model.model_dump(mode="json"), 200
@@ -673,8 +702,59 @@ class AppCopyApi(Resource):
             stmt = select(App).where(App.id == result.app_id)
             app = session.scalar(stmt)
 
+            if app and not app.department_id:
+                from services.department_service import DepartmentService
+
+                _, copy_tenant_id = current_account_with_tenant()
+                app.department_id = DepartmentService.resolve_department_id_for_creation(
+                    current_user, copy_tenant_id, None
+                )
+                session.commit()
+
         response_model = AppDetailWithSite.model_validate(app, from_attributes=True)
         return response_model.model_dump(mode="json"), 201
+
+
+@console_ns.route("/apps/<uuid:app_id>/transfer-department")
+class AppTransferDepartmentApi(Resource):
+    @console_ns.doc("transfer_app_department")
+    @console_ns.doc(description="Transfer an application to a different department")
+    @console_ns.doc(params={"app_id": "Application ID"})
+    @console_ns.expect(console_ns.models[TransferDepartmentPayload.__name__])
+    @console_ns.response(200, "App transferred successfully")
+    @console_ns.response(403, "Insufficient permissions")
+    @console_ns.response(400, "Invalid request parameters")
+    @setup_required
+    @login_required
+    @account_initialization_required
+    @get_app_model(mode=None)
+    @edit_permission_required
+    def put(self, app_model):
+        """Transfer app to another department"""
+        current_user, current_tenant_id = current_account_with_tenant()
+        args = TransferDepartmentPayload.model_validate(console_ns.payload)
+        target_department_id = args.department_id
+
+        from services.department_service import DepartmentService
+        from services.errors.department import DepartmentNotFoundError, DepartmentPermissionDeniedError
+
+        target_dept = (
+            db.session.query(Department)
+            .filter(Department.id == target_department_id, Department.tenant_id == current_tenant_id)
+            .first()
+        )
+        if not target_dept:
+            raise DepartmentNotFoundError("Target department not found")
+
+        if not current_user.is_admin_or_owner:
+            manageable = DepartmentService.get_manageable_department_ids(current_user, current_tenant_id)
+            if target_department_id not in manageable:
+                raise DepartmentPermissionDeniedError("No permission to transfer to target department")
+
+        app_service = AppService()
+        app_service.transfer_app_department(app_model, target_department_id, current_user, current_tenant_id)
+
+        return {"result": "success"}, 200
 
 
 @console_ns.route("/apps/<uuid:app_id>/export")

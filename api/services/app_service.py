@@ -22,6 +22,7 @@ from models import Account
 from models.model import App, AppMode, AppModelConfig, IconType, Site
 from models.tools import ApiToolProvider
 from services.billing_service import BillingService
+from services.department_service import DepartmentService
 from services.enterprise.enterprise_service import EnterpriseService
 from services.feature_service import FeatureService
 from services.tag_service import TagService
@@ -31,15 +32,22 @@ logger = logging.getLogger(__name__)
 
 
 class AppService:
-    def get_paginate_apps(self, user_id: str, tenant_id: str, args: dict) -> Pagination | None:
+    def get_paginate_apps(self, user: Account, tenant_id: str, args: dict) -> Pagination | None:
         """
         Get app list with pagination
-        :param user_id: user id
+        :param user: current user account
         :param tenant_id: tenant id
         :param args: request args
         :return:
         """
-        filters = [App.tenant_id == tenant_id, App.is_universal == False]
+        filters: list = [App.tenant_id == tenant_id, App.is_universal == False]
+
+        accessible = DepartmentService.get_accessible_department_ids(user, tenant_id)
+        if accessible is not None:
+            filters.append(DepartmentService.resource_department_filter(App, tenant_id, accessible))
+
+        if args.get("department_id"):
+            filters.append(App.department_id == args["department_id"])
 
         if args["mode"] == "workflow":
             filters.append(App.mode == AppMode.WORKFLOW)
@@ -53,7 +61,7 @@ class AppService:
             filters.append(App.mode == AppMode.AGENT_CHAT)
 
         if args.get("is_created_by_me", False):
-            filters.append(App.created_by == user_id)
+            filters.append(App.created_by == user.id)
         if args.get("name"):
             from libs.helper import escape_like_pattern
 
@@ -141,6 +149,9 @@ class AppService:
         app.icon = args["icon"]
         app.icon_background = args["icon_background"]
         app.tenant_id = tenant_id
+        app.department_id = DepartmentService.resolve_department_id_for_creation(
+            account, tenant_id, args.get("department_id")
+        )
         app.api_rph = args.get("api_rph", 0)
         app.api_rpm = args.get("api_rpm", 0)
         app.created_by = account.id
@@ -370,6 +381,22 @@ class AppService:
 
         # Trigger asynchronous deletion of app and related data
         remove_app_and_related_data_task.delay(tenant_id=app.tenant_id, app_id=app.id)
+
+    @staticmethod
+    def transfer_app_department(app: App, target_department_id: str, operator: Account, tenant_id: str) -> None:
+        from services.department_service import DepartmentAuditLog
+
+        app.department_id = target_department_id
+        app.updated_by = operator.id
+        db.session.commit()
+
+        DepartmentAuditLog.log(
+            tenant_id,
+            operator.id,
+            None,
+            "transfer_app",
+            {"app_id": app.id, "app_name": app.name, "target_department_id": target_department_id},
+        )
 
     def get_app_meta(self, app_model: App):
         """

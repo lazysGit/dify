@@ -94,6 +94,11 @@ class WorkflowConverter:
         new_app.api_rph = app_model.api_rph
         new_app.is_demo = False
         new_app.is_public = app_model.is_public
+        from services.department_service import DepartmentService
+
+        new_app.department_id = DepartmentService.resolve_department_id_for_creation(
+            account, app_model.tenant_id, app_model.department_id
+        )
         new_app.created_by = account.id
         new_app.updated_by = account.id
         db.session.add(new_app)
