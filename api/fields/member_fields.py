@@ -80,6 +80,9 @@ class AccountWithRole(_AccountAvatar):
     created_at: int | None = None
     role: str
     status: str
+    department_id: str | None = None
+    department_name: str = ""
+    is_department_admin: bool = False
 
     @field_validator("last_login_at", "last_active_at", "created_at", mode="before")
     @classmethod

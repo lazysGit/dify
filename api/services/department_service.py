@@ -673,6 +673,61 @@ class DepartmentService:
             )
 
     @staticmethod
+    def get_member_created_resources(tenant_id: str, account_id: str) -> dict:
+        apps = (
+            db.session.query(App)
+            .filter(
+                App.tenant_id == tenant_id,
+                App.created_by == account_id,
+            )
+            .all()
+        )
+        datasets = (
+            db.session.query(Dataset)
+            .filter(
+                Dataset.tenant_id == tenant_id,
+                Dataset.created_by == account_id,
+            )
+            .all()
+        )
+
+        dept_ids = set()
+        for app in apps:
+            if app.department_id:
+                dept_ids.add(app.department_id)
+        for ds in datasets:
+            if ds.department_id:
+                dept_ids.add(ds.department_id)
+
+        dept_name_map: dict[str, str] = {}
+        if dept_ids:
+            depts = db.session.query(Department).filter(Department.id.in_(dept_ids)).all()
+            dept_name_map = {d.id: d.name for d in depts}
+
+        default_dept_id = DepartmentService.get_default_department(tenant_id).id
+
+        return {
+            "apps": [
+                {
+                    "id": app.id,
+                    "name": app.name,
+                    "department_id": app.department_id or default_dept_id,
+                    "department_name": dept_name_map.get(app.department_id or default_dept_id, ""),
+                }
+                for app in apps
+            ],
+            "datasets": [
+                {
+                    "id": ds.id,
+                    "name": ds.name,
+                    "department_id": ds.department_id or default_dept_id,
+                    "department_name": dept_name_map.get(ds.department_id or default_dept_id, ""),
+                }
+                for ds in datasets
+            ],
+        }
+
+    @staticmethod
     def revoke_department_admin_and_notify(
         tenant_id: str,
         account_id: str,

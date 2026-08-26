@@ -34,7 +34,7 @@ Implemented department admin management (set/unset) and member move service with
 - Ruff: all checks passed
 
 ## Commits
-Pending commit.
+- `ec3fb12b86` — feat(department): member move and department admin management with auto-revoke
 
 ## Concerns
 None.

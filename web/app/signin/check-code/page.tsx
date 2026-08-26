@@ -21,7 +21,6 @@ export default function CheckCode() {
   const searchParams = useSearchParams()
   const email = decodeURIComponent(searchParams.get('email') as string)
   const token = decodeURIComponent(searchParams.get('token') as string)
-  const invite_token = decodeURIComponent(searchParams.get('invite_token') || '')
   const language = i18n.language
   const [code, setVerifyCode] = useState('')
   const [loading, setIsLoading] = useState(false)
@@ -41,19 +40,12 @@ export default function CheckCode() {
       setIsLoading(true)
       const ret = await emailLoginWithCode({ email, code: encryptVerificationCode(code), token, language })
       if (ret.result === 'success') {
-        // Track login success event
         trackEvent('user_login_success', {
           method: 'email_code',
-          is_invite: !!invite_token,
         })
 
-        if (invite_token) {
-          router.replace(`/signin/invite-settings?${searchParams.toString()}`)
-        }
-        else {
-          const redirectUrl = resolvePostLoginRedirect()
-          router.replace(redirectUrl || '/apps')
-        }
+        const redirectUrl = resolvePostLoginRedirect()
+        router.replace(redirectUrl || '/apps')
       }
     }
     catch (error) { console.error(error) }

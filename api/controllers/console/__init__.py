@@ -73,7 +73,6 @@ from .app import (
 
 # Import auth controllers
 from .auth import (
-    activate,
     data_source_bearer_auth,
     data_source_oauth,
     email_register,
@@ -140,7 +139,6 @@ api.add_namespace(console_ns)
 
 __all__ = [
     "account",
-    "activate",
     "admin",
     "advanced_prompt_template",
     "agent",

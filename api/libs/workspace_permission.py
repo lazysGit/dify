@@ -18,32 +18,6 @@ from services.feature_service import FeatureService
 logger = logging.getLogger(__name__)
 
 
-def check_workspace_member_invite_permission(workspace_id: str) -> None:
-    """
-    Check if workspace allows member invitations at both billing and policy levels.
-
-    Checks performed:
-    1. Billing/plan level - For future expansion (currently no plan-level restriction)
-    2. Enterprise policy level - Admin-configured workspace permission
-
-    Args:
-        workspace_id: The workspace ID to check permissions for
-
-    Raises:
-        Forbidden: If either billing plan or workspace policy prohibits member invitations
-    """
-    # Check enterprise workspace policy level (only if enterprise enabled)
-    if dify_config.ENTERPRISE_ENABLED:
-        try:
-            permission = EnterpriseService.WorkspacePermissionService.get_permission(workspace_id)
-            if not permission.allow_member_invite:
-                raise Forbidden("Workspace policy prohibits member invitations")
-        except Forbidden:
-            raise
-        except Exception:
-            logger.exception("Failed to check workspace invite permission for %s", workspace_id)
-
-
 def check_workspace_owner_transfer_permission(workspace_id: str) -> None:
     """
     Check if workspace allows owner transfer at both billing and policy levels.

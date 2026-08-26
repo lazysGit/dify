@@ -1,10 +1,7 @@
 import base64
-import json
 import logging
 import secrets
-import uuid
 from datetime import UTC, datetime, timedelta
-from hashlib import sha256
 from typing import Any, cast
 
 from pydantic import BaseModel
@@ -36,7 +33,6 @@ from models.account import (
 from models.model import DifySetup
 from services.billing_service import BillingService
 from services.errors.account import (
-    AccountAlreadyInTenantError,
     AccountEmailAlreadyInUseError,
     AccountLoginError,
     AccountNotLinkTenantError,
@@ -60,7 +56,6 @@ from tasks.mail_change_mail_task import (
     send_change_mail_task,
 )
 from tasks.mail_email_code_login import send_email_code_login_mail_task
-from tasks.mail_invite_member_task import send_invite_member_mail_task
 from tasks.mail_member_created_task import send_member_created_mail_task
 from tasks.mail_owner_transfer_task import (
     send_new_owner_transfer_notify_email_task,
@@ -185,7 +180,7 @@ class AccountService:
         return token
 
     @staticmethod
-    def authenticate(email: str, password: str, invite_token: str | None = None) -> Account:
+    def authenticate(email: str, password: str) -> Account:
         """authenticate account with email and password"""
 
         account = db.session.query(Account).filter_by(email=email).first()
@@ -194,15 +189,6 @@ class AccountService:
 
         if account.status == AccountStatus.BANNED:
             raise AccountLoginError("Account is banned.")
-
-        if password and invite_token and account.password is None:
-            # if invite_token is valid, set password and password_salt
-            salt = secrets.token_bytes(16)
-            base64_salt = base64.b64encode(salt).decode()
-            password_hashed = hash_password(password, salt)
-            base64_password_hashed = base64.b64encode(password_hashed).decode()
-            account.password = base64_password_hashed
-            account.password_salt = base64_salt
 
         if account.password is None or not compare_password(password, account.password, account.password_salt):
             raise AccountPasswordError("Invalid email or password.")
@@ -1179,19 +1165,34 @@ class TenantService:
 
     @staticmethod
     def get_tenant_members(tenant: Tenant) -> list[Account]:
-        """Get tenant members"""
+        """Get tenant members with department info (batch query to avoid N+1)."""
+        from models.department import Department
+
         query = (
-            db.session.query(Account, TenantAccountJoin.role)
+            db.session.query(
+                Account,
+                TenantAccountJoin.role,
+                TenantAccountJoin.department_id,
+                TenantAccountJoin.is_department_admin,
+            )
             .select_from(Account)
             .join(TenantAccountJoin, Account.id == TenantAccountJoin.account_id)
             .where(TenantAccountJoin.tenant_id == tenant.id)
         )
 
-        # Initialize an empty list to store the updated accounts
-        updated_accounts = []
+        rows = query.all()
+        dept_ids = {row[2] for row in rows if row[2]}
+        dept_name_map: dict[str, str] = {}
+        if dept_ids:
+            depts = db.session.query(Department).filter(Department.id.in_(dept_ids)).all()
+            dept_name_map = {d.id: d.name for d in depts}
 
-        for account, role in query:
+        updated_accounts: list[Account] = []
+        for account, role, department_id, is_department_admin in rows:
             account.role = role
+            account.department_id = department_id
+            account.department_name = dept_name_map.get(department_id, "") if department_id else ""
+            account.is_department_admin = is_department_admin
             updated_accounts.append(account)
 
         return updated_accounts
@@ -1366,10 +1367,6 @@ class TenantService:
 
 
 class RegisterService:
-    @classmethod
-    def _get_invitation_token_key(cls, token: str) -> str:
-        return f"member_invite:token:{token}"
-
     @classmethod
     def setup(cls, email: str, name: str, password: str, ip_address: str, language: str | None):
         """
@@ -1564,164 +1561,6 @@ class RegisterService:
         if not ta:
             return False
         return ta.role in {TenantAccountRole.OWNER, TenantAccountRole.ADMIN}
-
-    @classmethod
-    def invite_new_member(
-        cls, tenant: Tenant, email: str, language: str | None, role: str = "normal", inviter: Account | None = None
-    ) -> str:
-        if not inviter:
-            raise ValueError("Inviter is required")
-
-        normalized_email = email.lower()
-
-        """Invite new member"""
-        # Check workspace permission for member invitations
-        from libs.workspace_permission import check_workspace_member_invite_permission
-
-        check_workspace_member_invite_permission(tenant.id)
-
-        with Session(db.engine) as session:
-            account = AccountService.get_account_by_email_with_case_fallback(email, session=session)
-
-        if not account:
-            TenantService.check_member_permission(tenant, inviter, None, "add")
-            name = normalized_email.split("@")[0]
-
-            account = cls.register(
-                email=normalized_email,
-                name=name,
-                language=language,
-                status=AccountStatus.PENDING,
-                is_setup=True,
-            )
-            # Create new tenant member for invited tenant
-            TenantService.create_tenant_member(tenant, account, role)
-            TenantService.switch_tenant(account, tenant.id)
-        else:
-            TenantService.check_member_permission(tenant, inviter, account, "add")
-            ta = db.session.query(TenantAccountJoin).filter_by(tenant_id=tenant.id, account_id=account.id).first()
-
-            if not ta:
-                TenantService.create_tenant_member(tenant, account, role)
-
-            # Support resend invitation email when the account is pending status
-            if account.status != AccountStatus.PENDING:
-                raise AccountAlreadyInTenantError("Account already in tenant.")
-
-        token = cls.generate_invite_token(tenant, account)
-        language = account.interface_language or "en-US"
-
-        # send email
-        send_invite_member_mail_task.delay(
-            language=language,
-            to=account.email,
-            token=token,
-            inviter_name=inviter.name if inviter else "Dify",
-            workspace_name=tenant.name,
-        )
-
-        return token
-
-    @classmethod
-    def generate_invite_token(cls, tenant: Tenant, account: Account) -> str:
-        token = str(uuid.uuid4())
-        invitation_data = {
-            "account_id": account.id,
-            "email": account.email,
-            "workspace_id": tenant.id,
-        }
-        expiry_hours = dify_config.INVITE_EXPIRY_HOURS
-        redis_client.setex(cls._get_invitation_token_key(token), expiry_hours * 60 * 60, json.dumps(invitation_data))
-        return token
-
-    @classmethod
-    def is_valid_invite_token(cls, token: str) -> bool:
-        data = redis_client.get(cls._get_invitation_token_key(token))
-        return data is not None
-
-    @classmethod
-    def revoke_token(cls, workspace_id: str | None, email: str | None, token: str):
-        if workspace_id and email:
-            email_hash = sha256(email.encode()).hexdigest()
-            cache_key = f"member_invite_token:{workspace_id}, {email_hash}:{token}"
-            redis_client.delete(cache_key)
-        else:
-            redis_client.delete(cls._get_invitation_token_key(token))
-
-    @classmethod
-    def get_invitation_if_token_valid(
-        cls, workspace_id: str | None, email: str | None, token: str
-    ) -> dict[str, Any] | None:
-        invitation_data = cls.get_invitation_by_token(token, workspace_id, email)
-        if not invitation_data:
-            return None
-
-        tenant = (
-            db.session.query(Tenant)
-            .where(Tenant.id == invitation_data["workspace_id"], Tenant.status == "normal")
-            .first()
-        )
-
-        if not tenant:
-            return None
-
-        tenant_account = (
-            db.session.query(Account, TenantAccountJoin.role)
-            .join(TenantAccountJoin, Account.id == TenantAccountJoin.account_id)
-            .where(Account.email == invitation_data["email"], TenantAccountJoin.tenant_id == tenant.id)
-            .first()
-        )
-
-        if not tenant_account:
-            return None
-
-        account = tenant_account[0]
-        if not account:
-            return None
-
-        if invitation_data["account_id"] != str(account.id):
-            return None
-
-        return {
-            "account": account,
-            "data": invitation_data,
-            "tenant": tenant,
-        }
-
-    @classmethod
-    def get_invitation_by_token(
-        cls, token: str, workspace_id: str | None = None, email: str | None = None
-    ) -> dict[str, str] | None:
-        if workspace_id is not None and email is not None:
-            email_hash = sha256(email.encode()).hexdigest()
-            cache_key = f"member_invite_token:{workspace_id}, {email_hash}:{token}"
-            account_id = redis_client.get(cache_key)
-
-            if not account_id:
-                return None
-
-            return {
-                "account_id": account_id.decode("utf-8"),
-                "email": email,
-                "workspace_id": workspace_id,
-            }
-        else:
-            data = redis_client.get(cls._get_invitation_token_key(token))
-            if not data:
-                return None
-
-            invitation: dict = json.loads(data)
-            return invitation
-
-    @classmethod
-    def get_invitation_with_case_fallback(
-        cls, workspace_id: str | None, email: str | None, token: str
-    ) -> dict[str, Any] | None:
-        invitation = cls.get_invitation_if_token_valid(workspace_id, email, token)
-        if invitation or not email or email == email.lower():
-            return invitation
-        normalized_email = email.lower()
-        return cls.get_invitation_if_token_valid(workspace_id, normalized_email, token)
 
 
 def _generate_refresh_token(length: int = 64):

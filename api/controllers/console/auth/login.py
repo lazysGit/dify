@@ -1,5 +1,3 @@
-from typing import Any
-
 import flask_login
 from flask import make_response, request
 from flask_restx import Resource
@@ -42,7 +40,7 @@ from libs.token import (
     set_csrf_token_to_cookie,
     set_refresh_token_to_cookie,
 )
-from services.account_service import AccountService, RegisterService, TenantService
+from services.account_service import AccountService, TenantService
 from services.billing_service import BillingService
 from services.errors.account import AccountRegisterError
 from services.errors.workspace import WorkSpaceNotAllowedCreateError, WorkspacesLimitExceededError
@@ -55,7 +53,6 @@ class LoginPayload(BaseModel):
     email: EmailStr = Field(..., description="Email address")
     password: str = Field(..., description="Password")
     remember_me: bool = Field(default=False, description="Remember me flag")
-    invite_token: str | None = Field(default=None, description="Invitation token")
 
 
 class EmailPayload(BaseModel):
@@ -100,22 +97,9 @@ class LoginApi(Resource):
         if is_login_error_rate_limit:
             raise EmailPasswordLoginLimitError()
 
-        invite_token = args.invite_token
-        invitation_data: dict[str, Any] | None = None
-        if invite_token:
-            invitation_data = RegisterService.get_invitation_with_case_fallback(None, request_email, invite_token)
-            if invitation_data is None:
-                invite_token = None
-
         try:
-            if invitation_data:
-                data = invitation_data.get("data", {})
-                invitee_email = data.get("email") if data else None
-                invitee_email_normalized = invitee_email.lower() if isinstance(invitee_email, str) else invitee_email
-                if invitee_email_normalized != normalized_email:
-                    raise InvalidEmailError()
             account = _authenticate_account_with_case_fallback(
-                request_email, normalized_email, args.password, invite_token
+                request_email, normalized_email, args.password
             )
         except services.errors.account.AccountLoginError:
             raise AccountBannedError()
@@ -331,11 +315,11 @@ def _get_account_with_case_fallback(email: str):
 
 
 def _authenticate_account_with_case_fallback(
-    original_email: str, normalized_email: str, password: str, invite_token: str | None
+    original_email: str, normalized_email: str, password: str
 ):
     try:
-        return AccountService.authenticate(original_email, password, invite_token)
+        return AccountService.authenticate(original_email, password)
     except services.errors.account.AccountPasswordError:
         if original_email == normalized_email:
             raise
-        return AccountService.authenticate(normalized_email, password, invite_token)
+        return AccountService.authenticate(normalized_email, password)

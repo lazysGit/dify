@@ -26,28 +26,6 @@ vi.mock('../edit-workspace-modal', () => ({
     </div>
   ),
 }))
-vi.mock('../invite-button', () => ({
-  default: ({ onClick, disabled }: { onClick: () => void, disabled: boolean }) => (
-    <button onClick={onClick} disabled={disabled}>Invite</button>
-  ),
-}))
-vi.mock('../invite-modal', () => ({
-  default: ({ onCancel, onSend }: { onCancel: () => void, onSend: (results: Array<{ email: string, status: 'success', url: string }>) => void }) => (
-    <div>
-      <div>Invite Modal</div>
-      <button onClick={onCancel}>Close Invite Modal</button>
-      <button onClick={() => onSend([{ email: 'sent@example.com', status: 'success', url: 'http://invite/link' }])}>Send Invite Results</button>
-    </div>
-  ),
-}))
-vi.mock('../invited-modal', () => ({
-  default: ({ onCancel }: { onCancel: () => void }) => (
-    <div>
-      <div>Invited Modal</div>
-      <button onClick={onCancel}>Close Invited Modal</button>
-    </div>
-  ),
-}))
 vi.mock('../operation', () => ({
   default: () => <div>Member Operation</div>,
 }))
@@ -134,33 +112,6 @@ describe('MembersPage', () => {
     expect(screen.getByText('Admin User')).toBeInTheDocument()
   })
 
-  it('should open and close invite modal', async () => {
-    const user = userEvent.setup()
-
-    render(<MembersPage />)
-
-    await user.click(screen.getByRole('button', { name: /invite/i }))
-    expect(screen.getByText('Invite Modal')).toBeInTheDocument()
-
-    await user.click(screen.getByRole('button', { name: 'Close Invite Modal' }))
-    expect(screen.queryByText('Invite Modal')).not.toBeInTheDocument()
-  })
-
-  it('should open invited modal after invite results are sent', async () => {
-    const user = userEvent.setup()
-
-    render(<MembersPage />)
-
-    await user.click(screen.getByRole('button', { name: /invite/i }))
-    await user.click(screen.getByRole('button', { name: 'Send Invite Results' }))
-
-    expect(screen.getByText('Invited Modal')).toBeInTheDocument()
-    expect(mockRefetch).toHaveBeenCalled()
-
-    await user.click(screen.getByRole('button', { name: 'Close Invited Modal' }))
-    expect(screen.queryByText('Invited Modal')).not.toBeInTheDocument()
-  })
-
   it('should open transfer ownership modal when transfer action is used', async () => {
     const user = userEvent.setup()
 
@@ -192,7 +143,6 @@ describe('MembersPage', () => {
 
     render(<MembersPage />)
 
-    expect(screen.queryByRole('button', { name: /invite/i })).not.toBeInTheDocument()
     expect(screen.queryByText('Transfer ownership')).not.toBeInTheDocument()
   })
 
@@ -280,20 +230,6 @@ describe('MembersPage', () => {
 
     // Plan.team is an unlimited member plan → isNotUnlimitedMemberPlan=false → non-billing layout
     expect(screen.getByText(/plansCommon\.memberAfter/i)).toBeInTheDocument()
-  })
-
-  it('should show invite button when user is manager but not owner', () => {
-    vi.mocked(useAppContext).mockReturnValue({
-      userProfile: { email: 'admin@example.com' },
-      currentWorkspace: { name: 'Test Workspace', role: 'admin' } as ICurrentWorkspace,
-      isCurrentWorkspaceOwner: false,
-      isCurrentWorkspaceManager: true,
-    } as unknown as AppContextValue)
-
-    render(<MembersPage />)
-
-    expect(screen.getByRole('button', { name: /invite/i })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /transfer ownership/i })).not.toBeInTheDocument()
   })
 
   it('should use created_at as fallback when last_active_at is empty', () => {

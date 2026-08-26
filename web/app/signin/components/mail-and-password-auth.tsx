@@ -16,12 +16,11 @@ import { encryptPassword } from '@/utils/encryption'
 import { resolvePostLoginRedirect } from '../utils/post-login-redirect'
 
 type MailAndPasswordAuthProps = {
-  isInvite: boolean
   isEmailSetup: boolean
   allowRegistration: boolean
 }
 
-export default function MailAndPasswordAuth({ isInvite, isEmailSetup, allowRegistration: _allowRegistration }: MailAndPasswordAuthProps) {
+export default function MailAndPasswordAuth({ isEmailSetup, allowRegistration: _allowRegistration }: MailAndPasswordAuthProps) {
   const { t } = useTranslation()
   const locale = useLocale()
   const router = useRouter()
@@ -55,29 +54,20 @@ export default function MailAndPasswordAuth({ isInvite, isEmailSetup, allowRegis
         language: locale,
         remember_me: true,
       }
-      if (isInvite)
-        loginData.invite_token = decodeURIComponent(searchParams.get('invite_token') as string)
       const res = await login({
         url: '/login',
         body: loginData,
       })
       if (res.result === 'success') {
         if (res?.data?.access_token) {
-          // Track login success event
           setWebAppAccessToken(res.data.access_token)
         }
         trackEvent('user_login_success', {
           method: 'email_password',
-          is_invite: isInvite,
         })
 
-        if (isInvite) {
-          router.replace(`/signin/invite-settings?${searchParams.toString()}`)
-        }
-        else {
-          const redirectUrl = resolvePostLoginRedirect()
-          router.replace(redirectUrl || '/apps')
-        }
+        const redirectUrl = resolvePostLoginRedirect()
+        router.replace(redirectUrl || '/apps')
       }
       else {
         toast.error(res.data)
@@ -103,7 +93,6 @@ export default function MailAndPasswordAuth({ isInvite, isEmailSetup, allowRegis
           <Input
             value={email}
             onChange={e => setEmail(e.target.value)}
-            disabled={isInvite}
             id="email"
             type="email"
             autoComplete="email"

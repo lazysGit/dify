@@ -59,19 +59,18 @@ class OAuthLogin(Resource):
     @console_ns.doc("oauth_login")
     @console_ns.doc(description="Initiate OAuth login process")
     @console_ns.doc(
-        params={"provider": "OAuth provider name (github/google)", "invite_token": "Optional invitation token"}
+        params={"provider": "OAuth provider name (github/google)"}
     )
     @console_ns.response(302, "Redirect to OAuth authorization URL")
     @console_ns.response(400, "Invalid provider")
     def get(self, provider: str):
-        invite_token = request.args.get("invite_token") or None
         OAUTH_PROVIDERS = get_oauth_providers()
         with current_app.app_context():
             oauth_provider = OAUTH_PROVIDERS.get(provider)
         if not oauth_provider:
             return {"error": "Invalid provider"}, 400
 
-        auth_url = oauth_provider.get_authorization_url(invite_token=invite_token)
+        auth_url = oauth_provider.get_authorization_url()
         return redirect(auth_url)
 
 
@@ -83,7 +82,6 @@ class OAuthCallback(Resource):
         params={
             "provider": "OAuth provider name (github/google)",
             "code": "Authorization code from OAuth provider",
-            "state": "Optional state parameter (used for invite token)",
         }
     )
     @console_ns.response(302, "Redirect to console with access token")
@@ -96,10 +94,6 @@ class OAuthCallback(Resource):
             return {"error": "Invalid provider"}, 400
 
         code = request.args.get("code")
-        state = request.args.get("state")
-        invite_token = None
-        if state:
-            invite_token = state
 
         if not code:
             return {"error": "Authorization code is required"}, 400
@@ -116,18 +110,6 @@ class OAuthCallback(Resource):
         except ValueError as e:
             logger.warning("OAuth error with %s", provider, exc_info=True)
             return redirect(f"{dify_config.CONSOLE_WEB_URL}/signin?message={urllib.parse.quote(str(e))}")
-
-        if invite_token and RegisterService.is_valid_invite_token(invite_token):
-            invitation = RegisterService.get_invitation_by_token(token=invite_token)
-            if invitation:
-                invitation_email = invitation.get("email", None)
-                invitation_email_normalized = (
-                    invitation_email.lower() if isinstance(invitation_email, str) else invitation_email
-                )
-                if invitation_email_normalized != user_info.email.lower():
-                    return redirect(f"{dify_config.CONSOLE_WEB_URL}/signin?message=Invalid invitation token.")
-
-            return redirect(f"{dify_config.CONSOLE_WEB_URL}/signin/invite-settings?invite_token={invite_token}")
 
         try:
             account, oauth_new_user = _generate_account(provider, user_info)

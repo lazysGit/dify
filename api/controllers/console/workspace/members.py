@@ -1,11 +1,8 @@
-from urllib import parse
-
 from flask import abort, request
 from flask_restx import Resource
-from pydantic import BaseModel, Field, TypeAdapter
+from pydantic import BaseModel, TypeAdapter
 
 import services
-from configs import dify_config
 from controllers.common.schema import register_enum_models, register_schema_models
 from controllers.console import console_ns
 from controllers.console.auth.error import (
@@ -17,10 +14,11 @@ from controllers.console.auth.error import (
     NotOwnerError,
     OwnerTransferLimitError,
 )
-from controllers.console.error import EmailSendIpLimitError, WorkspaceMembersLimitExceeded
+from controllers.console.error import EmailSendIpLimitError
 from controllers.console.wraps import (
     account_initialization_required,
     cloud_edition_billing_resource_check,
+    decrypt_password_field,
     is_allow_transfer_owner,
     setup_required,
 )
@@ -28,18 +26,19 @@ from extensions.ext_database import db
 from fields.member_fields import AccountWithRole, AccountWithRoleList
 from libs.helper import extract_remote_ip
 from libs.login import current_account_with_tenant, login_required
-from models.account import Account, TenantAccountRole
+from models.account import Account, TenantAccountJoin, TenantAccountRole
 from services.account_service import AccountService, RegisterService, TenantService
-from services.errors.account import AccountAlreadyInTenantError
-from services.feature_service import FeatureService
+from services.department_service import DepartmentAuditLog, DepartmentService
 
 DEFAULT_REF_TEMPLATE_SWAGGER_2_0 = "#/definitions/{model}"
 
 
-class MemberInvitePayload(BaseModel):
-    emails: list[str] = Field(default_factory=list)
-    role: TenantAccountRole
-    language: str | None = None
+class MemberCreatePayload(BaseModel):
+    name: str
+    email: str
+    password: str
+    department_id: str
+    role: str
 
 
 class MemberRoleUpdatePayload(BaseModel):
@@ -63,7 +62,7 @@ def reg(cls: type[BaseModel]):
     console_ns.schema_model(cls.__name__, cls.model_json_schema(ref_template=DEFAULT_REF_TEMPLATE_SWAGGER_2_0))
 
 
-reg(MemberInvitePayload)
+reg(MemberCreatePayload)
 reg(MemberRoleUpdatePayload)
 reg(OwnerTransferEmailPayload)
 reg(OwnerTransferCheckPayload)
@@ -84,85 +83,28 @@ class MemberListApi(Resource):
         current_user, _ = current_account_with_tenant()
         if not current_user.current_tenant:
             raise ValueError("No current tenant")
+
+        tenant_id = current_user.current_tenant.id
+        is_admin_or_owner = current_user.is_admin_or_owner
+        is_dept_admin = DepartmentService.is_department_admin(current_user.id, tenant_id)
+
+        if not is_admin_or_owner and not is_dept_admin:
+            return {"code": "forbidden", "message": "Only admin or department admin can list members"}, 403
+
         members = TenantService.get_tenant_members(current_user.current_tenant)
+
+        if not is_admin_or_owner and is_dept_admin:
+            manageable = DepartmentService.get_manageable_department_ids(current_user, tenant_id)
+            members = [m for m in members if getattr(m, "department_id", None) in manageable]
+
         member_models = TypeAdapter(list[AccountWithRole]).validate_python(members, from_attributes=True)
         response = AccountWithRoleList(accounts=member_models)
         return response.model_dump(mode="json"), 200
 
 
-@console_ns.route("/workspaces/current/members/invite-email")
-class MemberInviteEmailApi(Resource):
-    """Invite a new member by email."""
-
-    @console_ns.expect(console_ns.models[MemberInvitePayload.__name__])
-    @setup_required
-    @login_required
-    @account_initialization_required
-    @cloud_edition_billing_resource_check("members")
-    def post(self):
-        payload = console_ns.payload or {}
-        args = MemberInvitePayload.model_validate(payload)
-
-        invitee_emails = args.emails
-        invitee_role = args.role
-        interface_language = args.language
-        if not TenantAccountRole.is_non_owner_role(invitee_role):
-            return {"code": "invalid-role", "message": "Invalid role"}, 400
-        current_user, _ = current_account_with_tenant()
-        inviter = current_user
-        if not inviter.current_tenant:
-            raise ValueError("No current tenant")
-
-        # Check workspace permission for member invitations
-        from libs.workspace_permission import check_workspace_member_invite_permission
-
-        check_workspace_member_invite_permission(inviter.current_tenant.id)
-
-        invitation_results = []
-        console_web_url = dify_config.CONSOLE_WEB_URL
-
-        workspace_members = FeatureService.get_features(tenant_id=inviter.current_tenant.id).workspace_members
-
-        if not workspace_members.is_available(len(invitee_emails)):
-            raise WorkspaceMembersLimitExceeded()
-
-        for invitee_email in invitee_emails:
-            normalized_invitee_email = invitee_email.lower()
-            try:
-                if not inviter.current_tenant:
-                    raise ValueError("No current tenant")
-                token = RegisterService.invite_new_member(
-                    tenant=inviter.current_tenant,
-                    email=invitee_email,
-                    language=interface_language,
-                    role=invitee_role,
-                    inviter=inviter,
-                )
-                encoded_invitee_email = parse.quote(normalized_invitee_email)
-                invitation_results.append(
-                    {
-                        "status": "success",
-                        "email": normalized_invitee_email,
-                        "url": f"{console_web_url}/activate?email={encoded_invitee_email}&token={token}",
-                    }
-                )
-            except AccountAlreadyInTenantError:
-                invitation_results.append(
-                    {"status": "success", "email": normalized_invitee_email, "url": f"{console_web_url}/signin"}
-                )
-            except Exception as e:
-                invitation_results.append({"status": "failed", "email": normalized_invitee_email, "message": str(e)})
-
-        return {
-            "result": "success",
-            "invitation_results": invitation_results,
-            "tenant_id": str(inviter.current_tenant.id) if inviter.current_tenant else "",
-        }, 201
-
-
 @console_ns.route("/workspaces/current/members/<uuid:member_id>")
 class MemberCancelInviteApi(Resource):
-    """Cancel an invitation by member id."""
+    """Remove a member from the workspace."""
 
     @setup_required
     @login_required
@@ -216,13 +158,163 @@ class MemberUpdateRoleApi(Resource):
 
         try:
             assert member is not None, "Member not found"
+            tenant_id = current_user.current_tenant.id
+
+            old_join = (
+                db.session.query(TenantAccountJoin)
+                .filter_by(tenant_id=tenant_id, account_id=member.id).first()
+            )
+            was_dept_admin = old_join.is_department_admin if old_join else False
+
             TenantService.update_member_role(current_user.current_tenant, member, new_role, current_user)
+
+            if was_dept_admin and new_role in {
+                TenantAccountRole.NORMAL,
+                TenantAccountRole.DATASET_OPERATOR,
+            }:
+                DepartmentService.revoke_department_admin_and_notify(
+                    tenant_id=tenant_id,
+                    account_id=member.id,
+                    reason="role_downgrade",
+                )
         except Exception as e:
             raise ValueError(str(e))
 
-        # todo: 403
-
         return {"result": "success"}
+
+
+@console_ns.route("/workspaces/current/members/create")
+class MemberCreateApi(Resource):
+    """Create a new member by admin."""
+
+    @console_ns.expect(console_ns.models[MemberCreatePayload.__name__])
+    @setup_required
+    @login_required
+    @account_initialization_required
+    @decrypt_password_field
+    @cloud_edition_billing_resource_check("members")
+    def post(self):
+        payload = console_ns.payload or {}
+        args = MemberCreatePayload.model_validate(payload)
+
+        current_user, _ = current_account_with_tenant()
+        if not current_user.current_tenant:
+            raise ValueError("No current tenant")
+
+        tenant_id = current_user.current_tenant.id
+
+        if not TenantAccountRole.is_non_owner_role(args.role):
+            return {"code": "invalid-role", "message": "Invalid role"}, 400
+
+        if not current_user.is_admin_or_owner:
+            is_dept_admin = DepartmentService.is_department_admin(current_user.id, tenant_id)
+            if not is_dept_admin:
+                return {"code": "forbidden", "message": "Only admin or department admin can create members"}, 403
+
+        try:
+            account = RegisterService.create_member_by_admin(
+                operator=current_user,
+                tenant_id=tenant_id,
+                name=args.name,
+                email=args.email,
+                password=args.password,
+                department_id=args.department_id,
+                role=TenantAccountRole(args.role),
+            )
+        except Exception as e:
+            raise ValueError(str(e))
+
+        join = (
+            db.session.query(TenantAccountJoin)
+            .filter_by(tenant_id=tenant_id, account_id=account.id).first()
+        )
+
+        from models.department import Department
+
+        dept_name = ""
+        if join and join.department_id:
+            dept = db.session.query(Department).filter_by(id=join.department_id).first()
+            dept_name = dept.name if dept else ""
+
+        return {
+            "id": account.id,
+            "name": account.name,
+            "email": account.email,
+            "department_id": join.department_id if join else None,
+            "role": join.role if join else None,
+            "is_department_admin": join.is_department_admin if join else False,
+            "created_at": int(account.created_at.timestamp()) if account.created_at else None,
+            "department_name": dept_name,
+        }, 201
+
+
+@console_ns.route("/workspaces/current/members/<uuid:member_id>/created-resources")
+class MemberCreatedResourcesApi(Resource):
+    """Get resources created by a member (G1)."""
+
+    @setup_required
+    @login_required
+    @account_initialization_required
+    def get(self, member_id):
+        current_user, _ = current_account_with_tenant()
+        if not current_user.current_tenant:
+            raise ValueError("No current tenant")
+
+        tenant_id = current_user.current_tenant.id
+
+        if not current_user.is_admin_or_owner:
+            is_dept_admin = DepartmentService.is_department_admin(current_user.id, tenant_id)
+            if not is_dept_admin:
+                return {"code": "forbidden", "message": "Forbidden"}, 403
+
+        try:
+            resources = DepartmentService.get_member_created_resources(tenant_id, str(member_id))
+        except Exception as e:
+            raise ValueError(str(e))
+
+        if not current_user.is_admin_or_owner:
+            manageable = DepartmentService.get_manageable_department_ids(current_user, tenant_id)
+            resources["apps"] = [a for a in resources["apps"] if a.get("department_id") in manageable]
+            resources["datasets"] = [d for d in resources["datasets"] if d.get("department_id") in manageable]
+
+        return resources, 200
+
+
+@console_ns.route("/workspaces/current/members/<uuid:member_id>/operation-logs")
+class MemberOperationLogApi(Resource):
+    """Get operation logs for a member (G2)."""
+
+    @setup_required
+    @login_required
+    @account_initialization_required
+    def get(self, member_id):
+        current_user, _ = current_account_with_tenant()
+        if not current_user.current_tenant:
+            raise ValueError("No current tenant")
+
+        if not current_user.is_admin_or_owner:
+            return {"code": "forbidden", "message": "Only owner/admin can view operation logs"}, 403
+
+        tenant_id = current_user.current_tenant.id
+        limit = request.args.get("limit", 100, type=int)
+
+        try:
+            logs = DepartmentAuditLog.query(tenant_id, "account_id", str(member_id), limit)
+        except Exception as e:
+            raise ValueError(str(e))
+
+        return {
+            "logs": [
+                {
+                    "id": log.id,
+                    "action": log.action,
+                    "content": log.content,
+                    "created_at": int(log.created_at.timestamp()) if log.created_at else None,
+                    "created_ip": log.created_ip,
+                }
+                for log in logs
+            ]
+        }, 200
 
 
 @console_ns.route("/workspaces/current/dataset-operators")

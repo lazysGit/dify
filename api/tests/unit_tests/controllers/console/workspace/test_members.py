@@ -13,18 +13,16 @@ from controllers.console.auth.error import (
     NotOwnerError,
     OwnerTransferLimitError,
 )
-from controllers.console.error import EmailSendIpLimitError, WorkspaceMembersLimitExceeded
+from controllers.console.error import EmailSendIpLimitError
 from controllers.console.workspace.members import (
     DatasetOperatorMemberListApi,
     MemberCancelInviteApi,
-    MemberInviteEmailApi,
     MemberListApi,
     MemberUpdateRoleApi,
     OwnerTransfer,
     OwnerTransferCheckApi,
     SendOwnerTransferEmailApi,
 )
-from services.errors.account import AccountAlreadyInTenantError
 
 
 def unwrap(func):
@@ -39,7 +37,7 @@ class TestMemberListApi:
         method = unwrap(api.get)
 
         tenant = MagicMock()
-        user = MagicMock(current_tenant=tenant)
+        user = MagicMock(current_tenant=tenant, is_admin_or_owner=True)
         member = MagicMock()
         member.id = "m1"
         member.name = "Member"
@@ -47,12 +45,16 @@ class TestMemberListApi:
         member.avatar = "avatar.png"
         member.role = "admin"
         member.status = "active"
+        member.department_id = "dept1"
+        member.department_name = "Engineering"
+        member.is_department_admin = False
         members = [member]
 
         with (
             app.test_request_context("/"),
             patch("controllers.console.workspace.members.current_account_with_tenant", return_value=(user, "t1")),
             patch("controllers.console.workspace.members.TenantService.get_tenant_members", return_value=members),
+            patch("controllers.console.workspace.members.DepartmentService.is_department_admin", return_value=False),
         ):
             result, status = method(api)
 
@@ -71,128 +73,6 @@ class TestMemberListApi:
         ):
             with pytest.raises(ValueError):
                 method(api)
-
-
-class TestMemberInviteEmailApi:
-    def test_invite_success(self, app):
-        api = MemberInviteEmailApi()
-        method = unwrap(api.post)
-
-        tenant = MagicMock(id="t1")
-        user = MagicMock(current_tenant=tenant)
-        features = MagicMock()
-        features.workspace_members.is_available.return_value = True
-
-        payload = {
-            "emails": ["a@test.com"],
-            "role": "normal",
-            "language": "en-US",
-        }
-
-        with (
-            app.test_request_context("/", json=payload),
-            patch("controllers.console.workspace.members.current_account_with_tenant", return_value=(user, "t1")),
-            patch("controllers.console.workspace.members.FeatureService.get_features", return_value=features),
-            patch("controllers.console.workspace.members.RegisterService.invite_new_member", return_value="token"),
-            patch("controllers.console.workspace.members.dify_config.CONSOLE_WEB_URL", "http://x"),
-        ):
-            result, status = method(api)
-
-        assert status == 201
-        assert result["result"] == "success"
-
-    def test_invite_limit_exceeded(self, app):
-        api = MemberInviteEmailApi()
-        method = unwrap(api.post)
-
-        tenant = MagicMock(id="t1")
-        user = MagicMock(current_tenant=tenant)
-        features = MagicMock()
-        features.workspace_members.is_available.return_value = False
-
-        payload = {
-            "emails": ["a@test.com"],
-            "role": "normal",
-        }
-
-        with (
-            app.test_request_context("/", json=payload),
-            patch("controllers.console.workspace.members.current_account_with_tenant", return_value=(user, "t1")),
-            patch("controllers.console.workspace.members.FeatureService.get_features", return_value=features),
-        ):
-            with pytest.raises(WorkspaceMembersLimitExceeded):
-                method(api)
-
-    def test_invite_already_member(self, app):
-        api = MemberInviteEmailApi()
-        method = unwrap(api.post)
-
-        tenant = MagicMock(id="t1")
-        user = MagicMock(current_tenant=tenant)
-        features = MagicMock()
-        features.workspace_members.is_available.return_value = True
-
-        payload = {
-            "emails": ["a@test.com"],
-            "role": "normal",
-        }
-
-        with (
-            app.test_request_context("/", json=payload),
-            patch("controllers.console.workspace.members.current_account_with_tenant", return_value=(user, "t1")),
-            patch("controllers.console.workspace.members.FeatureService.get_features", return_value=features),
-            patch(
-                "controllers.console.workspace.members.RegisterService.invite_new_member",
-                side_effect=AccountAlreadyInTenantError(),
-            ),
-            patch("controllers.console.workspace.members.dify_config.CONSOLE_WEB_URL", "http://x"),
-        ):
-            result, status = method(api)
-
-        assert result["invitation_results"][0]["status"] == "success"
-
-    def test_invite_invalid_role(self, app):
-        api = MemberInviteEmailApi()
-        method = unwrap(api.post)
-
-        payload = {
-            "emails": ["a@test.com"],
-            "role": "owner",
-        }
-
-        with app.test_request_context("/", json=payload):
-            result, status = method(api)
-
-        assert status == 400
-        assert result["code"] == "invalid-role"
-
-    def test_invite_generic_exception(self, app):
-        api = MemberInviteEmailApi()
-        method = unwrap(api.post)
-
-        tenant = MagicMock(id="t1")
-        user = MagicMock(current_tenant=tenant)
-        features = MagicMock()
-        features.workspace_members.is_available.return_value = True
-
-        payload = {
-            "emails": ["a@test.com"],
-            "role": "normal",
-        }
-
-        with (
-            app.test_request_context("/", json=payload),
-            patch("controllers.console.workspace.members.current_account_with_tenant", return_value=(user, "t1")),
-            patch("controllers.console.workspace.members.FeatureService.get_features", return_value=features),
-            patch(
-                "controllers.console.workspace.members.RegisterService.invite_new_member",
-                side_effect=Exception("boom"),
-            ),
-            patch("controllers.console.workspace.members.dify_config.CONSOLE_WEB_URL", "http://x"),
-        ):
-            result, _ = method(api)
-
-        assert result["invitation_results"][0]["status"] == "failed"
 
 
 class TestMemberCancelInviteApi:
@@ -306,8 +186,13 @@ class TestMemberUpdateRoleApi:
         method = unwrap(api.put)
 
         tenant = MagicMock()
+        tenant.id = "t1"
         user = MagicMock(current_tenant=tenant)
         member = MagicMock()
+        member.id = "mid"
+
+        mock_join = MagicMock()
+        mock_join.is_department_admin = False
 
         payload = {"role": "normal"}
 
@@ -316,7 +201,9 @@ class TestMemberUpdateRoleApi:
             patch("controllers.console.workspace.members.current_account_with_tenant", return_value=(user, "t1")),
             patch("controllers.console.workspace.members.db.session.get", return_value=member),
             patch("controllers.console.workspace.members.TenantService.update_member_role"),
+            patch("controllers.console.workspace.members.db.session.query") as mock_query,
         ):
+            mock_query.return_value.filter_by.return_value.first.return_value = mock_join
             result = method(api, "id")
 
         if isinstance(result, tuple):
@@ -367,6 +254,9 @@ class TestDatasetOperatorMemberListApi:
         member.avatar = "avatar.png"
         member.role = "operator"
         member.status = "active"
+        member.department_id = "dept1"
+        member.department_name = "Engineering"
+        member.is_department_admin = False
         members = [member]
 
         with (
