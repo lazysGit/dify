@@ -6,7 +6,8 @@ from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 
 from extensions.ext_database import db
-from models.account import TenantAccountJoin
+from extensions.ext_mail import mail
+from models.account import Account, TenantAccountJoin, TenantAccountRole
 from models.dataset import Dataset
 from models.department import Department
 from models.model import App, OperationLog
@@ -294,11 +295,7 @@ class DepartmentService:
                 updated_at=func.now(),
             )
         )
-        db.session.execute(
-            sa.update(Department)
-            .where(Department.id == department_id)
-            .values(parent_id=new_parent_id)
-        )
+        db.session.execute(sa.update(Department).where(Department.id == department_id).values(parent_id=new_parent_id))
         db.session.commit()
 
         DepartmentAuditLog.log(
@@ -550,7 +547,13 @@ class DepartmentService:
         if not join:
             raise DepartmentNotFoundError("Member not found in tenant")
 
-        join.department_id = department_id
+        if join.department_id != department_id:
+            raise DepartmentValidationError("Member does not belong to this department")
+
+        allowed_roles = {TenantAccountRole.OWNER, TenantAccountRole.ADMIN, TenantAccountRole.EDITOR}
+        if join.role not in allowed_roles:
+            raise DepartmentValidationError("Only owner, admin, or editor can be set as department admin")
+
         join.is_department_admin = True
         db.session.commit()
 
@@ -590,4 +593,117 @@ class DepartmentService:
             operator_ip,
             "remove_department_admin",
             {"department_id": department_id, "member_id": member_account_id},
+        )
+
+    @staticmethod
+    def unset_department_admin(
+        tenant_id: str,
+        department_id: str,
+        member_account_id: str,
+        operator_id: str,
+        operator_ip: str | None = None,
+    ) -> None:
+        DepartmentService.remove_department_admin(
+            tenant_id=tenant_id,
+            department_id=department_id,
+            member_account_id=member_account_id,
+            operator_id=operator_id,
+            operator_ip=operator_ip,
+        )
+
+    @staticmethod
+    def move_member(
+        operator: Account,
+        tenant_id: str,
+        member_account_id: str,
+        target_department_id: str,
+        operator_ip: str | None = None,
+    ) -> None:
+        target_dept = (
+            db.session.query(Department)
+            .filter(Department.id == target_department_id, Department.tenant_id == tenant_id)
+            .first()
+        )
+        if not target_dept:
+            raise DepartmentNotFoundError("Target department not found")
+
+        join = (
+            db.session.query(TenantAccountJoin)
+            .filter(
+                TenantAccountJoin.tenant_id == tenant_id,
+                TenantAccountJoin.account_id == member_account_id,
+            )
+            .with_for_update()
+            .first()
+        )
+        if not join:
+            raise DepartmentNotFoundError("Member not found in tenant")
+
+        operator_accessible = DepartmentService.get_accessible_department_ids(operator, tenant_id)
+
+        if not operator.is_admin_or_owner:
+            if member_account_id == operator.id:
+                if DepartmentService.is_department_admin(operator.id, tenant_id):
+                    raise DepartmentPermissionDeniedError("Department admin cannot move themselves")
+
+            if operator_accessible is not None:
+                if join.department_id not in operator_accessible:
+                    raise DepartmentPermissionDeniedError("No permission to move this member")
+                if target_department_id not in operator_accessible:
+                    raise DepartmentPermissionDeniedError("No permission to move member to target department")
+
+        was_dept_admin = join.is_department_admin
+        join.department_id = target_department_id
+        join.is_department_admin = False
+        db.session.commit()
+
+        DepartmentAuditLog.log(
+            tenant_id,
+            operator.id,
+            operator_ip,
+            "move_member",
+            {"member_id": member_account_id, "target_department_id": target_department_id},
+        )
+
+        if was_dept_admin:
+            DepartmentService.revoke_department_admin_and_notify(
+                tenant_id=tenant_id,
+                account_id=member_account_id,
+                reason="member_moved",
+            )
+
+    @staticmethod
+    def revoke_department_admin_and_notify(
+        tenant_id: str,
+        account_id: str,
+        reason: str,
+    ) -> None:
+        if not mail.is_inited():
+            return
+
+        admin_joins = (
+            db.session.query(TenantAccountJoin)
+            .filter(
+                TenantAccountJoin.tenant_id == tenant_id,
+                TenantAccountJoin.role.in_([TenantAccountRole.OWNER, TenantAccountRole.ADMIN]),
+            )
+            .all()
+        )
+
+        recipients: list[str] = []
+        for admin_join in admin_joins:
+            account = db.session.query(Account).filter(Account.id == admin_join.account_id).first()
+            if account and account.email:
+                recipients.append(account.email)
+
+        if not recipients:
+            return
+
+        from libs.email_i18n import get_email_i18n_service
+
+        email_service = get_email_i18n_service()
+        email_service.send_raw_email(
+            to=recipients,
+            subject="Department Admin Revoked",
+            html_content=f"<p>Department admin status has been revoked for account {account_id}. Reason: {reason}</p>",
         )

@@ -4,7 +4,7 @@
 DONE
 
 ## Commits
-(pending)
+- 462beb83ed feat(department): enforce department access on single-resource console endpoints
 
 ## Test summary
 526 passed, 0 failed (11 new guard tests + 515 regression tests)
