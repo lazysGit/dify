@@ -14,10 +14,12 @@ import MenuDialog from '@/app/components/header/account-setting/menu-dialog'
 import { useAppContext } from '@/context/app-context'
 import { useProviderContext } from '@/context/provider-context'
 import useBreakpoints, { MediaType } from '@/hooks/use-breakpoints'
+import { useDepartmentList } from '@/service/use-departments'
 import { cn } from '@/utils/classnames'
 import Button from '../../base/button'
 import ApiBasedExtensionPage from './api-based-extension-page'
 import DataSourcePage from './data-source-page-new'
+import DepartmentPage from './department-page'
 import LanguagePage from './language-page'
 import MembersPage from './members-page'
 import ModelProviderPage from './model-provider-page'
@@ -50,7 +52,11 @@ export default function AccountSetting({
   const activeMenu = activeTab
   const { t } = useTranslation()
   const { enableBilling, enableReplaceWebAppLogo } = useProviderContext()
-  const { isCurrentWorkspaceDatasetOperator } = useAppContext()
+  const { isCurrentWorkspaceDatasetOperator, isCurrentWorkspaceManager } = useAppContext()
+  const departmentListQuery = useDepartmentList()
+  const isDepartmentAdmin = departmentListQuery.data?.is_department_admin ?? false
+  const departmentApiFailed = departmentListQuery.isError
+  const showDepartmentsTab = isCurrentWorkspaceManager || isDepartmentAdmin
 
   const workplaceGroupItems: GroupItem[] = (() => {
     if (isCurrentWorkspaceDatasetOperator)
@@ -70,6 +76,15 @@ export default function AccountSetting({
         activeIcon: <span className={cn('i-ri-group-2-fill', iconClassName)} />,
       },
     ]
+
+    if (showDepartmentsTab) {
+      items.push({
+        key: ACCOUNT_SETTING_TAB.DEPARTMENTS,
+        name: t('settings.departments', { ns: 'common' }),
+        icon: <span className={cn('i-ri-org-chart-line', iconClassName)} />,
+        activeIcon: <span className={cn('i-ri-org-chart-fill', iconClassName)} />,
+      })
+    }
 
     if (enableBilling) {
       items.push({
@@ -228,6 +243,13 @@ export default function AccountSetting({
             <div className="px-4 pt-2 sm:px-8">
               {activeMenu === ACCOUNT_SETTING_TAB.PROVIDER && <ModelProviderPage searchText={searchValue} />}
               {activeMenu === ACCOUNT_SETTING_TAB.MEMBERS && <MembersPage />}
+              {activeMenu === ACCOUNT_SETTING_TAB.DEPARTMENTS && (
+                <DepartmentPage
+                  isAdmin={isCurrentWorkspaceManager}
+                  isDepartmentAdmin={isDepartmentAdmin}
+                  apiFailed={departmentApiFailed}
+                />
+              )}
               {activeMenu === ACCOUNT_SETTING_TAB.BILLING && <BillingPage />}
               {activeMenu === ACCOUNT_SETTING_TAB.DATA_SOURCE && <DataSourcePage />}
               {activeMenu === ACCOUNT_SETTING_TAB.API_BASED_EXTENSION && <ApiBasedExtensionPage />}
