@@ -119,6 +119,7 @@ class Dataset(Base):
     __table_args__ = (
         sa.PrimaryKeyConstraint("id", name="dataset_pkey"),
         sa.Index("dataset_tenant_idx", "tenant_id"),
+        sa.Index("dataset_department_id_idx", "department_id"),
         adjusted_json_index("retrieval_model_idx", "retrieval_model"),
     )
 
@@ -160,6 +161,7 @@ class Dataset(Base):
     chunk_structure = mapped_column(sa.String(255), nullable=True)
     enable_api = mapped_column(sa.Boolean, nullable=False, server_default=sa.text("true"))
     is_multimodal = mapped_column(sa.Boolean, default=False, nullable=False, server_default=db.text("false"))
+    department_id: Mapped[str | None] = mapped_column(StringUUID, nullable=True, default=None)
 
     @property
     def total_documents(self):

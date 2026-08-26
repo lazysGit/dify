@@ -277,6 +277,7 @@ class TenantAccountJoin(TypeBase):
         sa.PrimaryKeyConstraint("id", name="tenant_account_join_pkey"),
         sa.Index("tenant_account_join_account_id_idx", "account_id"),
         sa.Index("tenant_account_join_tenant_id_idx", "tenant_id"),
+        sa.Index("tenant_account_join_department_id_idx", "department_id"),
         sa.UniqueConstraint("tenant_id", "account_id", name="unique_tenant_account_join"),
     )
 
@@ -290,6 +291,8 @@ class TenantAccountJoin(TypeBase):
         EnumText(TenantAccountRole, length=16), server_default="normal", default=TenantAccountRole.NORMAL
     )
     invited_by: Mapped[str | None] = mapped_column(StringUUID, nullable=True, default=None)
+    department_id: Mapped[str | None] = mapped_column(StringUUID, nullable=True, default=None)
+    is_department_admin: Mapped[bool] = mapped_column(sa.Boolean, server_default=sa.text("false"), default=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.current_timestamp(), nullable=False, init=False
     )
