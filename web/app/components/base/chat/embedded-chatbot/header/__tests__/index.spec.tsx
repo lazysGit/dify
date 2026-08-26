@@ -85,6 +85,9 @@ describe('EmbeddedChatbot Header', () => {
     },
     enable_trial_app: false,
     enable_explore_banner: false,
+    department_access_control: {
+      enabled: false,
+    },
   }
 
   const setupIframe = () => {

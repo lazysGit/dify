@@ -242,6 +242,38 @@ export const departmentDepartmentOperationLogsContract = base
   }>())
   .output(type<OperationLogsResponse>())
 
+export type PublishDepartment = {
+  id: string
+  name: string
+}
+
+export type PublishDepartmentsResponse = {
+  departments: PublishDepartment[]
+}
+
+export const departmentPublishAppsContract = base
+  .route({
+    path: '/apps/{id}/publish-departments',
+    method: 'GET',
+  })
+  .input(type<{
+    params: { id: string }
+  }>())
+  .output(type<PublishDepartmentsResponse>())
+
+export const departmentUpdatePublishAppsContract = base
+  .route({
+    path: '/apps/{id}/publish-departments',
+    method: 'PUT',
+  })
+  .input(type<{
+    params: { id: string }
+    body: {
+      department_ids: string[]
+    }
+  }>())
+  .output(type<unknown>())
+
 export const departmentRouterContract = {
   list: departmentListContract,
   create: departmentCreateContract,
@@ -258,4 +290,6 @@ export const departmentRouterContract = {
   createdResources: departmentCreatedResourcesContract,
   operationLogs: departmentOperationLogsContract,
   departmentOperationLogs: departmentDepartmentOperationLogsContract,
+  publishApps: departmentPublishAppsContract,
+  updatePublishApps: departmentUpdatePublishAppsContract,
 }

@@ -1,5 +1,7 @@
+import type { App, AppCategory } from '@/models/explore'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { consoleQuery } from '@/service/client'
+import { useLocale } from '@/context/i18n'
+import { consoleClient, consoleQuery } from '@/service/client'
 
 export const useDepartmentList = () => {
   return useQuery(consoleQuery.departments.list.queryOptions({}))
@@ -148,5 +150,46 @@ export const useMemberOperationLogs = (memberId: string) => {
 export const useDepartmentOperationLogs = (id: string) => {
   return useQuery(consoleQuery.departments.departmentOperationLogs.queryOptions({
     input: { params: { id } },
+  }))
+}
+
+type DepartmentExploreAppsData = {
+  categories: AppCategory[]
+  allList: App[]
+}
+
+export const useDepartmentExploreApps = () => {
+  const locale = useLocale()
+  const input = locale
+    ? { query: { language: locale } }
+    : {}
+  const language = input?.query?.language
+
+  return useQuery<DepartmentExploreAppsData>({
+    queryKey: [...consoleQuery.explore.departmentApps.queryKey({ input }), language],
+    queryFn: async () => {
+      const result = await consoleClient.explore.departmentApps(input)
+      return {
+        categories: result.categories,
+        allList: [...result.recommended_apps].sort((a, b) => a.position - b.position),
+      }
+    },
+  })
+}
+
+export const usePublishDepartments = (appId: string) => {
+  return useQuery(consoleQuery.departments.publishApps.queryOptions({
+    input: { params: { id: appId } },
+  }))
+}
+
+export const useUpdatePublishDepartmentsMutation = (appId: string) => {
+  const queryClient = useQueryClient()
+  return useMutation(consoleQuery.departments.updatePublishApps.mutationOptions({
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: consoleQuery.departments.publishApps.queryKey({ input: { params: { id: appId } } }),
+      })
+    },
   }))
 }

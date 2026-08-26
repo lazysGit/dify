@@ -24,6 +24,7 @@ import {
 } from '@/models/app'
 import { fetchAppDetail } from '@/service/explore'
 import { useMembers } from '@/service/use-common'
+import { useDepartmentExploreApps } from '@/service/use-departments'
 import { useExploreAppList } from '@/service/use-explore'
 import { cn } from '@/utils/classnames'
 import TryApp from '../try-app'
@@ -66,11 +67,21 @@ const Apps = ({
     defaultValue: allCategoriesEn,
   })
 
+  const isDepartmentAccessEnabled = systemFeatures.department_access_control.enabled
   const {
-    data,
-    isLoading,
-    isError,
+    data: departmentData,
+    isLoading: departmentLoading,
+    isError: departmentError,
+  } = useDepartmentExploreApps()
+  const {
+    data: exploreData,
+    isLoading: exploreLoading,
+    isError: exploreError,
   } = useExploreAppList()
+
+  const data = isDepartmentAccessEnabled ? departmentData : exploreData
+  const isLoading = isDepartmentAccessEnabled ? departmentLoading : exploreLoading
+  const isError = isDepartmentAccessEnabled ? departmentError : exploreError
 
   const filteredList = useMemo(() => {
     if (!data)

@@ -112,6 +112,14 @@ export const exploreInstalledAppMetaContract = base
   }>())
   .output(type<AppMeta>())
 
+export const exploreDepartmentAppsContract = base
+  .route({
+    path: '/explore/department-apps',
+    method: 'GET',
+  })
+  .input(type<{ query?: { language?: string } }>())
+  .output(type<ExploreAppsResponse>())
+
 export const exploreBannersContract = base
   .route({
     path: '/explore/banners',

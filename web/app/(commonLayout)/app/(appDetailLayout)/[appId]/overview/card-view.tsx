@@ -9,6 +9,7 @@ import { useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useContext } from 'use-context-selector'
 import AppCard from '@/app/components/app/overview/app-card'
+import PublishDepartmentPanel from '@/app/components/app/overview/publish-department-panel'
 import TriggerCard from '@/app/components/app/overview/trigger-card'
 import { useStore as useAppStore } from '@/app/components/app/store'
 import Loading from '@/app/components/base/loading'
@@ -16,6 +17,7 @@ import { ToastContext } from '@/app/components/base/toast/context'
 import MCPServiceCard from '@/app/components/tools/mcp/mcp-service-card'
 import { isTriggerNode } from '@/app/components/workflow/types'
 import { NEED_REFRESH_APP_LIST_KEY } from '@/config'
+import { useGlobalPublicStore } from '@/context/global-public-context'
 import {
   fetchAppDetail,
   updateAppSiteAccessToken,
@@ -37,6 +39,8 @@ const CardView: FC<ICardViewProps> = ({ appId, isInPanel, className }) => {
   const { notify } = useContext(ToastContext)
   const appDetail = useAppStore(state => state.appDetail)
   const setAppDetail = useAppStore(state => state.setAppDetail)
+  const systemFeatures = useGlobalPublicStore(s => s.systemFeatures)
+  const isDepartmentEnabled = systemFeatures.department_access_control.enabled
 
   const isWorkflowApp = appDetail?.mode === AppModeEnum.WORKFLOW
   const showMCPCard = isInPanel
@@ -188,6 +192,9 @@ const CardView: FC<ICardViewProps> = ({ appId, isInPanel, className }) => {
       {disableAppCards && triggerCardNode}
       {appCards}
       {!disableAppCards && triggerCardNode}
+      {isDepartmentEnabled && (
+        <PublishDepartmentPanel appId={appId} />
+      )}
     </div>
   )
 }

@@ -3,7 +3,7 @@
 ## Status: DONE
 
 ## Commits
-- (pending commit)
+- 917b0445af
 
 ## Test Summary
 210 passed in explore/ test suite; config consistency test passes; 13 new tests for department app endpoint and publish-gated install.

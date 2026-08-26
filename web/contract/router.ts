@@ -6,6 +6,7 @@ import {
   exploreAppDetailContract,
   exploreAppsContract,
   exploreBannersContract,
+  exploreDepartmentAppsContract,
   exploreInstalledAppAccessModeContract,
   exploreInstalledAppMetaContract,
   exploreInstalledAppParametersContract,
@@ -60,6 +61,7 @@ export const consoleRouterContract = {
     installedAppParameters: exploreInstalledAppParametersContract,
     installedAppMeta: exploreInstalledAppMetaContract,
     banners: exploreBannersContract,
+    departmentApps: exploreDepartmentAppsContract,
   },
   trialApps: {
     info: trialAppInfoContract,
