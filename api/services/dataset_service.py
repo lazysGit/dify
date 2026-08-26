@@ -109,27 +109,26 @@ logger = logging.getLogger(__name__)
 
 class DatasetService:
     @staticmethod
-    def get_datasets(page, per_page, tenant_id=None, user=None, search=None, tag_ids=None, include_all=False):
+    def get_datasets(
+        page, per_page, tenant_id=None, user=None, search=None, tag_ids=None, include_all=False, department_id=None
+    ):
         query = select(Dataset).where(Dataset.tenant_id == tenant_id).order_by(Dataset.created_at.desc(), Dataset.id)
 
         if user:
-            # get permitted dataset ids
+            from services.department_service import DepartmentService
+
             dataset_permission = (
                 db.session.query(DatasetPermission).filter_by(account_id=user.id, tenant_id=tenant_id).all()
             )
             permitted_dataset_ids = {dp.dataset_id for dp in dataset_permission} if dataset_permission else None
 
             if user.current_role == TenantAccountRole.DATASET_OPERATOR:
-                # only show datasets that the user has permission to access
-                # Check if permitted_dataset_ids is not empty to avoid WHERE false condition
                 if permitted_dataset_ids and len(permitted_dataset_ids) > 0:
                     query = query.where(Dataset.id.in_(permitted_dataset_ids))
                 else:
                     return [], 0
             else:
                 if user.current_role != TenantAccountRole.OWNER or not include_all:
-                    # show all datasets that the user has permission to access
-                    # Check if permitted_dataset_ids is not empty to avoid WHERE false condition
                     if permitted_dataset_ids and len(permitted_dataset_ids) > 0:
                         query = query.where(
                             sa.or_(
@@ -152,15 +151,22 @@ class DatasetService:
                                 ),
                             )
                         )
+
+            accessible = DepartmentService.get_accessible_department_ids(user, tenant_id)
+            if accessible is not None:
+                query = query.where(
+                    DepartmentService.resource_department_filter(Dataset, tenant_id, accessible)
+                )
         else:
-            # if no user, only show datasets that are shared with all team members
             query = query.where(Dataset.permission == DatasetPermissionEnum.ALL_TEAM)
+
+        if department_id:
+            query = query.where(Dataset.department_id == department_id)
 
         if search:
             escaped_search = helper.escape_like_pattern(search)
             query = query.where(Dataset.name.ilike(f"%{escaped_search}%", escape="\\"))
 
-        # Check if tag_ids is not empty to avoid WHERE false condition
         if tag_ids and len(tag_ids) > 0:
             if tenant_id is not None:
                 target_ids = TagService.get_target_ids_by_tag_ids(
@@ -223,8 +229,8 @@ class DatasetService:
         embedding_model_name: str | None = None,
         retrieval_model: RetrievalModel | None = None,
         summary_index_setting: dict | None = None,
+        department_id: str | None = None,
     ):
-        # check if dataset name already exists
         if db.session.query(Dataset).filter_by(name=name, tenant_id=tenant_id).first():
             raise DatasetNameDuplicateError(f"Dataset with name {name} already exists.")
         embedding_model = None
@@ -270,6 +276,13 @@ class DatasetService:
         dataset.provider = provider
         if summary_index_setting is not None:
             dataset.summary_index_setting = summary_index_setting
+
+        from services.department_service import DepartmentService
+
+        dataset.department_id = DepartmentService.resolve_department_id_for_creation(
+            account, tenant_id, department_id
+        )
+
         db.session.add(dataset)
         db.session.flush()
 
@@ -1155,6 +1168,24 @@ class DatasetService:
             )
         except DepartmentPermissionDeniedError:
             raise NoPermissionError("You do not have permission to access this dataset.")
+
+    @staticmethod
+    def transfer_dataset_department(
+        dataset: Dataset, target_department_id: str, operator: Account, tenant_id: str
+    ) -> None:
+        from services.department_service import DepartmentAuditLog
+
+        dataset.department_id = target_department_id
+        dataset.updated_by = operator.id
+        db.session.commit()
+
+        DepartmentAuditLog.log(
+            tenant_id,
+            operator.id,
+            None,
+            "transfer_dataset",
+            {"dataset_id": dataset.id, "dataset_name": dataset.name, "target_department_id": target_department_id},
+        )
 
     @staticmethod
     def check_dataset_operator_permission(user: Account | None = None, dataset: Dataset | None = None):

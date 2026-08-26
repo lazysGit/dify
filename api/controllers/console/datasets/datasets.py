@@ -205,10 +205,20 @@ class ConsoleDatasetListQuery(BaseModel):
     include_all: bool = Field(default=False, description="Include all datasets")
     ids: list[str] = Field(default_factory=list, description="Filter by dataset IDs")
     tag_ids: list[str] = Field(default_factory=list, description="Filter by tag IDs")
+    department_id: str | None = Field(default=None, description="Filter by department ID")
+
+
+class DatasetTransferDepartmentPayload(BaseModel):
+    department_id: str = Field(..., min_length=1, description="Target department ID")
 
 
 register_schema_models(
-    console_ns, DatasetCreatePayload, DatasetUpdatePayload, IndexingEstimatePayload, ConsoleDatasetListQuery
+    console_ns,
+    DatasetCreatePayload,
+    DatasetUpdatePayload,
+    IndexingEstimatePayload,
+    ConsoleDatasetListQuery,
+    DatasetTransferDepartmentPayload,
 )
 
 
@@ -300,6 +310,7 @@ class DatasetListApi(Resource):
             "keyword": "Search keyword",
             "tag_ids": "Filter by tag IDs (list)",
             "include_all": "Include all datasets (default: false)",
+            "department_id": "Filter by department ID",
         }
     )
     @console_ns.response(200, "Datasets retrieved successfully")
@@ -309,15 +320,12 @@ class DatasetListApi(Resource):
     @enterprise_license_required
     def get(self):
         current_user, current_tenant_id = current_account_with_tenant()
-        # Convert query parameters to dict, handling list parameters correctly
         query_params: dict[str, str | list[str]] = dict(request.args.to_dict())
-        # Handle ids and tag_ids as lists (Flask request.args.getlist returns list even for single value)
         if "ids" in request.args:
             query_params["ids"] = request.args.getlist("ids")
         if "tag_ids" in request.args:
             query_params["tag_ids"] = request.args.getlist("tag_ids")
         query = ConsoleDatasetListQuery.model_validate(query_params)
-        # provider = request.args.get("provider", default="vendor")
         if query.ids:
             datasets, total = DatasetService.get_datasets_by_ids(query.ids, current_tenant_id)
         else:
@@ -329,6 +337,7 @@ class DatasetListApi(Resource):
                 query.keyword,
                 query.tag_ids,
                 query.include_all,
+                query.department_id,
             )
 
         # check embedding setting
@@ -370,6 +379,25 @@ class DatasetListApi(Resource):
                 item.update({"partial_member_list": partial_members_map.get(item["id"], [])})
             else:
                 item.update({"partial_member_list": []})
+
+        dept_ids = {ds.department_id for ds in datasets if ds.department_id}
+        dept_name_map: dict[str, str] = {}
+        if dept_ids:
+            from models.department import Department
+
+            depts = db.session.query(Department).filter(Department.id.in_(dept_ids)).all()
+            dept_name_map = {d.id: d.name for d in depts}
+
+        default_dept_id: str | None = None
+        null_dept_datasets = [ds for ds in datasets if not ds.department_id]
+        if null_dept_datasets:
+            from services.department_service import DepartmentService
+
+            default_dept_id = DepartmentService.get_default_department(current_tenant_id).id
+
+        for item, ds in zip(data, datasets):
+            effective_dept_id = ds.department_id or default_dept_id
+            item["department_name"] = dept_name_map.get(effective_dept_id, "") if effective_dept_id else ""
 
         response = {
             "data": data,
@@ -968,6 +996,54 @@ class DatasetPermissionUserListApi(Resource):
         return {
             "data": partial_members_list,
         }, 200
+
+
+@console_ns.route("/datasets/<uuid:dataset_id>/transfer-department")
+class DatasetTransferDepartmentApi(Resource):
+    @console_ns.doc("transfer_dataset_department")
+    @console_ns.doc(description="Transfer a dataset to a different department")
+    @console_ns.doc(params={"dataset_id": "Dataset ID"})
+    @console_ns.expect(console_ns.models[DatasetTransferDepartmentPayload.__name__])
+    @console_ns.response(200, "Dataset transferred successfully")
+    @console_ns.response(403, "Insufficient permissions")
+    @console_ns.response(404, "Dataset not found")
+    @setup_required
+    @login_required
+    @account_initialization_required
+    def put(self, dataset_id):
+        current_user, current_tenant_id = current_account_with_tenant()
+        dataset_id_str = str(dataset_id)
+        dataset = DatasetService.get_dataset(dataset_id_str)
+        if dataset is None:
+            raise NotFound("Dataset not found.")
+        try:
+            DatasetService.check_dataset_permission(dataset, current_user)
+        except services.errors.account.NoPermissionError as e:
+            raise Forbidden(str(e))
+
+        args = DatasetTransferDepartmentPayload.model_validate(console_ns.payload)
+        target_department_id = args.department_id
+
+        from models.department import Department
+        from services.department_service import DepartmentService
+        from services.errors.department import DepartmentNotFoundError, DepartmentPermissionDeniedError
+
+        target_dept = (
+            db.session.query(Department)
+            .filter(Department.id == target_department_id, Department.tenant_id == current_tenant_id)
+            .first()
+        )
+        if not target_dept:
+            raise DepartmentNotFoundError("Target department not found")
+
+        if not current_user.is_admin_or_owner:
+            manageable = DepartmentService.get_manageable_department_ids(current_user, current_tenant_id)
+            if target_department_id not in manageable:
+                raise DepartmentPermissionDeniedError("No permission to transfer to target department")
+
+        DatasetService.transfer_dataset_department(dataset, target_department_id, current_user, current_tenant_id)
+
+        return {"result": "success"}, 200
 
 
 @console_ns.route("/datasets/<uuid:dataset_id>/auto-disable-logs")
