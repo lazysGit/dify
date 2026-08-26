@@ -51,3 +51,23 @@ class Department(TypeBase):
     sort_order: Mapped[int] = mapped_column(sa.Integer, server_default=sa.text("0"), default=0)
     is_default: Mapped[bool] = mapped_column(sa.Boolean, server_default=sa.text("false"), default=False)
     updated_by: Mapped[str | None] = mapped_column(StringUUID, nullable=True, default=None)
+
+
+class AppPublishedDepartment(TypeBase):
+    __tablename__ = "app_published_departments"
+    __table_args__ = (
+        sa.PrimaryKeyConstraint("id", name="app_published_department_pkey"),
+        sa.UniqueConstraint("app_id", "department_id", name="unique_app_department"),
+        sa.Index("app_published_department_app_id_idx", "app_id"),
+        sa.Index("app_published_department_department_id_idx", "department_id"),
+    )
+
+    id: Mapped[str] = mapped_column(
+        StringUUID, insert_default=lambda: str(uuid4()), default_factory=lambda: str(uuid4()), init=False
+    )
+    app_id: Mapped[str] = mapped_column(StringUUID)
+    department_id: Mapped[str] = mapped_column(StringUUID)
+    published_by: Mapped[str] = mapped_column(StringUUID)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.current_timestamp(), nullable=False, init=False
+    )

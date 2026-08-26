@@ -54,4 +54,4 @@ The `isInviteLink` reference mentioned in the task spec does not exist in the cu
 - `pnpm test -- --run __tests__/department/ app/components/header/account-setting/members-page/`: PASS (117/117)
 
 ## Commits
-(to be created)
+- `0de8b177ce` - feat(web/department): members page with department filter and manual creation

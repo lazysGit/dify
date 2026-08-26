@@ -3,6 +3,9 @@
 ## Status
 DONE
 
+## Commits
+- `15d4b8aa94` - feat(web/department): department filter tabs, ownership selectors and transfer modals
+
 ## Summary
 Implemented department filter tabs, ownership selectors, and transfer modals for both apps and datasets list pages.
 

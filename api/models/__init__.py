@@ -26,7 +26,7 @@ from .dataset import (
     TidbAuthBinding,
     Whitelist,
 )
-from .department import Department
+from .department import AppPublishedDepartment, Department
 from .enums import (
     AppTriggerStatus,
     AppTriggerType,
@@ -131,6 +131,7 @@ __all__ = [
     "AppMCPServer",
     "AppMode",
     "AppModelConfig",
+    "AppPublishedDepartment",
     "AppTrigger",
     "AppTriggerStatus",
     "AppTriggerType",
