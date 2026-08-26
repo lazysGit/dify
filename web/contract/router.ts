@@ -1,6 +1,7 @@
 import type { InferContractRouterInputs } from '@orpc/contract'
 import { appDeleteContract } from './console/apps'
 import { bindPartnerStackContract, invoicesContract } from './console/billing'
+import { departmentRouterContract } from './console/departments'
 import {
   exploreAppDetailContract,
   exploreAppsContract,
@@ -80,6 +81,7 @@ export const consoleRouterContract = {
   },
   notification: notificationContract,
   notificationDismiss: notificationDismissContract,
+  departments: departmentRouterContract,
   triggers: {
     list: triggersContract,
     providerInfo: triggerProviderInfoContract,
