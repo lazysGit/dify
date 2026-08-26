@@ -1143,6 +1143,19 @@ class DatasetService:
                         logger.debug("User %s does not have permission to access dataset %s", user.id, dataset.id)
                         raise NoPermissionError("You do not have permission to access this dataset.")
 
+        from services.department_service import DepartmentService
+        from services.errors.department import DepartmentPermissionDeniedError
+
+        try:
+            DepartmentService.assert_department_access(
+                user,
+                user.current_tenant_id,
+                dataset.department_id,
+                resource_tenant_id=dataset.tenant_id,
+            )
+        except DepartmentPermissionDeniedError:
+            raise NoPermissionError("You do not have permission to access this dataset.")
+
     @staticmethod
     def check_dataset_operator_permission(user: Account | None = None, dataset: Dataset | None = None):
         if not dataset:

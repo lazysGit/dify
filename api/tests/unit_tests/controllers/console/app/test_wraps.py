@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import pytest
 
@@ -10,19 +11,35 @@ from models.model import AppMode
 
 
 def test_get_app_model_injects_model(monkeypatch: pytest.MonkeyPatch) -> None:
-    app_model = SimpleNamespace(id="app-1", mode=AppMode.CHAT.value, status="normal", tenant_id="t1")
+    app_model = SimpleNamespace(
+        id="app-1",
+        mode=AppMode.CHAT.value,
+        status="normal",
+        tenant_id="t1",
+        department_id="d1",
+    )
     monkeypatch.setattr(wraps_module, "current_account_with_tenant", lambda: (None, "t1"))
     monkeypatch.setattr(wraps_module.db, "session", SimpleNamespace(scalar=lambda *_args, **_kwargs: app_model))
 
-    @wraps_module.get_app_model
-    def handler(app_model):
-        return app_model.id
+    from services.department_service import DepartmentService
 
-    assert handler(app_id="app-1") == "app-1"
+    with patch.object(DepartmentService, "assert_department_access", return_value=None):
+
+        @wraps_module.get_app_model
+        def handler(app_model):
+            return app_model.id
+
+        assert handler(app_id="app-1") == "app-1"
 
 
 def test_get_app_model_rejects_wrong_mode(monkeypatch: pytest.MonkeyPatch) -> None:
-    app_model = SimpleNamespace(id="app-1", mode=AppMode.CHAT.value, status="normal", tenant_id="t1")
+    app_model = SimpleNamespace(
+        id="app-1",
+        mode=AppMode.CHAT.value,
+        status="normal",
+        tenant_id="t1",
+        department_id="d1",
+    )
     monkeypatch.setattr(wraps_module, "current_account_with_tenant", lambda: (None, "t1"))
     monkeypatch.setattr(wraps_module.db, "session", SimpleNamespace(scalar=lambda *_args, **_kwargs: app_model))
 

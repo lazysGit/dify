@@ -27,7 +27,7 @@ def _make_account() -> Account:
 
 
 def _make_app(mode: AppMode) -> SimpleNamespace:
-    return SimpleNamespace(id="app-123", tenant_id="tenant-123", mode=mode.value)
+    return SimpleNamespace(id="app-123", tenant_id="tenant-123", mode=mode.value, department_id="dept-123")
 
 
 def _patch_console_guards(monkeypatch: pytest.MonkeyPatch, account: Account, app_model: SimpleNamespace) -> None:
@@ -45,6 +45,10 @@ def _patch_console_guards(monkeypatch: pytest.MonkeyPatch, account: Account, app
 
     # Avoid hitting the database when resolving the app model
     monkeypatch.setattr(app_wraps, "_load_app_model", lambda _app_id: app_model)
+
+    from services.department_service import DepartmentService
+
+    monkeypatch.setattr(DepartmentService, "assert_department_access", staticmethod(lambda *a, **kw: None))
 
 
 @dataclass
