@@ -18,6 +18,7 @@ type IOperationProps = {
   member: Member
   operatorRole: string
   onOperate: () => void
+  isDepartmentAdmin?: boolean
 }
 
 const roleI18nKeyMap = {
@@ -33,6 +34,7 @@ const Operation = ({
   member,
   operatorRole,
   onOperate,
+  isDepartmentAdmin = false,
 }: IOperationProps) => {
   const [open, setOpen] = useState(false)
   const { t } = useTranslation()
@@ -45,6 +47,13 @@ const Operation = ({
     dataset_operator: t('members.datasetOperator', { ns: 'common' }),
   }
   const roleList = useMemo((): OperationRoleKey[] => {
+    if (isDepartmentAdmin) {
+      return [
+        'editor',
+        'normal',
+        ...(datasetOperatorEnabled ? ['dataset_operator'] as const : []),
+      ]
+    }
     if (operatorRole === 'owner') {
       return [
         'admin',
@@ -61,7 +70,7 @@ const Operation = ({
       ]
     }
     return []
-  }, [operatorRole, datasetOperatorEnabled])
+  }, [operatorRole, datasetOperatorEnabled, isDepartmentAdmin])
   const { notify } = useContext(ToastContext)
   const handleDeleteMemberOrCancelInvitation = async () => {
     setOpen(false)
@@ -89,6 +98,8 @@ const Operation = ({
     }
   }
 
+  const isRoleReadonly = isDepartmentAdmin && member.role === 'admin'
+
   return (
     <PortalToFollowElem
       open={open}
@@ -96,10 +107,10 @@ const Operation = ({
       placement="bottom-end"
       offset={{ mainAxis: 4 }}
     >
-      <PortalToFollowElemTrigger asChild onClick={() => setOpen(prev => !prev)}>
-        <div className={cn('group flex h-full w-full cursor-pointer items-center justify-between px-3 text-text-secondary system-sm-regular hover:bg-state-base-hover', open && 'bg-state-base-hover')}>
+      <PortalToFollowElemTrigger asChild onClick={() => !isRoleReadonly && setOpen(prev => !prev)}>
+        <div className={cn('group flex h-full w-full cursor-pointer items-center justify-between px-3 text-text-secondary system-sm-regular hover:bg-state-base-hover', open && 'bg-state-base-hover', isRoleReadonly && 'cursor-default hover:bg-transparent')}>
           {RoleMap[member.role] || RoleMap.normal}
-          <ChevronDownIcon className={cn('h-4 w-4 shrink-0 group-hover:block', open ? 'block' : 'hidden')} />
+          {!isRoleReadonly && <ChevronDownIcon className={cn('h-4 w-4 shrink-0 group-hover:block', open ? 'block' : 'hidden')} />}
         </div>
       </PortalToFollowElemTrigger>
       <PortalToFollowElemContent className="z-[1002]">

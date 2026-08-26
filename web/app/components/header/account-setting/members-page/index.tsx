@@ -1,23 +1,28 @@
 'use client'
-import type { InvitationResult } from '@/models/common'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Avatar } from '@/app/components/base/avatar'
+import Button from '@/app/components/base/button'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/app/components/base/ui/select'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/app/components/base/ui/tooltip'
 import { NUM_INFINITE } from '@/app/components/billing/config'
 import { Plan } from '@/app/components/billing/type'
 import UpgradeBtn from '@/app/components/billing/upgrade-btn'
 import { useAppContext } from '@/context/app-context'
-import { useGlobalPublicStore } from '@/context/global-public-context'
 import { useLocale } from '@/context/i18n'
 import { useProviderContext } from '@/context/provider-context'
 import { useFormatTimeFromNow } from '@/hooks/use-format-time-from-now'
 import { LanguagesSupported } from '@/i18n-config/language'
 import { useMembers } from '@/service/use-common'
+import { useDepartmentList } from '@/service/use-departments'
+import CreateMemberModal from './create-member-modal'
 import EditWorkspaceModal from './edit-workspace-modal'
-import InviteButton from './invite-button'
-import InviteModal from './invite-modal'
-import InvitedModal from './invited-modal'
 import Operation from './operation'
 import TransferOwnership from './operation/transfer-ownership'
 import TransferOwnershipModal from './transfer-ownership-modal'
@@ -35,17 +40,35 @@ const MembersPage = () => {
 
   const { userProfile, currentWorkspace, isCurrentWorkspaceOwner, isCurrentWorkspaceManager } = useAppContext()
   const { data, refetch } = useMembers()
-  const systemFeatures = useGlobalPublicStore(s => s.systemFeatures)
   const { formatTimeFromNow } = useFormatTimeFromNow()
-  const [inviteModalVisible, setInviteModalVisible] = useState(false)
-  const [invitationResults, setInvitationResults] = useState<InvitationResult[]>([])
-  const [invitedModalVisible, setInvitedModalVisible] = useState(false)
   const accounts = data?.accounts || []
   const { plan, enableBilling, isAllowTransferWorkspace } = useProviderContext()
   const isNotUnlimitedMemberPlan = enableBilling && plan.type !== Plan.team && plan.type !== Plan.enterprise
   const isMemberFull = enableBilling && isNotUnlimitedMemberPlan && accounts.length >= plan.total.teamMembers
   const [editWorkspaceModalVisible, setEditWorkspaceModalVisible] = useState(false)
   const [showTransferOwnershipModal, setShowTransferOwnershipModal] = useState(false)
+
+  const departmentListQuery = useDepartmentList()
+  const departments = departmentListQuery.data?.departments ?? []
+  const manageableDepartmentIds = departmentListQuery.data?.manageable_department_ids ?? []
+  const isDepartmentAdmin = departmentListQuery.data?.is_department_admin ?? false
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState<string>('')
+
+  const deptNameMap = useMemo(() => {
+    const map: Record<string, string> = {}
+    for (const d of departments)
+      map[d.id] = d.name
+    return map
+  }, [departments])
+
+  const filteredAccounts = useMemo(() => {
+    if (!selectedDepartmentId)
+      return accounts
+    return accounts.filter(a => a.department_id === selectedDepartmentId)
+  }, [accounts, selectedDepartmentId])
+
+  const canCreateMember = isCurrentWorkspaceOwner || isCurrentWorkspaceManager || isDepartmentAdmin
+  const [showCreateMemberModal, setShowCreateMemberModal] = useState(false)
 
   return (
     <>
@@ -111,8 +134,35 @@ const MembersPage = () => {
             <UpgradeBtn className="mr-2" loc="member-invite" />
           )}
           <div className="shrink-0">
-            {isCurrentWorkspaceManager && <InviteButton disabled={isMemberFull} onClick={() => setInviteModalVisible(true)} />}
+            {canCreateMember && (
+              <Button variant="primary" onClick={() => setShowCreateMemberModal(true)}>
+                <span className="i-ri-user-add-line mr-1 h-4 w-4" />
+                {t('members.createMember', { ns: 'common' })}
+              </Button>
+            )}
           </div>
+        </div>
+        <div className="mb-3 flex items-center gap-2">
+          <Select value={selectedDepartmentId} onValueChange={v => setSelectedDepartmentId(v ?? '')}>
+            <SelectTrigger className="h-8 w-[200px] rounded-lg">
+              <SelectValue placeholder={t('members.allDepartments', { ns: 'common' })} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">
+                {t('members.allDepartments', { ns: 'common' })}
+              </SelectItem>
+              {manageableDepartmentIds.map((id) => {
+                const dept = departments.find(d => d.id === id)
+                if (!dept)
+                  return null
+                return (
+                  <SelectItem key={id} value={id}>
+                    {dept.name}
+                  </SelectItem>
+                )
+              })}
+            </SelectContent>
+          </Select>
         </div>
         <div className="overflow-visible lg:overflow-visible">
           <div className="flex min-w-[480px] items-center border-b border-divider-regular py-[7px]">
@@ -122,7 +172,7 @@ const MembersPage = () => {
           </div>
           <div className="relative min-w-[480px]">
             {
-              accounts.map(account => (
+              filteredAccounts.map(account => (
                 <div key={account.id} className="flex border-b border-divider-subtle">
                   <div className="flex grow items-center px-3 py-2">
                     <Avatar avatar={account.avatar_url} size="sm" className="mr-2" name={account.name} />
@@ -132,7 +182,15 @@ const MembersPage = () => {
                         {account.status === 'pending' && <span className="ml-1 text-text-warning system-xs-medium">{t('members.pending', { ns: 'common' })}</span>}
                         {userProfile.email === account.email && <span className="text-text-tertiary system-xs-regular">{t('members.you', { ns: 'common' })}</span>}
                       </div>
-                      <div className="text-text-tertiary system-xs-regular">{account.email}</div>
+                      <div className="flex items-center gap-1 text-text-tertiary system-xs-regular">
+                        <span>{account.email}</span>
+                        {account.department_id && deptNameMap[account.department_id] && (
+                          <>
+                            <span className="text-divider-regular">/</span>
+                            <span>{deptNameMap[account.department_id]}</span>
+                          </>
+                        )}
+                      </div>
                     </div>
                   </div>
                   <div className="flex w-[104px] shrink-0 items-center py-2 text-text-secondary system-sm-regular">{formatTimeFromNow(Number((account.last_active_at || account.created_at)) * 1000)}</div>
@@ -144,7 +202,7 @@ const MembersPage = () => {
                       <div className="px-3 text-text-secondary system-sm-regular">{RoleMap[account.role] || RoleMap.normal}</div>
                     )}
                     {isCurrentWorkspaceOwner && account.role !== 'owner' && (
-                      <Operation member={account} operatorRole={currentWorkspace.role} onOperate={refetch} />
+                      <Operation member={account} operatorRole={currentWorkspace.role} onOperate={refetch} isDepartmentAdmin={isDepartmentAdmin} />
                     )}
                     {!isCurrentWorkspaceOwner && (
                       <div className="px-3 text-text-secondary system-sm-regular">{RoleMap[account.role] || RoleMap.normal}</div>
@@ -157,27 +215,6 @@ const MembersPage = () => {
         </div>
       </div>
       {
-        inviteModalVisible && (
-          <InviteModal
-            isEmailSetup={systemFeatures.is_email_setup}
-            onCancel={() => setInviteModalVisible(false)}
-            onSend={(invitationResults) => {
-              setInvitedModalVisible(true)
-              setInvitationResults(invitationResults)
-              refetch()
-            }}
-          />
-        )
-      }
-      {
-        invitedModalVisible && (
-          <InvitedModal
-            invitationResults={invitationResults}
-            onCancel={() => setInvitedModalVisible(false)}
-          />
-        )
-      }
-      {
         editWorkspaceModalVisible && (
           <EditWorkspaceModal
             onCancel={() => setEditWorkspaceModalVisible(false)}
@@ -188,6 +225,12 @@ const MembersPage = () => {
         <TransferOwnershipModal
           show={showTransferOwnershipModal}
           onClose={() => setShowTransferOwnershipModal(false)}
+        />
+      )}
+      {showCreateMemberModal && (
+        <CreateMemberModal
+          onClose={() => setShowCreateMemberModal(false)}
+          onSuccess={refetch}
         />
       )}
     </>

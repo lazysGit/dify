@@ -10,6 +10,7 @@ import { useGlobalPublicStore } from '@/context/global-public-context'
 import { useProviderContext } from '@/context/provider-context'
 import { useFormatTimeFromNow } from '@/hooks/use-format-time-from-now'
 import { useMembers } from '@/service/use-common'
+import { useDepartmentList } from '@/service/use-departments'
 import MembersPage from '../index'
 
 vi.mock('@/context/app-context')
@@ -17,6 +18,7 @@ vi.mock('@/context/global-public-context')
 vi.mock('@/context/provider-context')
 vi.mock('@/hooks/use-format-time-from-now')
 vi.mock('@/service/use-common')
+vi.mock('@/service/use-departments')
 
 vi.mock('../edit-workspace-modal', () => ({
   default: ({ onCancel }: { onCancel: () => void }) => (
@@ -37,6 +39,14 @@ vi.mock('../transfer-ownership-modal', () => ({
     <div>
       <div>Transfer Ownership Modal</div>
       <button onClick={onClose}>Close Transfer Modal</button>
+    </div>
+  ),
+}))
+vi.mock('../create-member-modal', () => ({
+  default: ({ onClose }: { onClose: () => void }) => (
+    <div>
+      <div>Create Member Modal</div>
+      <button onClick={onClose}>Close Create Member</button>
     </div>
   ),
 }))
@@ -89,6 +99,15 @@ describe('MembersPage', () => {
       data: { accounts: mockAccounts },
       refetch: mockRefetch,
     } as unknown as ReturnType<typeof useMembers>)
+
+    vi.mocked(useDepartmentList).mockReturnValue({
+      data: {
+        departments: [],
+        tree: [],
+        manageable_department_ids: [],
+        is_department_admin: false,
+      },
+    } as unknown as ReturnType<typeof useDepartmentList>)
 
     vi.mocked(useGlobalPublicStore).mockImplementation(selector => selector({
       systemFeatures: { is_email_setup: true },
@@ -183,7 +202,7 @@ describe('MembersPage', () => {
     render(<MembersPage />)
 
     expect(screen.getByText(/members\.pending/i)).toBeInTheDocument()
-    expect(screen.getByText(/members\.you/i)).toBeInTheDocument() // Current user is owner@example.com
+    expect(screen.getByText(/members\.you/i)).toBeInTheDocument()
   })
 
   it('should show billing information for limited plan', () => {
@@ -198,9 +217,9 @@ describe('MembersPage', () => {
     render(<MembersPage />)
 
     expect(screen.getByText(/plansCommon\.member/i)).toBeInTheDocument()
-    expect(screen.getByText('2')).toBeInTheDocument() // accounts.length
+    expect(screen.getByText('2')).toBeInTheDocument()
     expect(screen.getByText('/')).toBeInTheDocument()
-    expect(screen.getByText('5')).toBeInTheDocument() // plan.total.teamMembers
+    expect(screen.getByText('5')).toBeInTheDocument()
   })
 
   it('should show unlimited billing information', () => {
@@ -228,7 +247,6 @@ describe('MembersPage', () => {
 
     render(<MembersPage />)
 
-    // Plan.team is an unlimited member plan → isNotUnlimitedMemberPlan=false → non-billing layout
     expect(screen.getByText(/plansCommon\.memberAfter/i)).toBeInTheDocument()
   })
 
