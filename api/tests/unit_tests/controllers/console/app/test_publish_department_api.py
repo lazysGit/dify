@@ -126,7 +126,7 @@ class TestDeleteDepartmentPublishCheck:
         mock_session.query.side_effect = query_side_effect
 
         with pytest.raises(DepartmentValidationError, match="请先取消发布"):
-            DepartmentService.delete_department(tenant_id="t1", department_id="d1")
+            DepartmentService.delete_department(tenant_id="t1", department_id="d1", operator_id="u1")
 
 
 class TestDeleteAppCascade:

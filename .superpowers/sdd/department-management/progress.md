@@ -39,3 +39,8 @@ Task 20: complete (commits 061bdfb..917b044, review clean)
 Task 21: complete (commits 917b044..773801b, review clean)
 Task 22: complete (commits 773801b..fee90b2, review clean)
 Task 23: complete (ruff pass, 52 backend key tests pass, 136 frontend department tests pass, type-check clean, lint 0 errors)
+Final review fixes: complete (commit 202da2b)
+  - Critical: delete_department audit log crash fixed (added operator_id param)
+  - Important: move_member now used instead of move_member_to_department (admin revocation notification)
+  - Removed unused move_member_to_department method
+  - Pushed back on Important 2 (R4 trial exception is intentional per spec)
