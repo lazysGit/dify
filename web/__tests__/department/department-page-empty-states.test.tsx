@@ -31,6 +31,10 @@ vi.mock('@/app/components/header/account-setting/department-page/create-departme
   default: () => <div data-testid="create-modal" />,
 }))
 
+vi.mock('@/app/components/header/account-setting/department-page/department-detail', () => ({
+  default: () => <div data-testid="dept-detail" />,
+}))
+
 const mockDeptData: DepartmentListResponse = {
   departments: [],
   tree: [],
@@ -49,6 +53,14 @@ const mockUseDepartmentList = vi.fn()
 
 vi.mock('@/service/use-departments', () => ({
   useDepartmentList: () => mockUseDepartmentList(),
+  useDeleteDepartmentMutation: () => ({ mutate: vi.fn() }),
+}))
+
+vi.mock('@/context/app-context', () => ({
+  useAppContext: () => ({
+    userProfile: { id: 'u1', name: 'tester', email: 't@example.com', avatar: '', avatar_url: null, is_password_set: true },
+    isCurrentWorkspaceManager: true,
+  }),
 }))
 
 describe('DepartmentPage Empty States', () => {

@@ -5,8 +5,13 @@ import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import Button from '@/app/components/base/button'
 import SearchInput from '@/app/components/base/search-input'
-import { useDepartmentList } from '@/service/use-departments'
+import { useAppContext } from '@/context/app-context'
+import {
+  useDeleteDepartmentMutation,
+  useDepartmentList,
+} from '@/service/use-departments'
 import CreateDepartmentModal from './create-department-modal'
+import DepartmentDetail from './department-detail'
 import DepartmentTree from './department-tree'
 
 type DepartmentPageProps = {
@@ -15,14 +20,19 @@ type DepartmentPageProps = {
   apiFailed: boolean
 }
 
-export default function DepartmentPage({ isAdmin, isDepartmentAdmin: _isDepartmentAdmin, apiFailed }: DepartmentPageProps) {
+export default function DepartmentPage({ isAdmin, isDepartmentAdmin, apiFailed }: DepartmentPageProps) {
   const { t } = useTranslation()
+  const { userProfile } = useAppContext()
   const { data, isLoading } = useDepartmentList()
   const [searchValue, setSearchValue] = useState('')
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState<string | null>(null)
+  const deleteMutation = useDeleteDepartmentMutation()
 
   const tree = data?.tree ?? []
   const canCreate = isAdmin
+  const manageableDepartmentIds = data?.manageable_department_ids ?? []
+  const selectedDepartment = selectedDepartmentId ? findNode(tree, selectedDepartmentId) : undefined
 
   const filteredTree = useMemo(() => {
     if (!searchValue.trim())
@@ -44,6 +54,21 @@ export default function DepartmentPage({ isAdmin, isDepartmentAdmin: _isDepartme
       <div className="flex items-center justify-center py-20">
         <span className="i-ri-loader-4-line h-6 w-6 animate-spin text-text-tertiary" />
       </div>
+    )
+  }
+
+  if (selectedDepartment) {
+    return (
+      <DepartmentDetail
+        department={selectedDepartment}
+        currentUserId={userProfile.id}
+        isAdmin={isAdmin}
+        isDepartmentAdmin={isDepartmentAdmin}
+        manageableDepartmentIds={manageableDepartmentIds}
+        tree={tree}
+        onBack={() => setSelectedDepartmentId(null)}
+        onNavigateToSubDepartment={id => setSelectedDepartmentId(id)}
+      />
     )
   }
 
@@ -101,6 +126,12 @@ export default function DepartmentPage({ isAdmin, isDepartmentAdmin: _isDepartme
       <DepartmentTree
         tree={filteredTree}
         isAdmin={isAdmin}
+        onManage={id => setSelectedDepartmentId(id)}
+        onDelete={(id) => {
+          deleteMutation.mutate({ params: { id } })
+          if (selectedDepartmentId === id)
+            setSelectedDepartmentId(null)
+        }}
       />
       {showCreateModal && (
         <CreateDepartmentModal
@@ -110,6 +141,17 @@ export default function DepartmentPage({ isAdmin, isDepartmentAdmin: _isDepartme
       )}
     </div>
   )
+}
+
+function findNode(nodes: DepartmentTreeNode[], id: string): DepartmentTreeNode | undefined {
+  for (const node of nodes) {
+    if (node.id === id)
+      return node
+    const found = findNode(node.children, id)
+    if (found)
+      return found
+  }
+  return undefined
 }
 
 function filterTree(nodes: DepartmentTreeNode[], query: string): DepartmentTreeNode[] {
