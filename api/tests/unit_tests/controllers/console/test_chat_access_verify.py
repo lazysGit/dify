@@ -59,7 +59,7 @@ class TestChatAccessVerify:
     @patch("controllers.web.chat_access.extract_access_token", return_value="valid-token")
     @patch("controllers.web.chat_access.PassportService")
     @patch("controllers.web.chat_access.FeatureService.get_system_features")
-    def test_no_account_id_in_payload_returns_401(
+    def test_no_user_id_in_payload_returns_401(
         self, mock_features: MagicMock, mock_passport_cls: MagicMock, mock_extract: MagicMock, app: Flask
     ) -> None:
         mock_features.return_value = SimpleNamespace(department_access_control=True)
@@ -81,7 +81,7 @@ class TestChatAccessVerify:
         app: Flask,
     ) -> None:
         mock_features.return_value = SimpleNamespace(department_access_control=True)
-        mock_passport_cls.return_value.verify.return_value = {"account_id": "acc-1"}
+        mock_passport_cls.return_value.verify.return_value = {"user_id": "acc-1"}
         mock_db.session.scalar.return_value = None
         with app.test_request_context("/api/chat-access/verify?app_code=code1"):
             with pytest.raises(Unauthorized, match="Console login state"):
@@ -100,7 +100,7 @@ class TestChatAccessVerify:
         app: Flask,
     ) -> None:
         mock_features.return_value = SimpleNamespace(department_access_control=True)
-        mock_passport_cls.return_value.verify.return_value = {"account_id": "acc-1"}
+        mock_passport_cls.return_value.verify.return_value = {"user_id": "acc-1"}
         account = SimpleNamespace(id="acc-1")
         mock_db.session.scalar.side_effect = [account, None]
         with app.test_request_context("/api/chat-access/verify?app_code=code1"):
@@ -123,7 +123,7 @@ class TestChatAccessVerify:
         app: Flask,
     ) -> None:
         mock_features.return_value = SimpleNamespace(department_access_control=True)
-        mock_passport_cls.return_value.verify.return_value = {"account_id": "acc-1"}
+        mock_passport_cls.return_value.verify.return_value = {"user_id": "acc-1"}
         account = SimpleNamespace(id="acc-1")
         site = SimpleNamespace(app_id="app-1")
         app_model = SimpleNamespace(id="app-1", status="normal", enable_site=True, tenant_id="t1")
@@ -149,7 +149,7 @@ class TestChatAccessVerify:
         app: Flask,
     ) -> None:
         mock_features.return_value = SimpleNamespace(department_access_control=True)
-        mock_passport_cls.return_value.verify.return_value = {"account_id": "acc-1"}
+        mock_passport_cls.return_value.verify.return_value = {"user_id": "acc-1"}
         account = SimpleNamespace(id="acc-1")
         site = SimpleNamespace(app_id="app-1")
         app_model = SimpleNamespace(
@@ -180,7 +180,7 @@ class TestChatAccessVerify:
         self, mock_features: MagicMock, mock_passport_cls: MagicMock, mock_extract: MagicMock, app: Flask
     ) -> None:
         mock_features.return_value = SimpleNamespace(department_access_control=True)
-        mock_passport_cls.return_value.verify.return_value = {"account_id": "acc-1"}
+        mock_passport_cls.return_value.verify.return_value = {"user_id": "acc-1"}
         mock_db = MagicMock()
         mock_db.session.scalar.side_effect = [SimpleNamespace(id="acc-1"), None]
         with (
@@ -198,7 +198,7 @@ class TestChatAccessVerify:
         self, mock_features: MagicMock, mock_passport_cls: MagicMock, mock_extract: MagicMock, app: Flask
     ) -> None:
         mock_features.return_value = SimpleNamespace(department_access_control=True)
-        mock_passport_cls.return_value.verify.return_value = {"account_id": "acc-1"}
+        mock_passport_cls.return_value.verify.return_value = {"user_id": "acc-1"}
         mock_db = MagicMock()
         mock_db.session.scalar.side_effect = [SimpleNamespace(id="acc-1"), None]
         with (
@@ -225,7 +225,7 @@ class TestChatAccessVerify:
         app: Flask,
     ) -> None:
         mock_features.return_value = SimpleNamespace(department_access_control=True)
-        mock_passport_cls.return_value.verify.return_value = {"account_id": "acc-1"}
+        mock_passport_cls.return_value.verify.return_value = {"user_id": "acc-1"}
         account = SimpleNamespace(id="acc-1")
         site = SimpleNamespace(app_id="app-1")
         disabled_app = SimpleNamespace(id="app-1", status="normal", enable_site=False)

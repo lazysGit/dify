@@ -47,7 +47,8 @@ class ChatAccessVerifyResource(Resource):
         except Unauthorized:
             raise Unauthorized("Invalid console login state.")
 
-        account_id = payload.get("account_id")
+        # Console access token payload carries "user_id" (see AccountService.get_account_jwt_token)
+        account_id = payload.get("user_id")
         if not account_id:
             raise Unauthorized("Console login state is required.")
 
