@@ -282,7 +282,7 @@ class TestDepartmentMemberApi:
                 return_value=False,
             ),
             patch(
-                "controllers.console.workspace.department.DepartmentService.move_member_to_department",
+                "controllers.console.workspace.department.DepartmentService.move_member",
             ),
         ):
             result = method(api, "d1")
@@ -315,7 +315,7 @@ class TestDepartmentMemberApi:
                 return_value="d1",
             ),
             patch(
-                "controllers.console.workspace.department.DepartmentService.move_member_to_department",
+                "controllers.console.workspace.department.DepartmentService.move_member",
             ),
         ):
             result = method(api, "d1")

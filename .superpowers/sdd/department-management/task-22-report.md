@@ -1,7 +1,7 @@
 # Task 22: Chat URL Authentication
 
 - Status: DONE
-- Commits: (pending)
+- Commits: fee90b2e21
 - Test summary: 258 backend tests pass (web dir regression), 7 frontend tests pass
 - Concerns: None
 

@@ -192,7 +192,7 @@ class DepartmentService:
         return department
 
     @staticmethod
-    def delete_department(tenant_id: str, department_id: str, operator_ip: str | None = None) -> None:
+    def delete_department(tenant_id: str, department_id: str, operator_id: str, operator_ip: str | None = None) -> None:
         department = (
             db.session.query(Department)
             .filter(Department.id == department_id, Department.tenant_id == tenant_id)
@@ -235,7 +235,7 @@ class DepartmentService:
 
         DepartmentAuditLog.log(
             tenant_id,
-            operator_ip or "0.0.0.0",
+            operator_id,
             operator_ip,
             "delete_department",
             {"department_id": department_id},
@@ -486,45 +486,6 @@ class DepartmentService:
                     }
                 )
         return result
-
-    @staticmethod
-    def move_member_to_department(
-        tenant_id: str,
-        member_account_id: str,
-        target_department_id: str,
-        operator_id: str,
-        operator_ip: str | None = None,
-    ) -> None:
-        target_dept = (
-            db.session.query(Department)
-            .filter(Department.id == target_department_id, Department.tenant_id == tenant_id)
-            .first()
-        )
-        if not target_dept:
-            raise DepartmentNotFoundError("Target department not found")
-
-        join = (
-            db.session.query(TenantAccountJoin)
-            .filter(
-                TenantAccountJoin.tenant_id == tenant_id,
-                TenantAccountJoin.account_id == member_account_id,
-            )
-            .first()
-        )
-        if not join:
-            raise DepartmentNotFoundError("Member not found in tenant")
-
-        join.department_id = target_department_id
-        join.is_department_admin = False
-        db.session.commit()
-
-        DepartmentAuditLog.log(
-            tenant_id,
-            operator_id,
-            operator_ip,
-            "move_member",
-            {"member_id": member_account_id, "target_department_id": target_department_id},
-        )
 
     @staticmethod
     def set_department_admin(

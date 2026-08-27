@@ -170,7 +170,7 @@ class TestDeleteDepartment:
         mock_session.query.return_value = mock_query
 
         with pytest.raises(DepartmentValidationError, match="默认部门不能删除"):
-            DepartmentService.delete_department(tenant_id="t1", department_id="d1")
+            DepartmentService.delete_department(tenant_id="t1", department_id="d1", operator_id="u1")
 
     @patch("services.department_service.DepartmentAuditLog")
     @patch("services.department_service.db")
@@ -217,7 +217,7 @@ class TestDeleteDepartment:
         mock_session.query.side_effect = query_side_effect
 
         with pytest.raises(DepartmentValidationError, match=check_msg):
-            DepartmentService.delete_department(tenant_id="t1", department_id="d1")
+            DepartmentService.delete_department(tenant_id="t1", department_id="d1", operator_id="u1")
 
 
 class TestAccessibleDepartmentIds:

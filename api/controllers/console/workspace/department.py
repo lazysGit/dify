@@ -184,6 +184,7 @@ class DepartmentApi(Resource):
             DepartmentService.delete_department(
                 tenant_id=tenant_id,
                 department_id=str(department_id),
+                operator_id=user.id,
                 operator_ip=request.remote_addr,
             )
         except (DepartmentNotFoundError, DepartmentValidationError, DepartmentPermissionDeniedError) as e:
@@ -277,11 +278,11 @@ class DepartmentMemberApi(Resource):
                     console_ns.abort(403, description="No permission to move this member")
 
         try:
-            DepartmentService.move_member_to_department(
+            DepartmentService.move_member(
+                operator=user,
                 tenant_id=tenant_id,
                 member_account_id=args.member_id,
                 target_department_id=target_dept_id,
-                operator_id=user.id,
                 operator_ip=request.remote_addr,
             )
         except (DepartmentNotFoundError, DepartmentValidationError, DepartmentPermissionDeniedError) as e:
