@@ -111,7 +111,8 @@ class DepartmentService:
             db.session.query(Department)
             .filter(
                 Department.tenant_id == tenant_id,
-                Department.parent_id.is_(parent_id),
+                # .is_() only valid for NULL comparison; non-null parent must use ==
+                (Department.parent_id.is_(None) if parent_id is None else Department.parent_id == parent_id),
                 Department.name == name,
             )
             .first()
@@ -162,11 +163,13 @@ class DepartmentService:
             raise DepartmentNotFoundError("Department not found")
 
         if name and name != department.name:
+            pid = department.parent_id
+            parent_col = Department.parent_id.is_(None) if pid is None else Department.parent_id == pid
             dup = (
                 db.session.query(Department)
                 .filter(
                     Department.tenant_id == tenant_id,
-                    Department.parent_id.is_(department.parent_id),
+                    parent_col,
                     Department.name == name,
                     Department.id != department_id,
                 )

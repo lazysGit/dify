@@ -1480,9 +1480,10 @@ class RegisterService:
     ) -> Account:
         normalized_email = email.lower()
 
-        existing = Account.query.filter_by(email=normalized_email).first()
+        # TypeBase models have no legacy .query; use db.session (aligns with rest of module)
+        existing = db.session.query(Account).filter_by(email=normalized_email).first()
         if not existing and normalized_email != email:
-            existing = Account.query.filter_by(email=email).first()
+            existing = db.session.query(Account).filter_by(email=email).first()
         if existing:
             raise AccountEmailAlreadyInUseError(f"Email {normalized_email} is already in use.")
 

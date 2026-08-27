@@ -183,7 +183,8 @@ class MemberUpdateRoleApi(Resource):
         return {"result": "success"}
 
 
-@console_ns.route("/workspaces/current/members/create")
+# Plan spec: POST /workspaces/current/members (same collection URL as MemberListApi; Flask-RESTx merges methods)
+@console_ns.route("/workspaces/current/members")
 class MemberCreateApi(Resource):
     """Create a new member by admin."""
 
