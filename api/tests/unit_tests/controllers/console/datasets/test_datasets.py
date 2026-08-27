@@ -86,7 +86,10 @@ class TestDatasetList:
                     "get_configurations",
                     return_value=MagicMock(get_models=lambda **_: []),
                 ),
+                patch("controllers.console.datasets.datasets.db") as mock_db,
             ):
+                # G4 department enrichment queries Department; MagicMock dataset ids are truthy.
+                mock_db.session.query.return_value.filter.return_value.all.return_value = []
                 resp, status = method(api)
 
         assert status == 200
@@ -121,7 +124,9 @@ class TestDatasetList:
                     "get_configurations",
                     return_value=MagicMock(get_models=lambda **_: []),
                 ),
+                patch("controllers.console.datasets.datasets.db") as mock_db,
             ):
+                mock_db.session.query.return_value.filter.return_value.all.return_value = []
                 resp, status = method(api)
 
         by_ids_mock.assert_called_once()
@@ -156,7 +161,9 @@ class TestDatasetList:
                     "get_configurations",
                     return_value=MagicMock(get_models=lambda **_: []),
                 ),
+                patch("controllers.console.datasets.datasets.db") as mock_db,
             ):
+                mock_db.session.query.return_value.filter.return_value.all.return_value = []
                 resp, status = method(api)
 
         assert status == 200
@@ -198,7 +205,9 @@ class TestDatasetList:
                     "get_configurations",
                     return_value=config,
                 ),
+                patch("controllers.console.datasets.datasets.db") as mock_db,
             ):
+                mock_db.session.query.return_value.filter.return_value.all.return_value = []
                 resp, status = method(api)
 
         assert resp["data"][0]["embedding_available"] is False
@@ -223,10 +232,6 @@ class TestDatasetList:
                     return_value=(datasets, 1),
                 ),
                 patch(
-                    "controllers.console.datasets.datasets.db.session.execute",
-                    return_value=MagicMock(all=lambda: [("ds-1", "u1")]),
-                ),
-                patch(
                     "controllers.console.datasets.datasets.marshal",
                     return_value=marshaled,
                 ),
@@ -235,7 +240,11 @@ class TestDatasetList:
                     "get_configurations",
                     return_value=MagicMock(get_models=lambda **_: []),
                 ),
+                patch("controllers.console.datasets.datasets.db") as mock_db,
             ):
+                mock_db.session.query.return_value.filter.return_value.all.return_value = []
+                # partial_members fetch: db.session.execute(...).all() yields (dataset_id, user_id) rows
+                mock_db.session.execute.return_value.all.return_value = [("ds-1", "u1")]
                 resp, status = method(api)
 
         assert resp["data"][0]["partial_member_list"] == ["u1"]
