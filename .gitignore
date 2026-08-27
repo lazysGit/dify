@@ -247,3 +247,6 @@ scripts/stress-test/reports/
 
 # uv package manager
 uv.lock
+
+# Superpowers SDD workspace (agent scratch)
+.superpowers/
