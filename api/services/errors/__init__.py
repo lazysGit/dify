@@ -12,6 +12,7 @@ from . import (
     file,
     index,
     message,
+    model_permission,
 )
 
 __all__ = [
@@ -28,4 +29,5 @@ __all__ = [
     "file",
     "index",
     "message",
+    "model_permission",
 ]
