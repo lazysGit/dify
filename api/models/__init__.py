@@ -69,6 +69,7 @@ from .model import (
     TrialApp,
     UploadFile,
 )
+from .model_permission import AccountModelWhitelist
 from .oauth import DatasourceOauthParamConfig, DatasourceProvider
 from .provider import (
     LoadBalancingModelConfig,
@@ -119,6 +120,7 @@ __all__ = [
     "APIBasedExtensionPoint",
     "Account",
     "AccountIntegrate",
+    "AccountModelWhitelist",
     "AccountStatus",
     "AccountTrialAppRecord",
     "ApiRequest",
