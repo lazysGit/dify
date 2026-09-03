@@ -23,6 +23,7 @@ import { useMembers } from '@/service/use-common'
 import { useDepartmentList } from '@/service/use-departments'
 import CreateMemberModal from './create-member-modal'
 import EditWorkspaceModal from './edit-workspace-modal'
+import ModelWhitelistModal from './model-whitelist-modal'
 import Operation from './operation'
 import TransferOwnership from './operation/transfer-ownership'
 import TransferOwnershipModal from './transfer-ownership-modal'
@@ -69,6 +70,8 @@ const MembersPage = () => {
 
   const canCreateMember = isCurrentWorkspaceOwner || isCurrentWorkspaceManager || isDepartmentAdmin
   const [showCreateMemberModal, setShowCreateMemberModal] = useState(false)
+  const canManageModelPermission = isCurrentWorkspaceOwner || isCurrentWorkspaceManager
+  const [modelPermissionAccount, setModelPermissionAccount] = useState<{ id: string, name: string } | null>(null)
 
   return (
     <>
@@ -169,6 +172,9 @@ const MembersPage = () => {
             <div className="grow px-3 text-text-tertiary system-xs-medium-uppercase">{t('members.name', { ns: 'common' })}</div>
             <div className="w-[104px] shrink-0 text-text-tertiary system-xs-medium-uppercase">{t('members.lastActive', { ns: 'common' })}</div>
             <div className="w-[96px] shrink-0 px-3 text-text-tertiary system-xs-medium-uppercase">{t('members.role', { ns: 'common' })}</div>
+            {canManageModelPermission && (
+              <div className="w-[104px] shrink-0 px-3 text-text-tertiary system-xs-medium-uppercase">{t('members.model_permission', { ns: 'common' })}</div>
+            )}
           </div>
           <div className="relative min-w-[480px]">
             {
@@ -208,6 +214,17 @@ const MembersPage = () => {
                       <div className="px-3 text-text-secondary system-sm-regular">{RoleMap[account.role] || RoleMap.normal}</div>
                     )}
                   </div>
+                  {canManageModelPermission && (
+                    <div className="flex w-[104px] shrink-0 items-center px-3">
+                      <Button
+                        variant="secondary"
+                        size="small"
+                        onClick={() => setModelPermissionAccount({ id: account.id, name: account.name })}
+                      >
+                        {t('members.model_permission', { ns: 'common' })}
+                      </Button>
+                    </div>
+                  )}
                 </div>
               ))
             }
@@ -231,6 +248,12 @@ const MembersPage = () => {
         <CreateMemberModal
           onClose={() => setShowCreateMemberModal(false)}
           onSuccess={refetch}
+        />
+      )}
+      {modelPermissionAccount && (
+        <ModelWhitelistModal
+          accountId={modelPermissionAccount.id}
+          onClose={() => setModelPermissionAccount(null)}
         />
       )}
     </>
