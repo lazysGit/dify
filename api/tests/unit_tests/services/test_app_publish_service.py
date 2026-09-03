@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from services.app_publish_service import AppPublishService
+from services.errors.department import DepartmentPermissionDeniedError
 
 
 def _make_user(user_id="u1", is_admin_or_owner=False):
@@ -75,7 +76,7 @@ class TestUpdatePublishedDepartments:
 
         mock_session.execute.return_value = mock_existing_query
 
-        user = _make_user()
+        user = _make_user(is_admin_or_owner=True)
         result = AppPublishService.update_published_departments(user, "t1", "app1", ["d2", "d3"])
 
         added = list(mock_session.add.call_args_list)
@@ -97,7 +98,7 @@ class TestUpdatePublishedDepartments:
         mock_existing_query.scalars.return_value = mock_scalars
         mock_session.execute.return_value = mock_existing_query
 
-        user = _make_user()
+        user = _make_user(is_admin_or_owner=True)
         AppPublishService.update_published_departments(user, "t1", "app1", ["d1", "d1", "d1"])
 
         added = list(mock_session.add.call_args_list)
@@ -116,12 +117,12 @@ class TestUpdatePublishedDepartments:
         mock_existing_query.scalars.return_value = mock_scalars
         mock_session.execute.return_value = mock_existing_query
 
-        user = _make_user()
+        user = _make_user(is_admin_or_owner=True)
         AppPublishService.update_published_departments(user, "t1", "app1", ["d1"])
 
-        mock_audit.log.assert_called_once()
-        args = mock_audit.log.call_args
-        assert args[0][3] == "publish_app_to_departments"
+        mock_audit.log.assert_called()
+        actions = [c[0][3] for c in mock_audit.log.call_args_list]
+        assert "publish_app_to_departments" in actions
 
     @patch("services.app_publish_service.DepartmentAuditLog")
     @patch("services.app_publish_service.db")
@@ -136,11 +137,165 @@ class TestUpdatePublishedDepartments:
         mock_existing_query.scalars.return_value = mock_scalars
         mock_session.execute.return_value = mock_existing_query
 
-        user = _make_user()
+        user = _make_user(is_admin_or_owner=True)
         AppPublishService.update_published_departments(user, "t1", "app1", [])
 
         calls = mock_audit.log.call_args_list
         assert any(c[0][3] == "unpublish_app_from_departments" for c in calls)
+
+
+class TestPublishPermissionMatrix:
+    """Permission matrix for update_published_departments (plan Task 7)."""
+
+    def _mock_env(self, mock_db, mock_dept_svc, *, user_dept="d_own", descendants=None, is_dept_admin=False):
+        mock_session = MagicMock()
+        mock_db.session = mock_session
+        mock_session.scalar.return_value = _make_app(enable_site=True)
+
+        mock_scalars = MagicMock()
+        mock_scalars.all.return_value = []
+        mock_existing_query = MagicMock()
+        mock_existing_query.scalars.return_value = mock_scalars
+        mock_session.execute.return_value = mock_existing_query
+
+        mock_dept_svc.get_user_department_id.return_value = user_dept
+        mock_dept_svc.is_department_admin.return_value = is_dept_admin
+        mock_dept_svc.get_descendant_ids.return_value = descendants if descendants is not None else []
+        return mock_session
+
+    @patch("services.app_publish_service.DepartmentAuditLog")
+    @patch("services.app_publish_service.DepartmentService")
+    @patch("services.app_publish_service.db")
+    def test_owner_can_publish_to_any_department(self, mock_db, mock_dept_svc, mock_audit):
+        self._mock_env(mock_db, mock_dept_svc)
+        user = _make_user(user_id="owner1", is_admin_or_owner=True)
+
+        result = AppPublishService.update_published_departments(user, "t1", "app1", ["d_any"])
+
+        assert isinstance(result, list)
+
+    @patch("services.app_publish_service.DepartmentAuditLog")
+    @patch("services.app_publish_service.DepartmentService")
+    @patch("services.app_publish_service.db")
+    def test_admin_can_publish_to_any_department(self, mock_db, mock_dept_svc, mock_audit):
+        self._mock_env(mock_db, mock_dept_svc)
+        user = _make_user(user_id="admin1", is_admin_or_owner=True)
+
+        result = AppPublishService.update_published_departments(user, "t1", "app1", ["d_any"])
+
+        assert isinstance(result, list)
+
+    @patch("services.app_publish_service.DepartmentAuditLog")
+    @patch("services.app_publish_service.DepartmentService")
+    @patch("services.app_publish_service.db")
+    def test_dept_admin_can_publish_to_own_department(self, mock_db, mock_dept_svc, mock_audit):
+        self._mock_env(mock_db, mock_dept_svc, user_dept="d_own", is_dept_admin=True)
+        user = _make_user(user_id="deptadmin1")
+
+        result = AppPublishService.update_published_departments(user, "t1", "app1", ["d_own"])
+
+        assert isinstance(result, list)
+
+    @patch("services.app_publish_service.DepartmentAuditLog")
+    @patch("services.app_publish_service.DepartmentService")
+    @patch("services.app_publish_service.db")
+    def test_dept_admin_can_publish_to_subdepartment(self, mock_db, mock_dept_svc, mock_audit):
+        self._mock_env(mock_db, mock_dept_svc, user_dept="d_own", descendants=["d_sub"], is_dept_admin=True)
+        user = _make_user(user_id="deptadmin1")
+
+        result = AppPublishService.update_published_departments(user, "t1", "app1", ["d_sub"])
+
+        assert isinstance(result, list)
+
+    @patch("services.app_publish_service.DepartmentAuditLog")
+    @patch("services.app_publish_service.DepartmentService")
+    @patch("services.app_publish_service.db")
+    def test_dept_admin_cannot_publish_outside_scope(self, mock_db, mock_dept_svc, mock_audit):
+        self._mock_env(mock_db, mock_dept_svc, user_dept="d_own", descendants=["d_sub"], is_dept_admin=True)
+        user = _make_user(user_id="deptadmin1")
+
+        with pytest.raises(DepartmentPermissionDeniedError):
+            AppPublishService.update_published_departments(user, "t1", "app1", ["d_outside"])
+
+    @patch("services.app_publish_service.DepartmentAuditLog")
+    @patch("services.app_publish_service.DepartmentService")
+    @patch("services.app_publish_service.db")
+    def test_editor_can_publish_to_own_department_only(self, mock_db, mock_dept_svc, mock_audit):
+        self._mock_env(mock_db, mock_dept_svc, user_dept="d_own")
+        user = _make_user(user_id="editor1")
+
+        result = AppPublishService.update_published_departments(user, "t1", "app1", ["d_own"])
+
+        assert isinstance(result, list)
+
+        with pytest.raises(DepartmentPermissionDeniedError):
+            AppPublishService.update_published_departments(user, "t1", "app1", ["d_other"])
+
+    @patch("services.app_publish_service.DepartmentAuditLog")
+    @patch("services.app_publish_service.DepartmentService")
+    @patch("services.app_publish_service.db")
+    def test_normal_can_publish_to_own_department_only(self, mock_db, mock_dept_svc, mock_audit):
+        self._mock_env(mock_db, mock_dept_svc, user_dept="d_own")
+        user = _make_user(user_id="normal1")
+
+        result = AppPublishService.update_published_departments(user, "t1", "app1", ["d_own"])
+
+        assert isinstance(result, list)
+
+    @patch("services.app_publish_service.DepartmentAuditLog")
+    @patch("services.app_publish_service.DepartmentService")
+    @patch("services.app_publish_service.db")
+    def test_dataset_operator_can_publish_to_own_department_only(self, mock_db, mock_dept_svc, mock_audit):
+        self._mock_env(mock_db, mock_dept_svc, user_dept="d_own")
+        user = _make_user(user_id="dsop1")
+
+        result = AppPublishService.update_published_departments(user, "t1", "app1", ["d_own"])
+
+        assert isinstance(result, list)
+
+    @patch("services.app_publish_service.DepartmentAuditLog")
+    @patch("services.app_publish_service.DepartmentService")
+    @patch("services.app_publish_service.db")
+    def test_cross_department_publish_raises_403(self, mock_db, mock_dept_svc, mock_audit):
+        self._mock_env(mock_db, mock_dept_svc, user_dept="d_own")
+        user = _make_user(user_id="normal1")
+
+        with pytest.raises(DepartmentPermissionDeniedError):
+            AppPublishService.update_published_departments(user, "t1", "app1", ["d_other"])
+
+    @patch("services.app_publish_service.DepartmentAuditLog")
+    @patch("services.app_publish_service.DepartmentService")
+    @patch("services.app_publish_service.db")
+    def test_audit_log_records_correct_action_type(self, mock_db, mock_dept_svc, mock_audit):
+        self._mock_env(mock_db, mock_dept_svc, user_dept="d_own")
+        admin = _make_user(user_id="admin1", is_admin_or_owner=True)
+        AppPublishService.update_published_departments(admin, "t1", "app1", ["d_any"])
+        actions = [c[0][3] for c in mock_audit.log.call_args_list]
+        assert "publish_cross_department" in actions
+
+        mock_audit.log.reset_mock()
+        normal = _make_user(user_id="normal1")
+        AppPublishService.update_published_departments(normal, "t1", "app1", ["d_own"])
+        actions = [c[0][3] for c in mock_audit.log.call_args_list]
+        assert "publish_to_own_department" in actions
+        assert "publish_cross_department" not in actions
+
+    @patch("services.app_publish_service.DepartmentAuditLog")
+    @patch("services.app_publish_service.DepartmentService")
+    @patch("services.app_publish_service.db")
+    def test_audit_log_records_permission_denied(self, mock_db, mock_dept_svc, mock_audit):
+        self._mock_env(mock_db, mock_dept_svc, user_dept="d_own")
+        user = _make_user(user_id="normal1")
+
+        with pytest.raises(DepartmentPermissionDeniedError):
+            AppPublishService.update_published_departments(user, "t1", "app1", ["d_other"])
+
+        denied_calls = [c for c in mock_audit.log.call_args_list if c[0][3] == "publish_permission_denied"]
+        assert len(denied_calls) == 1
+        content = denied_calls[0][0][4]
+        assert content["app_id"] == "app1"
+        assert content["target_department_id"] == "d_other"
+        assert content["user_id"] == "normal1"
 
 
 class TestCanAccess:

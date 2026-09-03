@@ -7,28 +7,53 @@ from models.account import Account
 from models.department import AppPublishedDepartment, Department
 from models.model import App
 from services.department_service import DepartmentAuditLog, DepartmentService
+from services.errors.department import DepartmentPermissionDeniedError
 
 logger = logging.getLogger(__name__)
+
+
+def _check_publish_permission(user: Account, target_dept_id: str, tenant_id: str) -> None:
+    """Raise DepartmentPermissionDeniedError when user may not publish to target_dept_id.
+
+    Matrix: tenant owner/admin -> anywhere; department admin -> own department and
+    its descendants (get_descendant_ids excludes self, so it is appended); regular
+    members (any role) -> their own department only.
+    """
+    if user.is_admin_or_owner:
+        return
+
+    user_dept_id = DepartmentService.get_user_department_id(user.id, tenant_id)
+
+    if target_dept_id == user_dept_id:
+        return
+
+    if DepartmentService.is_department_admin(user.id, tenant_id):
+        user_dept = db.session.query(Department).filter_by(id=user_dept_id).first()
+        if user_dept:
+            allowed_ids = DepartmentService.get_descendant_ids(tenant_id, user_dept_id)
+            allowed_ids.append(user_dept_id)
+            if target_dept_id in allowed_ids:
+                return
+        raise DepartmentPermissionDeniedError("部门管理员只能发布到管辖范围内的部门")
+
+    raise DepartmentPermissionDeniedError("普通用户只能发布到自己所属部门，如需跨部门发布请联系管理员")
 
 
 class AppPublishService:
     @staticmethod
     def get_published_departments(app_id: str) -> list[dict]:
-        rows = (
-            db.session.execute(
-                select(
-                    Department.id,
-                    Department.name,
-                    Department.path,
-                )
-                .join(
-                    AppPublishedDepartment,
-                    AppPublishedDepartment.department_id == Department.id,
-                )
-                .where(AppPublishedDepartment.app_id == app_id)
+        rows = db.session.execute(
+            select(
+                Department.id,
+                Department.name,
+                Department.path,
             )
-            .all()
-        )
+            .join(
+                AppPublishedDepartment,
+                AppPublishedDepartment.department_id == Department.id,
+            )
+            .where(AppPublishedDepartment.app_id == app_id)
+        ).all()
         return [{"id": str(r.id), "name": r.name, "path": r.path} for r in rows]
 
     @staticmethod
@@ -44,6 +69,40 @@ class AppPublishService:
             raise ValueError("App not found")
         if not app.enable_site:
             raise ValueError("App site is not enabled")
+
+        # Permission gate: any out-of-scope target rejects the whole request,
+        # with the denial audited before re-raising (design doc §11).
+        for dept_id in department_ids:
+            try:
+                _check_publish_permission(user, dept_id, tenant_id)
+            except DepartmentPermissionDeniedError:
+                DepartmentAuditLog.log(
+                    tenant_id,
+                    user.id,
+                    operator_ip,
+                    "publish_permission_denied",
+                    {"app_id": app_id, "target_department_id": dept_id, "user_id": user.id},
+                )
+                raise
+
+        # Successful publish audit: distinguish cross-department pushes from
+        # routine own-department ones (admins always count as cross-department;
+        # short-circuit before touching department lookup to avoid a needless query).
+        if user.is_admin_or_owner:
+            publish_action = "publish_cross_department"
+        else:
+            user_dept_id = DepartmentService.get_user_department_id(user.id, tenant_id)
+            if any(d != user_dept_id for d in department_ids):
+                publish_action = "publish_cross_department"
+            else:
+                publish_action = "publish_to_own_department"
+        DepartmentAuditLog.log(
+            tenant_id,
+            user.id,
+            operator_ip,
+            publish_action,
+            {"app_id": app_id, "department_ids": department_ids},
+        )
 
         unique_dept_ids = list(dict.fromkeys(department_ids))
 
