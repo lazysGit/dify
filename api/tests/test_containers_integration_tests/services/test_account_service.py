@@ -2644,4 +2644,3 @@ class TestRegisterService:
 
         tenant_join = db_session_with_containers.query(TenantAccountJoin).filter_by(account_id=account.id).first()
         assert tenant_join is None
-

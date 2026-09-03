@@ -59,6 +59,9 @@ class MemberModelWhitelistApi(Resource):
         payload = console_ns.payload or {}
         args = ModelWhitelistPayload.model_validate(payload)
 
+        # abort() always raises, but it is untyped (returns Any), so initialise
+        # `result` to keep type checkers from flagging a possibly-unbound use.
+        result: dict[str, object] = {}
         try:
             result = ModelPermissionService.set_whitelist(
                 tenant_id=tenant_id,

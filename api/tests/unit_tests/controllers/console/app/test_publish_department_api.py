@@ -142,9 +142,7 @@ class TestDeleteAppCascade:
         mock_session = MagicMock()
         mock_db.session = mock_session
 
-        mock_feat.get_system_features.return_value = MagicMock(
-            webapp_auth=MagicMock(enabled=False)
-        )
+        mock_feat.get_system_features.return_value = MagicMock(webapp_auth=MagicMock(enabled=False))
 
         app = _make_app()
         svc = AppService()

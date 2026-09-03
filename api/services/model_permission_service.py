@@ -144,9 +144,7 @@ class ModelPermissionService:
         filtered: list[ProviderWithModelsResponse] = []
         for response in provider_responses:
             kept_models = [
-                model
-                for model in response.models
-                if (model.provider.provider, model.model, str(model.model_type)) in allowed
+                model for model in response.models if (response.provider, model.model, str(model.model_type)) in allowed
             ]
             if kept_models:
                 filtered.append(response.model_copy(update={"models": kept_models}))

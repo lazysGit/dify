@@ -33,10 +33,10 @@ console_ns.schema_model(
 class AppPublishDepartmentsApi(Resource):
     @console_ns.doc("get_published_departments")
     @console_ns.doc(description="Get departments this app is published to")
+    @get_app_model
     @setup_required
     @login_required
     @account_initialization_required
-    @get_app_model
     def get(self, app_model):
         result = AppPublishService.get_published_departments(app_model.id)
         return {"departments": result}, 200
@@ -44,10 +44,10 @@ class AppPublishDepartmentsApi(Resource):
     @console_ns.doc("update_published_departments")
     @console_ns.doc(description="Update departments this app is published to")
     @console_ns.expect(console_ns.models[UpdatePublishDepartmentsPayload.__name__])
+    @get_app_model
     @setup_required
     @login_required
     @account_initialization_required
-    @get_app_model
     @edit_permission_required
     def put(self, app_model):
         payload = UpdatePublishDepartmentsPayload.model_validate(request.get_json(force=True) or {})
@@ -81,10 +81,10 @@ class AppPublishableDepartmentsApi(Resource):
 
     @console_ns.doc("get_publishable_departments")
     @console_ns.doc(description="List departments the current user can publish to, with scope info")
+    @get_app_model
     @setup_required
     @login_required
     @account_initialization_required
-    @get_app_model
     @edit_permission_required
     def get(self, app_model):
         user, tenant_id = current_account_with_tenant()

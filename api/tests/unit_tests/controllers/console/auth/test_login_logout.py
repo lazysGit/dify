@@ -207,9 +207,7 @@ class TestLoginApi:
     @patch("controllers.console.auth.login.dify_config.BILLING_ENABLED", False)
     @patch("controllers.console.auth.login.AccountService.is_login_error_rate_limit")
     @patch("controllers.console.auth.login.AccountService.authenticate")
-    def test_login_fails_for_banned_account(
-        self, mock_authenticate, mock_is_rate_limit, mock_db, app
-    ):
+    def test_login_fails_for_banned_account(self, mock_authenticate, mock_is_rate_limit, mock_db, app):
         """
         Test login rejection for banned accounts.
 

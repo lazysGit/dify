@@ -160,10 +160,7 @@ class MemberUpdateRoleApi(Resource):
             assert member is not None, "Member not found"
             tenant_id = current_user.current_tenant.id
 
-            old_join = (
-                db.session.query(TenantAccountJoin)
-                .filter_by(tenant_id=tenant_id, account_id=member.id).first()
-            )
+            old_join = db.session.query(TenantAccountJoin).filter_by(tenant_id=tenant_id, account_id=member.id).first()
             was_dept_admin = old_join.is_department_admin if old_join else False
 
             TenantService.update_member_role(current_user.current_tenant, member, new_role, current_user)
@@ -225,10 +222,7 @@ class MemberCreateApi(Resource):
         except Exception as e:
             raise ValueError(str(e))
 
-        join = (
-            db.session.query(TenantAccountJoin)
-            .filter_by(tenant_id=tenant_id, account_id=account.id).first()
-        )
+        join = db.session.query(TenantAccountJoin).filter_by(tenant_id=tenant_id, account_id=account.id).first()
 
         from models.department import Department
 

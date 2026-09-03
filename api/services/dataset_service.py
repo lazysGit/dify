@@ -152,11 +152,10 @@ class DatasetService:
                             )
                         )
 
-            accessible = DepartmentService.get_accessible_department_ids(user, tenant_id)
-            if accessible is not None:
-                query = query.where(
-                    DepartmentService.resource_department_filter(Dataset, tenant_id, accessible)
-                )
+            if tenant_id:
+                accessible = DepartmentService.get_accessible_department_ids(user, tenant_id)
+                if accessible is not None:
+                    query = query.where(DepartmentService.resource_department_filter(Dataset, tenant_id, accessible))
         else:
             query = query.where(Dataset.permission == DatasetPermissionEnum.ALL_TEAM)
 
@@ -279,9 +278,7 @@ class DatasetService:
 
         from services.department_service import DepartmentService
 
-        dataset.department_id = DepartmentService.resolve_department_id_for_creation(
-            account, tenant_id, department_id
-        )
+        dataset.department_id = DepartmentService.resolve_department_id_for_creation(account, tenant_id, department_id)
 
         db.session.add(dataset)
         db.session.flush()

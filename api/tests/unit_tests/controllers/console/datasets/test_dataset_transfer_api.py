@@ -130,9 +130,7 @@ class TestDatasetListApiDepartmentPassthrough:
         user = _make_user(is_admin_or_owner=True)
 
         with patch.object(DatasetService, "get_datasets", return_value=([], 0)) as mock_get:
-            DatasetService.get_datasets(
-                1, 20, "t1", user, department_id="d_specific"
-            )
+            DatasetService.get_datasets(1, 20, "t1", user, department_id="d_specific")
 
             call_kwargs = mock_get.call_args
             assert call_kwargs[1].get("department_id") == "d_specific" or (
@@ -145,10 +143,22 @@ class TestDatasetListDepartmentNameSerialization:
         from types import SimpleNamespace
 
         datasets = [
-            SimpleNamespace(id="ds1", department_id="d1", permission="all_team", indexing_technique=None,
-                            embedding_model_provider=None, embedding_model=None),
-            SimpleNamespace(id="ds2", department_id=None, permission="all_team", indexing_technique=None,
-                            embedding_model_provider=None, embedding_model=None),
+            SimpleNamespace(
+                id="ds1",
+                department_id="d1",
+                permission="all_team",
+                indexing_technique=None,
+                embedding_model_provider=None,
+                embedding_model=None,
+            ),
+            SimpleNamespace(
+                id="ds2",
+                department_id=None,
+                permission="all_team",
+                indexing_technique=None,
+                embedding_model_provider=None,
+                embedding_model=None,
+            ),
         ]
 
         dept_name_map = {"d1": "Engineering", "default_d": "Default"}

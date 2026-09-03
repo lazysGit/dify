@@ -169,6 +169,7 @@ __all__ = [
     "datasets_segments",
     "datasource_auth",
     "datasource_content_preview",
+    "department",
     "email_register",
     "endpoint",
     "extension",

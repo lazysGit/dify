@@ -27,7 +27,7 @@ def _check_publish_permission(user: Account, target_dept_id: str, tenant_id: str
     if target_dept_id == user_dept_id:
         return
 
-    if DepartmentService.is_department_admin(user.id, tenant_id):
+    if DepartmentService.is_department_admin(user.id, tenant_id) and user_dept_id:
         user_dept = db.session.query(Department).filter_by(id=user_dept_id).first()
         if user_dept:
             allowed_ids = DepartmentService.get_descendant_ids(tenant_id, user_dept_id)

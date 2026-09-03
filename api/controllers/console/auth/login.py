@@ -98,9 +98,7 @@ class LoginApi(Resource):
             raise EmailPasswordLoginLimitError()
 
         try:
-            account = _authenticate_account_with_case_fallback(
-                request_email, normalized_email, args.password
-            )
+            account = _authenticate_account_with_case_fallback(request_email, normalized_email, args.password)
         except services.errors.account.AccountLoginError:
             raise AccountBannedError()
         except services.errors.account.AccountPasswordError as exc:
@@ -314,9 +312,7 @@ def _get_account_with_case_fallback(email: str):
     return AccountService.get_user_through_email(email.lower())
 
 
-def _authenticate_account_with_case_fallback(
-    original_email: str, normalized_email: str, password: str
-):
+def _authenticate_account_with_case_fallback(original_email: str, normalized_email: str, password: str):
     try:
         return AccountService.authenticate(original_email, password)
     except services.errors.account.AccountPasswordError:

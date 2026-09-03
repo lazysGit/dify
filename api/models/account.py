@@ -48,7 +48,7 @@ class TenantAccountRole(enum.StrEnum):
         return role == TenantAccountRole.ADMIN
 
     @staticmethod
-    def is_non_owner_role(role: Optional["TenantAccountRole"]) -> bool:
+    def is_non_owner_role(role: str) -> bool:
         if not role:
             return False
         return role in {

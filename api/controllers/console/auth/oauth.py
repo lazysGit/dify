@@ -58,9 +58,7 @@ def get_oauth_providers():
 class OAuthLogin(Resource):
     @console_ns.doc("oauth_login")
     @console_ns.doc(description="Initiate OAuth login process")
-    @console_ns.doc(
-        params={"provider": "OAuth provider name (github/google)"}
-    )
+    @console_ns.doc(params={"provider": "OAuth provider name (github/google)"})
     @console_ns.response(302, "Redirect to OAuth authorization URL")
     @console_ns.response(400, "Invalid provider")
     def get(self, provider: str):

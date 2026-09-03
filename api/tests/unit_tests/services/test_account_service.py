@@ -1503,4 +1503,3 @@ class TestRegisterService:
 
             # Verify rollback was called
             mock_db_dependencies["db"].session.rollback.assert_called()
-

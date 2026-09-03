@@ -155,6 +155,7 @@ __all__ = [
     "DatasetRetrieverResource",
     "DatasourceOauthParamConfig",
     "DatasourceProvider",
+    "Department",
     "DifySetup",
     "Document",
     "DocumentSegment",

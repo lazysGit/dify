@@ -36,9 +36,7 @@ class TestChatAccessVerify:
 
     @patch("controllers.web.chat_access.extract_access_token", return_value=None)
     @patch("controllers.web.chat_access.FeatureService.get_system_features")
-    def test_no_access_token_returns_401(
-        self, mock_features: MagicMock, mock_extract: MagicMock, app: Flask
-    ) -> None:
+    def test_no_access_token_returns_401(self, mock_features: MagicMock, mock_extract: MagicMock, app: Flask) -> None:
         mock_features.return_value = SimpleNamespace(department_access_control=True)
         with app.test_request_context("/api/chat-access/verify?app_code=code1"):
             with pytest.raises(Unauthorized, match="Console login state"):
