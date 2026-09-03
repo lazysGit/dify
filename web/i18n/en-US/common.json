@@ -675,6 +675,8 @@
   "provider.saveFailed": "Save api key failed",
   "provider.validatedError": "Validation failed: ",
   "provider.validating": "Validating key...",
+  "publish.cross_department_locked": "Admin permission required to publish to this department",
+  "publish.own_department_only_hint": "Normal users can only publish to their own department. Contact an administrator for cross-department publishing.",
   "settings.account": "My account",
   "settings.accountGroup": "GENERAL",
   "settings.apiBasedExtension": "API Extension",

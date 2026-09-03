@@ -251,6 +251,18 @@ export type PublishDepartmentsResponse = {
   departments: PublishDepartment[]
 }
 
+export type PublishableDepartment = {
+  id: string
+  name: string
+  is_own_department: boolean
+}
+
+export type PublishableDepartmentsResponse = {
+  departments: PublishableDepartment[]
+  publish_scope: 'all' | 'department_and_subdepartments' | 'own_department_only'
+  can_publish_cross_department: boolean
+}
+
 export const departmentPublishAppsContract = base
   .route({
     path: '/apps/{id}/publish-departments',
@@ -260,6 +272,16 @@ export const departmentPublishAppsContract = base
     params: { id: string }
   }>())
   .output(type<PublishDepartmentsResponse>())
+
+export const departmentPublishableAppsContract = base
+  .route({
+    path: '/apps/{id}/publishable-departments',
+    method: 'GET',
+  })
+  .input(type<{
+    params: { id: string }
+  }>())
+  .output(type<PublishableDepartmentsResponse>())
 
 export const departmentUpdatePublishAppsContract = base
   .route({
@@ -291,5 +313,6 @@ export const departmentRouterContract = {
   operationLogs: departmentOperationLogsContract,
   departmentOperationLogs: departmentDepartmentOperationLogsContract,
   publishApps: departmentPublishAppsContract,
+  publishableDepartments: departmentPublishableAppsContract,
   updatePublishApps: departmentUpdatePublishAppsContract,
 }

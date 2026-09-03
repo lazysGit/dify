@@ -60,6 +60,7 @@ const PublishDepartmentPanel: FC<PublishDepartmentPanelProps> = ({ appId }) => {
         <PublishDepartmentModal
           open={modalOpen}
           onOpenChange={setModalOpen}
+          appId={appId}
           tree={tree}
           selectedIds={publishedDepts.map(d => d.id)}
           onSave={handleSave}

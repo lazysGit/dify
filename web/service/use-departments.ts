@@ -183,6 +183,12 @@ export const usePublishDepartments = (appId: string) => {
   }))
 }
 
+export const usePublishableDepartments = (appId: string) => {
+  return useQuery(consoleQuery.departments.publishableDepartments.queryOptions({
+    input: { params: { id: appId } },
+  }))
+}
+
 export const useUpdatePublishDepartmentsMutation = (appId: string) => {
   const queryClient = useQueryClient()
   return useMutation(consoleQuery.departments.updatePublishApps.mutationOptions({

@@ -675,6 +675,8 @@
   "provider.saveFailed": "API 密钥保存失败",
   "provider.validatedError": "校验失败：",
   "provider.validating": "验证密钥中...",
+  "publish.cross_department_locked": "发布到该部门需要管理员权限",
+  "publish.own_department_only_hint": "普通用户只能发布到自己部门。如需跨部门发布，请联系管理员。",
   "settings.account": "我的账户",
   "settings.accountGroup": "通用",
   "settings.apiBasedExtension": "API 扩展",

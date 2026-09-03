@@ -41,6 +41,16 @@ vi.mock('@/service/use-departments', () => ({
     },
     isLoading: false,
   }),
+  usePublishableDepartments: () => ({
+    data: {
+      departments: [
+        { id: 'dept-1', name: 'Engineering', is_own_department: false },
+      ],
+      publish_scope: 'all',
+      can_publish_cross_department: true,
+    },
+    isLoading: false,
+  }),
   useUpdatePublishDepartmentsMutation: () => ({
     mutateAsync: mockMutateAsync,
     isPending: false,

@@ -70,8 +70,8 @@ describe('department contracts', () => {
     })
   })
 
-  it('should have exactly 17 routes in departmentRouterContract', () => {
-    expect(Object.keys(departmentRouterContract)).toHaveLength(17)
+  it('should have exactly 18 routes in departmentRouterContract', () => {
+    expect(Object.keys(departmentRouterContract)).toHaveLength(18)
   })
 })
 
