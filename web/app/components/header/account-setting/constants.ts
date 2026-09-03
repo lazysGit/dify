@@ -4,6 +4,7 @@ export const ACCOUNT_SETTING_TAB = {
   PROVIDER: 'provider',
   MEMBERS: 'members',
   DEPARTMENTS: 'departments',
+  MODEL_SETTINGS: 'model_settings',
   BILLING: 'billing',
   DATA_SOURCE: 'data-source',
   API_BASED_EXTENSION: 'api-based-extension',
