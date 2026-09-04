@@ -126,6 +126,12 @@
 - **`department_access_control` 前后端契约形状不一致（真实集成 bug）**：后端 `FeatureService.get_system_features` 返回裸 bool（`"department_access_control": true`，`feature_service.py:254`），前端 `web/types/feature.ts` 却定义为 `{ enabled: boolean }`，消费方（card-view、explore app-list、splash、chat-access-guard）读 `.enabled` → 恒 undefined → **发布部门面板永不渲染（即使开关已开）**。修复：前端对齐后端裸 bool——`types/feature.ts` 改 `boolean`，4 处用法去掉 `.enabled`，embedded-chatbot spec fixture 同步。修复后 UI 冒烟验证：应用信息抽屉出现"部门发布"面板并可正常编辑保存。后端保持裸 bool 与既有消费者（passport/chat_access/wraps）一致。`web/app` 该特性为本地开发功能（upstream 无此字段），由本分支定义契约，前端改型零成本。type-check/lint/52 个相关测试全绿。
 - 冒烟依赖的环境修正（不入库）：`api/.env` 追加 `DEPARTMENT_ACCESS_CONTROL_ENABLED=true`（面板按 systemFeatures 开关渲染，非仅角色）；member/new 两账号 department_id 改动为测试操作。
 
+### 二次冒烟复验（2026-09-04，最终代码含 a08b83109c + cafc635322，全场景重跑）
+
+S1-S8 全部复验通过：S1 弹窗设白名单 {qwen-max,qwen-plus}（未修改禁用保存 → 修改后启用）；S2 A 受限提示 + 仅白名单模型 + 成员页只读 + 选择器端点仅 2 模型；S3 移除 qwen-max → A 端点仅剩 qwen-plus；**S4 发布部门面板在契约形状修复后正常可见（本轮核心新验证点）**，对话框 4 部门全可选无 disabled、保存成功；S5 member（技术部部门管理员）GET scope=department_and_subdepartments + 管外 400 + 管内 200；S6 admin 任意发布 200，operation_logs 四类审计时间线齐全；S7 移动 A→技术部白名单 {qwen-plus} 不变、publish_scope 按新部门 own_department_only；S8 A 跨部门 400（文案同）、本部门 200。S9 仍跳过（无第二租户成员，DB/单测已覆盖）。
+- 复验附带回归确认：代码评审发现的 `web/__tests__/department/chat-access-guard.test.tsx` 陈旧 mock 形状（`{enabled}`）导致"flag off"用例回归已修复于 `cafc635322`（member 视角 flag 取布尔后守卫正确走 granted 分支）；explore-source-switch spec mock 同步。
+- API 冒烟注意：`GET /console/api/account/profile` 等鉴权接口在浏览器会话同样要求 `X-CSRF-Token`（SPA 自动带，裸 fetch/curl 需手动）；白名单 PUT payload 字段为 `provider`/`model`/`model_type`（非 `provider_name`/`model_name`）。
+
 ---
 
 ## 各批次启动 Prompt（复制到新会话即用）
