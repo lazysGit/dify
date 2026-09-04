@@ -64,6 +64,15 @@
 - Minor 顺手修：删除未引用的 `my_available_models.loading` i18n key
 - 未修复（已记录待后续）：白名单对话框未显示成员归属租户语义不变；`publish_scope` 用 `len(accessible)>1` 启发式判定（无子部门管理员标签失真，集合本身正确）；每次 PUT 发布均写审计（无 diff 跳过可优化）；`department_ids` 不校验存在性（既有缺口）
 
+### 第二轮评审修复（682c716f2f，评审范围 f6927600dc..fea9b8f67d）
+
+- 首轮 6 项修复全部经第二轮评审验证成立，无回归（评审者实跑 53 后端 + 31 前端特性测试）
+- Critical：`unique_account_model` 唯一约束补 `tenant_id` 为首列（模型 + 迁移脚本同步改，本地 dev 库已 downgrade→upgrade 重放，psql 实证 5 列）。背景：首轮 tenant 作用域修复后，多租户同账号设同一 triple 会因 tenant-scoped delete 删不掉异租户旧行而 IntegrityError 500；迁移未发布，直接改脚本零成本
+- Important：新增 `test_success_audit_is_recorded_after_commit`（共享 order 序列断言 commit 先于成功审计），钉住首轮修复 4 防回退
+- Minor：`test_set_whitelist_non_empty_replaces` 补插入行 `tenant_id` 断言；删除死 key `model_whitelist.title`（en/zh 同步）
+- 未修复（记录待后续）：`ModelPermissionDeniedError` 生产代码未抛出（计划自身冗余，403 由控制器 abort 产生）；白名单 GET 失败时弹窗无错误态（低概率，入口条件已基本排除）
+- 冒烟清单建议补充第 9 条：同账号加入两个 workspace，各设同一模型白名单，确认互不干扰（覆盖约束修复）
+
 - 模型服务真实类名为 `ModelProviderService`（`api/services/model_provider_service.py:23`），非设计文档所写 `ProviderModelService`；按类型取模型走 `get_models_by_model_type(tenant_id, model_type) -> list[ProviderWithModelsResponse]`（:385）
 - 选择器过滤唯一端点：`ModelProviderAvailableModelApi.get`（`api/controllers/console/workspace/models.py:527`），前端唯一入口 `useModelListByType`（`web/service/use-common.ts:265`）
 - 发布门控目标方法为 `AppPublishService.update_published_departments`（`api/services/app_publish_service.py:35`，设计文档写的 `update_publish_departments` 有误），签名已含 `user/tenant_id/app_id/operator_ip`，无需改签名
