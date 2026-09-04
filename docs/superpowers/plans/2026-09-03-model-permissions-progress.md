@@ -2,6 +2,8 @@
 
 > 配套主计划：`docs/superpowers/plans/2026-09-03-model-permissions-and-publish-gate.md`
 > 用途：主计划体量过大（13 个 Task），单次会话 token 不足以完成，拆为 8 个批次。本文件是跨会话衔接的唯一状态源：每批结束后必须更新本文件，每批开始前必须阅读本文件。
+>
+> **状态（2026-09-04）：批次 1-8 全部完成。** 13 个 Task 全部 commit 且 checkbox 已勾选；仅剩 Task 13 手动冒烟 8 条场景待用户在本地 dev 环境执行确认。
 
 ---
 
@@ -30,7 +32,7 @@
 | 5 | Task 8 | F2 API：可发布部门列表 `publishable-departments` | 批次 4 | 已完成 | 044d52420f |
 | 6 | Task 9 + Task 11 | F1 前端：oRPC 契约/Hook + "我的可用模型"只读页 | 批次 3 | 已完成 | 703fe0c6f6, 66ce35b9a9 |
 | 7 | Task 10 | F1 前端：成员页"模型权限"入口与白名单对话框（最重 UI） | 批次 6 | 已完成 | c936eb1c75 |
-| 8 | Task 12 + Task 13 | F2 前端：发布对话框角色限制 + 全量回归与冒烟 | 批次 5, 7 | 未开始 | - |
+| 8 | Task 12 + Task 13 | F2 前端：发布对话框角色限制 + 全量回归与冒烟 | 批次 5, 7 | 已完成（手动冒烟待用户） | 3d022fb2dc, add21bc913 |
 
 说明：Task 10 与 Task 11 均只依赖 Task 9 的 Hook，互不依赖，故轻量的 Task 11 与 Task 9 合并为批次 6，Task 10 单独成批。
 
@@ -48,6 +50,19 @@
 - 批次 7 提示：GET 白名单响应自带 `all_system_models`（SystemModelEntry[]，含 provider/model/model_type/label），白名单对话框的模型数据源无需额外列表 API，直接复用 `useMemberModelWhitelist`
 - 批次 7 提示：`react/set-state-in-effect` 规则禁止 effect 内同步 setState——选中集用"派生状态"模式（`overrideKeys ?? 从 data 派生`），交互后写入 overrideKeys，无 effect 无 render setState
 - 批次 7 提示：成员行按钮与表头列共用 i18n 文本，RTL 测试点击需用 `getAllByRole('button', { name: key })` 定位（getAllByText 会命中表头 div）
+- 批次 8 提示：后端 `publishable-departments` 返回的 `departments` 是**过滤后的可发布集合**（非全量+标记），前端限制逻辑用"tree 节点 id 不在集合内则 disabled"实现；数据未加载时不限制（后端保存时兜底 403）
+- 批次 8 修复清单（全在 `add21bc913`）：`get_app_model`/`edit_permission_required` 装饰器顺序按 `statistic.py` 先例调整（publish_department.py 3 处）；`model_permission_service.get_filtered_models` 过滤键误用 `model.provider.provider`（ProviderModel 无 provider 字段）改为 `response.provider`；`is_non_owner_role` 签名改 `str`（StrEnum 成员与 str 比较等价）；`model_permission.py` result 显式初始化规避 abort 无类型标注导致的 possibly-unbound；`app_publish_service` 部门管理员分支加 `user_dept_id` 非空 guard；`dataset_service.get_datasets` 部门过滤加 `tenant_id` 窄化；`__init__.py`/`models/__init__.py` 导出补 __all__
+- 前端全量 `pnpm test`：27727 passed / 111 failed + 2 unhandled——111 failed 为分支早期 commit `15d4b8aa94`（department filter tabs）给 CreateAppModal 等组件引入 `useDepartmentList` 调用，旧 spec 无 QueryClientProvider 包装所致，与本功能无关（失败集中 explore/create-app-modal、datasets/list、apps list 等 7 文件）；2 unhandled 为 refresh-token 401 预存网络 mock 问题。属分支遗留 spec 基建债，未在本项目内修复
+- `web/app/signin/modern-login.tsx` 与 `web/app/signin/modern/`（预存未跟踪）已按用户指示删除，`web/eslint-suppressions.json` 已 prune（`--prune-suppressions` 移除 14 行失效条目）。此后 web 侧 commit 无需再走"移出/移回"流程
+
+### 代码评审修复（55ff64f57e，评审范围 f6927600dc..add21bc913）
+
+- Critical：`get_whitelist`/`is_restricted`/`set_whitelist` 删除语句补 `tenant_id` 过滤（账号可入多租户，原实现会把 A 租户的白名单泄漏到 B 租户）；白名单 GET/PUT 控制器补 `_ensure_tenant_member`（`TenantAccountJoin` 查询，非本租户成员 404），堵住跨租户 IDOR
+- Important：service 测试实体工厂从 `ModelWithProviderEntity` 改为真实链路的 `ProviderModelWithStatusEntity`（SYSTEM_MODELS 改 `(provider, entity)` 元组，provider 归属外层 response）——这正是 provider-key bug 当初漏测的根因；补 tenant 作用域断言 3 例 + 去重回归 1 例 + 控制器 404 用例
+- Important：成功审计日志移到 `db.session.commit()` 之后（原顺序会在发布落库失败时残留"成功"审计，与同文件既有日志顺序矛盾）
+- Important：白名单对话框未修改时禁用保存（防"顺手保存"把不限制静默变成显式全量白名单）；`mutateAsync` 失败捕获并 toast 报错；标题显示成员名（`model_whitelist.member_title`）；`set_whitelist` 对重复 triple 去重（防 unique 约束 IntegrityError 500）
+- Minor 顺手修：删除未引用的 `my_available_models.loading` i18n key
+- 未修复（已记录待后续）：白名单对话框未显示成员归属租户语义不变；`publish_scope` 用 `len(accessible)>1` 启发式判定（无子部门管理员标签失真，集合本身正确）；每次 PUT 发布均写审计（无 diff 跳过可优化）；`department_ids` 不校验存在性（既有缺口）
 
 - 模型服务真实类名为 `ModelProviderService`（`api/services/model_provider_service.py:23`），非设计文档所写 `ProviderModelService`；按类型取模型走 `get_models_by_model_type(tenant_id, model_type) -> list[ProviderWithModelsResponse]`（:385）
 - 选择器过滤唯一端点：`ModelProviderAvailableModelApi.get`（`api/controllers/console/workspace/models.py:527`），前端唯一入口 `useModelListByType`（`web/service/use-common.ts:265`）
@@ -75,12 +90,9 @@
 
 - （无）
 
-### 环境备注（批次 7/8 前必读）
+### 环境备注（已完成，归档备查）
 
-- 工作区预存未跟踪文件 `web/app/signin/modern-login.tsx` 与 `web/app/signin/modern/` 会让 pre-commit type-check 失败（TS2307/TS7006，非本项目代码）。web 侧 commit 前临时移到 `/tmp/opencode/signin-stash/`，commit 后移回（批次 6 已两次执行此流程，用户已确认该方案）。
-- 前端 lint/type-check 全量跑会报预存文件的错误与约 150+ warnings，验证本批次产出时按 touched 文件过滤判断。
-- Tailwind class 顺序规则要求 `text-*` 在 `system-sm-*` 之前（该规则不支持 --fix，需手改）。
-- i18n key 在 `web/i18n/{en-US,zh-Hans}/common.json`，flat 排序：`my_available_models.*` 插在 `modelProvider.*` 与 `noData` 之间；`settings.model_settings` 插在 `settings.members` 与 `settings.plugin` 之间（两文件已同步）。
+- 工作区预存未跟踪文件 `web/app/signin/modern-login.tsx` 与 `web/app/signin/modern/` 曾使 pre-commit type-check 失败，批次 6-8 期间采用"临时移到 `/tmp/opencode/signin-stash/`、commit 后移回"方案；批次 8 经用户确认后已直接删除（连同 stash 目录），eslint suppressions 同步 prune。
 
 ---
 
