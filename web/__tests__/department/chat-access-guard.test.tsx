@@ -19,8 +19,8 @@ vi.mock('@/next/navigation', () => ({
 }))
 
 vi.mock('@/context/global-public-context', () => ({
-  useGlobalPublicStore: (selector: (state: { systemFeatures: { department_access_control: { enabled: boolean } } }) => unknown) => {
-    return selector({ systemFeatures: { department_access_control: { enabled: mockDepartmentAccessEnabled } } })
+  useGlobalPublicStore: (selector: (state: { systemFeatures: { department_access_control: boolean } }) => unknown) => {
+    return selector({ systemFeatures: { department_access_control: mockDepartmentAccessEnabled } })
   },
 }))
 

@@ -18,8 +18,8 @@ vi.mock('@/service/use-departments', () => ({
 }))
 
 vi.mock('@/context/global-public-context', () => ({
-  useGlobalPublicStore: (selector: (state: { systemFeatures: { department_access_control: { enabled: boolean } } }) => unknown) => {
-    return selector({ systemFeatures: { department_access_control: { enabled: false } } })
+  useGlobalPublicStore: (selector: (state: { systemFeatures: { department_access_control: boolean } }) => unknown) => {
+    return selector({ systemFeatures: { department_access_control: false } })
   },
 }))
 
@@ -117,8 +117,8 @@ describe('Explore source switch', () => {
     })
 
     vi.doMock('@/context/global-public-context', () => ({
-      useGlobalPublicStore: (selector: (state: { systemFeatures: { department_access_control: { enabled: boolean } } }) => unknown) => {
-        return selector({ systemFeatures: { department_access_control: { enabled: false } } })
+      useGlobalPublicStore: (selector: (state: { systemFeatures: { department_access_control: boolean } }) => unknown) => {
+        return selector({ systemFeatures: { department_access_control: false } })
       },
     }))
 
