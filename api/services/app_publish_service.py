@@ -85,25 +85,6 @@ class AppPublishService:
                 )
                 raise
 
-        # Successful publish audit: distinguish cross-department pushes from
-        # routine own-department ones (admins always count as cross-department;
-        # short-circuit before touching department lookup to avoid a needless query).
-        if user.is_admin_or_owner:
-            publish_action = "publish_cross_department"
-        else:
-            user_dept_id = DepartmentService.get_user_department_id(user.id, tenant_id)
-            if any(d != user_dept_id for d in department_ids):
-                publish_action = "publish_cross_department"
-            else:
-                publish_action = "publish_to_own_department"
-        DepartmentAuditLog.log(
-            tenant_id,
-            user.id,
-            operator_ip,
-            publish_action,
-            {"app_id": app_id, "department_ids": department_ids},
-        )
-
         unique_dept_ids = list(dict.fromkeys(department_ids))
 
         existing = (
@@ -137,6 +118,27 @@ class AppPublishService:
             )
 
         db.session.commit()
+
+        # Successful publish audit AFTER the data commit: DepartmentAuditLog.log
+        # commits its own row, so logging earlier would record a "success" even
+        # when the subsequent publish commit fails. Admins always count as
+        # cross-department; short-circuit before department lookup to avoid a
+        # needless query.
+        if user.is_admin_or_owner:
+            publish_action = "publish_cross_department"
+        else:
+            user_dept_id = DepartmentService.get_user_department_id(user.id, tenant_id)
+            if any(d != user_dept_id for d in department_ids):
+                publish_action = "publish_cross_department"
+            else:
+                publish_action = "publish_to_own_department"
+        DepartmentAuditLog.log(
+            tenant_id,
+            user.id,
+            operator_ip,
+            publish_action,
+            {"app_id": app_id, "department_ids": department_ids},
+        )
 
         if to_add:
             DepartmentAuditLog.log(

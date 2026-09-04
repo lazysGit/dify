@@ -86,6 +86,10 @@ vi.mock('@/app/components/billing/upgrade-btn', () => ({
   default: () => null,
 }))
 
+vi.mock('@/app/components/base/ui/toast', () => ({
+  toast: { error: vi.fn(), success: vi.fn() },
+}))
+
 vi.mock('@/app/components/base/button', () => ({
   default: ({ children, loading, ...props }: { children: React.ReactNode, loading?: boolean } & Record<string, unknown>) => (
     <button {...props}>{children}</button>
@@ -164,23 +168,40 @@ describe('MembersPage model permission', () => {
 
     fireEvent.click(screen.getAllByRole('button', { name: 'members.model_permission' })[0])
 
-    expect(screen.getByText('model_whitelist.title')).toBeInTheDocument()
+    expect(screen.getByText('model_whitelist.member_title')).toBeInTheDocument()
     expect(screen.getByTestId('checkbox-openai:llm:gpt-4')).toHaveAttribute('aria-checked', 'true')
     expect(screen.getByTestId('checkbox-anthropic:llm:claude-3')).toHaveAttribute('aria-checked', 'false')
     expect(container).toBeDefined()
+  })
+
+  it('should disable save until the selection changes', async () => {
+    await renderPage({ isOwner: true, isManager: true })
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'members.model_permission' })[0])
+
+    const saveButton = screen.getByRole('button', { name: 'operation.save' })
+    expect(saveButton).toBeDisabled()
+
+    fireEvent.click(screen.getByTestId('checkbox-model-whitelist-all'))
+    expect(saveButton).toBeEnabled()
   })
 
   it('should call mutateAsync with selected models on save', async () => {
     await renderPage({ isOwner: true, isManager: true })
 
     fireEvent.click(screen.getAllByRole('button', { name: 'members.model_permission' })[0])
-    fireEvent.click(screen.getByText('operation.save'))
+    // 取消 gpt-4 勾选使状态变脏，保存应只含剩余两个模型
+    fireEvent.click(screen.getByTestId('checkbox-openai:llm:gpt-4'))
+    fireEvent.click(screen.getByRole('button', { name: 'operation.save' }))
 
     await waitFor(() => {
       expect(mockMutateAsync).toHaveBeenCalledWith({
         params: { account_id: 'a1' },
         body: {
-          models: allModels.map(m => ({ provider: m.provider, model: m.model, model_type: m.model_type })),
+          models: [
+            { provider: 'openai', model: 'text-embedding-3-small', model_type: 'text-embedding' },
+            { provider: 'anthropic', model: 'claude-3', model_type: 'llm' },
+          ],
         },
       })
     })

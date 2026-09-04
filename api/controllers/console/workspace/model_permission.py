@@ -12,7 +12,9 @@ from pydantic import BaseModel, ConfigDict
 
 from controllers.console import console_ns
 from controllers.console.wraps import account_initialization_required, setup_required
+from extensions.ext_database import db
 from libs.login import current_account_with_tenant, login_required
+from models.account import TenantAccountJoin
 from services.errors.model_permission import InvalidModelError
 from services.model_permission_service import ModelPermissionService
 
@@ -29,6 +31,22 @@ class ModelWhitelistPayload(BaseModel):
     models: list[ModelEntry]
 
 
+def _ensure_tenant_member(tenant_id: str, account_id: str) -> None:
+    """Abort with 404 unless the target account belongs to the current tenant.
+
+    Guards both read and write paths against cross-tenant IDOR: an admin of
+    tenant A must not be able to inspect or replace the whitelist of an
+    account that only exists in tenant B (or of a random UUID).
+    """
+    exists = (
+        db.session.query(TenantAccountJoin.id)
+        .filter_by(tenant_id=tenant_id, account_id=account_id)
+        .first()
+    )
+    if exists is None:
+        console_ns.abort(404, description="Member not found in this workspace")
+
+
 @console_ns.route("/workspaces/current/members/<uuid:account_id>/model-whitelist")
 class MemberModelWhitelistApi(Resource):
     """Inspect or replace the model whitelist of a workspace member."""
@@ -42,9 +60,10 @@ class MemberModelWhitelistApi(Resource):
             console_ns.abort(403, description="Only admin or owner can view model whitelist")
 
         account_key = str(account_id)
+        _ensure_tenant_member(tenant_id, account_key)
         return {
-            "is_restricted": ModelPermissionService.is_restricted(account_key),
-            "whitelist": ModelPermissionService.get_whitelist(account_key),
+            "is_restricted": ModelPermissionService.is_restricted(account_key, tenant_id),
+            "whitelist": ModelPermissionService.get_whitelist(account_key, tenant_id),
             "all_system_models": ModelPermissionService.get_all_system_models(tenant_id),
         }, 200
 
@@ -58,6 +77,8 @@ class MemberModelWhitelistApi(Resource):
 
         payload = console_ns.payload or {}
         args = ModelWhitelistPayload.model_validate(payload)
+
+        _ensure_tenant_member(tenant_id, str(account_id))
 
         # abort() always raises, but it is untyped (returns Any), so initialise
         # `result` to keep type checkers from flagging a possibly-unbound use.

@@ -253,6 +253,7 @@ const MembersPage = () => {
       {modelPermissionAccount && (
         <ModelWhitelistModal
           accountId={modelPermissionAccount.id}
+          accountName={modelPermissionAccount.name}
           onClose={() => setModelPermissionAccount(null)}
         />
       )}

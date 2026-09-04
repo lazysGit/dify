@@ -11,9 +11,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from core.entities.model_entities import ModelStatus, ModelWithProviderEntity, SimpleModelProviderEntity
+from core.entities.model_entities import ModelStatus, ProviderModelWithStatusEntity
 from dify_graph.model_runtime.entities.common_entities import I18nObject
-from dify_graph.model_runtime.entities.model_entities import FetchFrom, ModelType
+from dify_graph.model_runtime.entities.model_entities import ModelType
 from models.model_permission import AccountModelWhitelist
 from services.entities.model_provider_entities import CustomConfigurationStatus, ProviderWithModelsResponse
 from services.errors.model_permission import InvalidModelError, ModelPermissionDeniedError
@@ -38,20 +38,19 @@ def _make_user(user_id="u1", is_admin_or_owner=False):
     return user
 
 
-def _make_model_entity(provider="openai", model="gpt-4", model_type="llm"):
-    return ModelWithProviderEntity.model_construct(
+def _make_model_entity(model="gpt-4", model_type="llm"):
+    """Mimic the real shape returned by get_models_by_model_type.
+
+    The catalogue items are ``ProviderModelWithStatusEntity`` instances which
+    carry NO ``provider`` attribute (it lives on the wrapping
+    ``ProviderWithModelsResponse``). Building them with the wrong class once
+    let a ``model.provider.provider`` filter bug pass silently.
+    """
+    return ProviderModelWithStatusEntity.model_construct(
         model=model,
         label=I18nObject(en_US=model),
         model_type=ModelType(model_type),
-        fetch_from=FetchFrom.CUSTOMIZABLE_MODEL,
-        model_properties={},
-        deprecated=False,
         status=ModelStatus.ACTIVE,
-        provider=SimpleModelProviderEntity.model_construct(
-            provider=provider,
-            label=I18nObject(en_US=provider),
-            supported_model_types=[ModelType(model_type)],
-        ),
     )
 
 
@@ -75,10 +74,12 @@ def _mock_query_chain(mock_session, first_return=None, all_return=None):
     return mock_filter
 
 
+# (provider, entity) pairs: provider lives outside the entity now, mirroring
+# ProviderWithModelsResponse.provider wrapping ProviderModelWithStatusEntity.
 SYSTEM_MODELS = [
-    _make_model_entity(provider="openai", model="gpt-4", model_type="llm"),
-    _make_model_entity(provider="openai", model="gpt-4o", model_type="llm"),
-    _make_model_entity(provider="openai", model="text-embedding-3-small", model_type="text-embedding"),
+    ("openai", _make_model_entity(model="gpt-4", model_type="llm")),
+    ("openai", _make_model_entity(model="gpt-4o", model_type="llm")),
+    ("openai", _make_model_entity(model="text-embedding-3-small", model_type="text-embedding")),
 ]
 
 
@@ -86,11 +87,13 @@ def _patch_system_models(mock_svc_cls):
     svc_instance = mock_svc_cls.return_value
 
     def get_models_by_model_type(tenant_id, model_type):
-        matched = [m for m in SYSTEM_MODELS if str(m.model_type) == model_type]
-        providers = sorted({m.provider.provider for m in matched})
+        by_provider: dict[str, list] = {}
+        for provider, model in SYSTEM_MODELS:
+            if str(model.model_type) == model_type:
+                by_provider.setdefault(provider, []).append(model)
         return [
-            _make_provider_response(provider=p, models=[m for m in matched if m.provider.provider == p])
-            for p in providers
+            _make_provider_response(provider=p, models=ms)
+            for p, ms in sorted(by_provider.items())
         ]
 
     svc_instance.get_models_by_model_type.side_effect = get_models_by_model_type
@@ -101,7 +104,7 @@ class TestGetWhitelist:
     @patch("services.model_permission_service.db")
     def test_get_whitelist_empty_returns_empty_list(self, mock_db):
         _mock_query_chain(mock_db.session, first_return=None, all_return=[])
-        assert ModelPermissionService.get_whitelist("u2") == []
+        assert ModelPermissionService.get_whitelist("u2", "t1") == []
 
     @patch("services.model_permission_service.db")
     def test_get_whitelist_returns_entries(self, mock_db):
@@ -112,7 +115,7 @@ class TestGetWhitelist:
             ),
         ]
         _mock_query_chain(mock_db.session, all_return=rows)
-        result = ModelPermissionService.get_whitelist("u2")
+        result = ModelPermissionService.get_whitelist("u2", "t1")
         assert result == [
             {"provider_name": "openai", "model_name": "gpt-4", "model_type": "llm"},
             {"provider_name": "openai", "model_name": "text-embedding-3-small", "model_type": "text-embedding"},
@@ -195,6 +198,30 @@ class TestSetWhitelist:
         ModelPermissionService.set_whitelist("t1", "u2", [], created_by="u1", operator_ip="10.0.0.1")
         remove_call = mock_audit.log.call_args
         assert remove_call.args[:4] == ("t1", "u1", "10.0.0.1", "remove_model_whitelist")
+
+    @patch("services.model_permission_service.DepartmentAuditLog")
+    @patch("services.model_permission_service.ModelProviderService")
+    @patch("services.model_permission_service.db")
+    def test_set_whitelist_deduplicates_repeated_entries(self, mock_db, mock_svc_cls, mock_audit):
+        """Repeated triples would violate unique_account_model; they must be merged."""
+        mock_session = MagicMock()
+        mock_db.session = mock_session
+        _mock_query_chain(mock_session)
+        _patch_system_models(mock_svc_cls)
+
+        result = ModelPermissionService.set_whitelist(
+            "t1",
+            "u2",
+            [
+                {"provider_name": "openai", "model_name": "gpt-4", "model_type": "llm"},
+                {"provider_name": "openai", "model_name": "gpt-4", "model_type": "llm"},
+            ],
+            created_by="u1",
+            operator_ip="127.0.0.1",
+        )
+
+        assert mock_session.add.call_count == 1
+        assert result == {"is_restricted": True, "whitelist_count": 1}
 
 
 class TestGetFilteredModels:
@@ -286,12 +313,68 @@ class TestMisc:
     @patch("services.model_permission_service.db")
     def test_is_restricted_false_when_no_records(self, mock_db):
         _mock_query_chain(mock_db.session, first_return=None)
-        assert ModelPermissionService.is_restricted("u2") is False
+        assert ModelPermissionService.is_restricted("u2", "t1") is False
 
     @patch("services.model_permission_service.db")
     def test_is_restricted_true_when_has_records(self, mock_db):
         _mock_query_chain(mock_db.session, first_return=MagicMock())
-        assert ModelPermissionService.is_restricted("u2") is True
+        assert ModelPermissionService.is_restricted("u2", "t1") is True
+
+    @patch("services.model_permission_service.db")
+    def test_get_whitelist_query_is_tenant_scoped(self, mock_db):
+        """Regression: whitelist reads must filter by tenant_id, not account alone.
+
+        Accounts can join multiple tenants; an unscoped lookup would leak
+        tenant A's restrictions into tenant B for the same account.
+        """
+        mock_query = MagicMock()
+        mock_filter = MagicMock()
+        mock_filter.all.return_value = []
+        mock_query.filter.return_value = mock_filter
+        mock_db.session.query.return_value = mock_query
+
+        ModelPermissionService.get_whitelist("u2", "t1")
+
+        filter_args = mock_query.filter.call_args
+        assert filter_args is not None
+        assert len(filter_args.args) == 2
+        # 两个过滤条件都必须命中 AccountModelWhitelist 列（account_id + tenant_id）
+        columns = {str(cond.left.key) for cond in filter_args.args}
+        assert columns == {"account_id", "tenant_id"}
+
+    @patch("services.model_permission_service.db")
+    def test_is_restricted_query_is_tenant_scoped(self, mock_db):
+        mock_query = MagicMock()
+        mock_filter = MagicMock()
+        mock_filter.first.return_value = None
+        mock_query.filter.return_value = mock_filter
+        mock_db.session.query.return_value = mock_query
+
+        assert ModelPermissionService.is_restricted("u2", "t1") is False
+
+        filter_args = mock_query.filter.call_args
+        assert filter_args is not None
+        assert len(filter_args.args) == 2
+        columns = {str(cond.left.key) for cond in filter_args.args}
+        assert columns == {"account_id", "tenant_id"}
+
+    @patch("services.model_permission_service.DepartmentAuditLog")
+    @patch("services.model_permission_service.db")
+    def test_set_whitelist_query_is_tenant_scoped(self, mock_db, mock_audit):
+        mock_session = MagicMock()
+        mock_db.session = mock_session
+        mock_query = MagicMock()
+        mock_filter = MagicMock()
+        mock_query.filter.return_value = mock_filter
+        mock_session.query.return_value = mock_query
+
+        ModelPermissionService.set_whitelist("t1", "u2", [], created_by="u1", operator_ip="127.0.0.1")
+
+        filter_args = mock_query.filter.call_args
+        assert filter_args is not None
+        assert len(filter_args.args) == 2
+        columns = {str(cond.left.key) for cond in filter_args.args}
+        assert columns == {"account_id", "tenant_id"}
 
     @patch("services.model_permission_service.ModelProviderService")
     def test_get_all_system_models_flattens_all_types(self, mock_svc_cls):
@@ -302,13 +385,11 @@ class TestMisc:
                 return [
                     _make_provider_response(
                         provider="openai",
-                        models=[_make_model_entity(provider="openai", model="gpt-4", model_type="llm")],
+                        models=[_make_model_entity(model="gpt-4", model_type="llm")],
                     )
                 ]
             if model_type == "text-embedding":
-                te_model = _make_model_entity(
-                    provider="openai", model="text-embedding-3-small", model_type="text-embedding"
-                )
+                te_model = _make_model_entity(model="text-embedding-3-small", model_type="text-embedding")
                 return [_make_provider_response(provider="openai", models=[te_model])]
             return []
 

@@ -41,19 +41,31 @@ def _label_text(label: I18nObject) -> str:
 
 class ModelPermissionService:
     @staticmethod
-    def get_whitelist(account_id: str) -> list[dict[str, str]]:
-        """Return the raw whitelist triples for an account; empty list = unrestricted."""
-        rows = db.session.query(AccountModelWhitelist).filter(AccountModelWhitelist.account_id == account_id).all()
+    def get_whitelist(account_id: str, tenant_id: str) -> list[dict[str, str]]:
+        """Return the raw whitelist triples for an account within a tenant; empty list = unrestricted."""
+        rows = (
+            db.session.query(AccountModelWhitelist)
+            .filter(
+                AccountModelWhitelist.account_id == account_id,
+                AccountModelWhitelist.tenant_id == tenant_id,
+            )
+            .all()
+        )
         return [
             {"provider_name": row.provider_name, "model_name": row.model_name, "model_type": row.model_type}
             for row in rows
         ]
 
     @staticmethod
-    def is_restricted(account_id: str) -> bool:
-        """True iff at least one whitelist row exists for the account (EXISTS probe)."""
+    def is_restricted(account_id: str, tenant_id: str) -> bool:
+        """True iff at least one whitelist row exists for the account in the tenant (EXISTS probe)."""
         return (
-            db.session.query(AccountModelWhitelist.id).filter(AccountModelWhitelist.account_id == account_id).first()
+            db.session.query(AccountModelWhitelist.id)
+            .filter(
+                AccountModelWhitelist.account_id == account_id,
+                AccountModelWhitelist.tenant_id == tenant_id,
+            )
+            .first()
         ) is not None
 
     @staticmethod
@@ -74,6 +86,8 @@ class ModelPermissionService:
         :return: ``{"is_restricted": bool, "whitelist_count": int}``
         """
         if models:
+            # Deduplicate first: repeated triples would violate unique_account_model.
+            models = [dict(entry) for entry in {tuple(sorted(m.items())): m for m in models}.values()]
             valid_keys = {
                 (entry["provider"], entry["model"], entry["model_type"])
                 for entry in ModelPermissionService.get_all_system_models(tenant_id)
@@ -83,7 +97,10 @@ class ModelPermissionService:
                 if key not in valid_keys:
                     raise InvalidModelError(f"Model {model['model_name']} is not available in this workspace")
 
-        db.session.query(AccountModelWhitelist).filter(AccountModelWhitelist.account_id == account_id).delete()
+        db.session.query(AccountModelWhitelist).filter(
+            AccountModelWhitelist.account_id == account_id,
+            AccountModelWhitelist.tenant_id == tenant_id,
+        ).delete()
         for model in models:
             db.session.add(
                 AccountModelWhitelist(
@@ -134,12 +151,12 @@ class ModelPermissionService:
         hits (providers with zero hits are dropped entirely).
         """
         provider_responses = ModelProviderService().get_models_by_model_type(tenant_id, model_type)
-        if user.is_admin_or_owner or not ModelPermissionService.is_restricted(account_id):
+        if user.is_admin_or_owner or not ModelPermissionService.is_restricted(account_id, tenant_id):
             return provider_responses
 
         allowed = {
             (entry["provider_name"], entry["model_name"], entry["model_type"])
-            for entry in ModelPermissionService.get_whitelist(account_id)
+            for entry in ModelPermissionService.get_whitelist(account_id, tenant_id)
         }
         filtered: list[ProviderWithModelsResponse] = []
         for response in provider_responses:
@@ -158,12 +175,12 @@ class ModelPermissionService:
             admin/whitelist rules as :meth:`get_filtered_models`.
         """
         all_models = ModelPermissionService.get_all_system_models(tenant_id)
-        if user.is_admin_or_owner or not ModelPermissionService.is_restricted(account_id):
+        if user.is_admin_or_owner or not ModelPermissionService.is_restricted(account_id, tenant_id):
             return all_models, False
 
         allowed = {
             (entry["provider_name"], entry["model_name"], entry["model_type"])
-            for entry in ModelPermissionService.get_whitelist(account_id)
+            for entry in ModelPermissionService.get_whitelist(account_id, tenant_id)
         }
         filtered = [
             model for model in all_models if (model["provider"], model["model"], model["model_type"]) in allowed

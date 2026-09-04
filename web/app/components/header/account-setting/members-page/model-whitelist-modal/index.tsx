@@ -5,10 +5,12 @@ import { useTranslation } from 'react-i18next'
 import Button from '@/app/components/base/button'
 import Checkbox from '@/app/components/base/checkbox'
 import { Dialog, DialogCloseButton, DialogContent, DialogTitle } from '@/app/components/base/ui/dialog'
+import { toast } from '@/app/components/base/ui/toast'
 import { useMemberModelWhitelist, useSetMemberWhitelistMutation } from '@/service/use-model-permissions'
 
 type ModelWhitelistModalProps = {
   accountId: string
+  accountName: string
   onClose: () => void
 }
 
@@ -17,12 +19,13 @@ const modelKey = (model: { provider: string, model: string, model_type: string }
 
 const ALL_MODELS_CHECKBOX_ID = 'model-whitelist-all'
 
-const ModelWhitelistModal = ({ accountId, onClose }: ModelWhitelistModalProps) => {
+const ModelWhitelistModal = ({ accountId, accountName, onClose }: ModelWhitelistModalProps) => {
   const { t } = useTranslation()
   const { data, isLoading } = useMemberModelWhitelist(accountId)
   const setMemberWhitelist = useSetMemberWhitelistMutation()
   // 用户未交互时（null）选中集从接口数据派生：无白名单全选，有白名单仅选白名单项
   const [overrideKeys, setOverrideKeys] = useState<Set<string> | null>(null)
+  const isDirty = overrideKeys !== null
 
   const selectedKeys = useMemo(() => {
     if (overrideKeys)
@@ -68,8 +71,13 @@ const ModelWhitelistModal = ({ accountId, onClose }: ModelWhitelistModalProps) =
     const models = (data?.all_system_models ?? [])
       .filter(model => selectedKeys.has(modelKey(model)))
       .map(model => ({ provider: model.provider, model: model.model, model_type: model.model_type }))
-    await setMemberWhitelist.mutateAsync({ params: { account_id: accountId }, body: { models } })
-    onClose()
+    try {
+      await setMemberWhitelist.mutateAsync({ params: { account_id: accountId }, body: { models } })
+      onClose()
+    }
+    catch {
+      toast.error(t('model_whitelist.save_failed', { ns: 'common' }))
+    }
   }
 
   return (
@@ -82,7 +90,7 @@ const ModelWhitelistModal = ({ accountId, onClose }: ModelWhitelistModalProps) =
     >
       <DialogContent>
         <DialogTitle className="text-text-primary system-xl-semibold">
-          {t('model_whitelist.title', { ns: 'common' })}
+          {t('model_whitelist.member_title', { ns: 'common', name: accountName })}
         </DialogTitle>
         <DialogCloseButton />
         {isLoading && (
@@ -129,6 +137,7 @@ const ModelWhitelistModal = ({ accountId, onClose }: ModelWhitelistModalProps) =
               <Button onClick={onClose}>{t('operation.cancel', { ns: 'common' })}</Button>
               <Button
                 variant="primary"
+                disabled={!isDirty}
                 loading={setMemberWhitelist.isPending}
                 onClick={handleSave}
               >

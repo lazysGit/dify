@@ -37,14 +37,38 @@ class TestMemberModelWhitelistApi:
             ),
             patch("controllers.console.workspace.model_permission.ModelPermissionService") as mock_svc,
         ):
-            mock_svc.get_whitelist.return_value = whitelist
-            mock_svc.get_all_system_models.return_value = all_models
-            mock_svc.is_restricted.return_value = True
+            mock_db = MagicMock()
+            mock_db.session.query.return_value.filter.return_value.first.return_value = MagicMock()
+            with patch("controllers.console.workspace.model_permission.db", mock_db):
+                mock_svc.get_whitelist.return_value = whitelist
+                mock_svc.get_all_system_models.return_value = all_models
+                mock_svc.is_restricted.return_value = True
 
-            result, status = method(api, TARGET_UUID)
+                result, status = method(api, TARGET_UUID)
 
         assert status == 200
         assert result == {"is_restricted": True, "whitelist": whitelist, "all_system_models": all_models}
+
+    def test_get_returns_404_for_non_member_account(self, app):
+        """Cross-tenant IDOR guard: admin must not read whitelists of non-members."""
+        api = MemberModelWhitelistApi()
+        method = unwrap(api.get)
+        user = _admin_user()
+
+        with (
+            app.test_request_context("/"),
+            patch(
+                "controllers.console.workspace.model_permission.current_account_with_tenant",
+                return_value=(user, "t1"),
+            ),
+            patch("controllers.console.workspace.model_permission.db") as mock_db,
+        ):
+            mock_db.session.query.return_value.filter_by.return_value.first.return_value = None
+
+            with pytest.raises(HTTPException) as exc_info:
+                method(api, TARGET_UUID)
+
+        assert exc_info.value.code == 404
 
     def test_get_forbidden_for_non_admin(self, app):
         api = MemberModelWhitelistApi()
@@ -78,8 +102,11 @@ class TestMemberModelWhitelistApi:
             patch("controllers.console.workspace.model_permission.ModelPermissionService") as mock_svc,
         ):
             mock_svc.set_whitelist.return_value = {"is_restricted": True, "whitelist_count": 1}
+            mock_db = MagicMock()
+            mock_db.session.query.return_value.filter.return_value.first.return_value = MagicMock()
 
-            result, status = method(api, TARGET_UUID)
+            with patch("controllers.console.workspace.model_permission.db", mock_db):
+                result, status = method(api, TARGET_UUID)
 
         assert status == 200
         assert result == {"result": "success", "is_restricted": True, "whitelist_count": 1}
@@ -122,7 +149,9 @@ class TestMemberModelWhitelistApi:
                 return_value=(user, "t1"),
             ),
             patch("controllers.console.workspace.model_permission.ModelPermissionService") as mock_svc,
+            patch("controllers.console.workspace.model_permission.db") as mock_db,
         ):
+            mock_db.session.query.return_value.filter.return_value.first.return_value = MagicMock()
             mock_svc.set_whitelist.side_effect = InvalidModelError("Model claude-3 is not available in this workspace")
 
             with pytest.raises(HTTPException) as exc_info:
