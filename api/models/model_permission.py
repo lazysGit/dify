@@ -24,15 +24,20 @@ from .types import StringUUID
 class AccountModelWhitelist(TypeBase):
     """One allowed (provider_name, model_name, model_type) triple for a member.
 
-    Invariant: uniqueness is enforced per (account_id, provider_name,
-    model_name, model_type) so a whitelist never contains duplicates; "no
-    rows for this account" is the explicit "unrestricted" state.
+    Invariant: uniqueness is enforced per (tenant_id, account_id,
+    provider_name, model_name, model_type) so a whitelist never contains
+    duplicates AND the same account may hold independent whitelists in each
+    tenant it belongs to (accounts routinely join multiple tenants — the
+    constraint must not let tenant A's row block tenant B's write). "No rows
+    for this (tenant, account)" is the explicit "unrestricted" state.
     """
 
     __tablename__ = "account_model_whitelist"
     __table_args__ = (
         sa.PrimaryKeyConstraint("id", name="account_model_whitelist_pkey"),
-        sa.UniqueConstraint("account_id", "provider_name", "model_name", "model_type", name="unique_account_model"),
+        sa.UniqueConstraint(
+            "tenant_id", "account_id", "provider_name", "model_name", "model_type", name="unique_account_model"
+        ),
         sa.Index("account_model_whitelist_account_idx", "account_id"),
         sa.Index("account_model_whitelist_tenant_idx", "tenant_id"),
     )

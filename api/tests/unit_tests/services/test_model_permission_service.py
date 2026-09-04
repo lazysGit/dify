@@ -157,6 +157,8 @@ class TestSetWhitelist:
         assert result == {"is_restricted": True, "whitelist_count": 2}
         assert mock_session.query.return_value.filter.return_value.delete.called
         assert mock_session.add.call_count == 2
+        # 插入行必须带当前租户，否则跨租户串扰会在写入侧复活
+        assert mock_session.add.call_args.args[0].tenant_id == "t1"
         mock_audit.log.assert_called_once_with(
             "t1", "u1", None, "set_model_whitelist", {"account_id": "u2", "count": 2}
         )

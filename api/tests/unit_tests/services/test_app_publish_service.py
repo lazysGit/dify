@@ -283,6 +283,34 @@ class TestPublishPermissionMatrix:
     @patch("services.app_publish_service.DepartmentAuditLog")
     @patch("services.app_publish_service.DepartmentService")
     @patch("services.app_publish_service.db")
+    def test_success_audit_is_recorded_after_commit(self, mock_db, mock_dept_svc, mock_audit):
+        """Regression: success audit must come after the data commit.
+
+        DepartmentAuditLog.log commits its own row, so recording the audit
+        before the publish commit would leave a "success" entry behind even
+        when the commit fails.
+        """
+        self._mock_env(mock_db, mock_dept_svc, user_dept="d_own")
+        admin = _make_user(user_id="admin1", is_admin_or_owner=True)
+
+        # 记录两类调用的真实先后顺序
+        order: list[str] = []
+        mock_db.session.commit.side_effect = lambda: order.append("commit")
+        mock_audit.log.side_effect = lambda *args, **kwargs: order.append("audit")
+
+        AppPublishService.update_published_departments(admin, "t1", "app1", ["d_any"])
+
+        assert "commit" in order, "data commit missing"
+        success_calls = [
+            i for i, c in enumerate(mock_audit.log.call_args_list) if c[0][3] == "publish_cross_department"
+        ]
+        assert success_calls, "success audit missing"
+        # 最后一次 data commit 必须先于成功审计
+        assert order.index("commit") < order.index("audit")
+
+    @patch("services.app_publish_service.DepartmentAuditLog")
+    @patch("services.app_publish_service.DepartmentService")
+    @patch("services.app_publish_service.db")
     def test_audit_log_records_permission_denied(self, mock_db, mock_dept_svc, mock_audit):
         self._mock_env(mock_db, mock_dept_svc, user_dept="d_own")
         user = _make_user(user_id="normal1")

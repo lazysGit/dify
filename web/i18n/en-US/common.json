@@ -533,7 +533,6 @@
   "model_whitelist.description": "Select the models this member can use. If no model is selected, the member can use all system models.",
   "model_whitelist.member_title": "Model Permission: {{name}}",
   "model_whitelist.save_failed": "Failed to save model permission. Please try again.",
-  "model_whitelist.title": "Model Permission",
   "my_available_models.no_models": "No models are currently available. Please contact your administrator.",
   "my_available_models.restricted_hint": "Your administrator has restricted the models available to you.",
   "my_available_models.unrestricted": "You can use all system models.",

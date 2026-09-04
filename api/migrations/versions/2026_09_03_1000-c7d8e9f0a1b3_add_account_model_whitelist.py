@@ -28,7 +28,9 @@ def upgrade() -> None:
         sa.Column("created_by", models.types.StringUUID(), nullable=False),
         sa.Column("created_at", sa.DateTime(), server_default=sa.func.current_timestamp(), nullable=False),
         sa.PrimaryKeyConstraint("id", name="account_model_whitelist_pkey"),
-        sa.UniqueConstraint("account_id", "provider_name", "model_name", "model_type", name="unique_account_model"),
+        sa.UniqueConstraint(
+            "tenant_id", "account_id", "provider_name", "model_name", "model_type", name="unique_account_model"
+        ),
     )
     with op.batch_alter_table("account_model_whitelist", schema=None) as batch_op:
         batch_op.create_index("account_model_whitelist_account_idx", ["account_id"], unique=False)
