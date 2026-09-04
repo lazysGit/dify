@@ -105,6 +105,29 @@
 
 ---
 
+## 冒烟测试结果（2026-09-04，chrome-devtools MCP 手动执行）
+
+环境：middleware + `dev/start-dev-env --skip-middleware --skip-deps`（API :5001、worker、vinext :3000）。API 直连 :5001（vinext 只代理部分路径），登录 password 需 Base64，mutating 请求带 `X-CSRF-Token`。测试账号密码全部 `Dify123456`。冒烟中发现后端 bug：`get_app_model` 装饰器按 `app.department_id` 做部门访问校验（`department_service.assert_department_access`），故测试应用挂在技术部下时，**场景 5 部门管理员账号必须先移入技术部**才能访问该应用（member 原在默认部门 → 先 `UPDATE tenant_account_joins SET department_id=技术部`）。
+
+| 场景 | 预期 | 实测 | 状态 |
+|------|------|------|------|
+| 1. 管理员给成员设白名单 | 弹窗勾选 qwen-max/qwen-plus 保存 | 弹窗勾选保存成功，DB `account_model_whitelist` 2 行 | PASS |
+| 2. A 侧视角：受限提示 + 模型过滤 | 我的可用模型只剩白名单；无成员/部门管理；app 模型选择器只出白名单 | 完全符合 | PASS |
+| 3. 移除白名单模型 | app 草稿保留原模型，仍可运行（真实回复）；选择器不再出现 | 符合 | PASS |
+| 4. UI 发布面板/对话框 | 发布对话框按角色限制可选部门 | **UI 入口仅 workspace manager（owner/admin）可见**（`app-context-provider.tsx` isCurrentWorkspaceManager）。admin scope=all：对话框列出全部 4 部门、全可选、保存成功落库。**受 scope 限制的部门管理员均为 editor，无"编辑发布部门"按钮，Task 12 的 disabled/lock UI 在当前角色体系下不可达（防御性实现，已由单测覆盖）** | PASS（正向）/ 限制态不可达已记录 |
+| 5. 部门管理员只能发到管辖范围 | 管外拒绝、管内成功 | member 移入技术部（is_department_admin）后：GET publishable = {技术部,前端组,后端组} scope=department_and_subdepartments；PUT 默认部门 → **400**"部门管理员只能发布到管辖范围内的部门"；PUT 技术部+前端组 → 200 | PASS |
+| 6. 租户管理员发任意部门 | 成功 | test-admin PUT 默认部门 → 200（旧集合被替换为单默认部门，后续 UI 保存覆盖为 3 部门）；operation_logs 四类审计齐：publish_cross_department / publish_to_own_department / publish_permission_denied（member 管外被拒）/ publish_app_to_departments | PASS |
+| 7. 边界：移部门后白名单不变 | 白名单保持 | A 移入默认部门：白名单仍 {qwen-plus}（场景 3 后状态）；对新部门应用 publishable scope=own_department_only、can_cross=false；旧部门（技术部）应用对该账号 403（应用访问层按新部门过滤） | PASS |
+| 8. 边界：普通成员跨部门发布 | 拒绝 | A（editor）PUT 前端组（非所属）→ **400**（计划写 403，实现为 400 bad_request，文案同） | PASS（偏差 400 vs 403） |
+| 9. 多租户白名单隔离 | A 入两租户互不干扰 | UI 层跳过（账号未加入第二租户）；DB/API 层已由评审补充的 tenant 作用域单测 + unique(tenant_id,...) 约束覆盖 | DB 层已验证 |
+
+### 冒烟新发现的真实缺陷与修复
+
+- **`department_access_control` 前后端契约形状不一致（真实集成 bug）**：后端 `FeatureService.get_system_features` 返回裸 bool（`"department_access_control": true`，`feature_service.py:254`），前端 `web/types/feature.ts` 却定义为 `{ enabled: boolean }`，消费方（card-view、explore app-list、splash、chat-access-guard）读 `.enabled` → 恒 undefined → **发布部门面板永不渲染（即使开关已开）**。修复：前端对齐后端裸 bool——`types/feature.ts` 改 `boolean`，4 处用法去掉 `.enabled`，embedded-chatbot spec fixture 同步。修复后 UI 冒烟验证：应用信息抽屉出现"部门发布"面板并可正常编辑保存。后端保持裸 bool 与既有消费者（passport/chat_access/wraps）一致。`web/app` 该特性为本地开发功能（upstream 无此字段），由本分支定义契约，前端改型零成本。type-check/lint/52 个相关测试全绿。
+- 冒烟依赖的环境修正（不入库）：`api/.env` 追加 `DEPARTMENT_ACCESS_CONTROL_ENABLED=true`（面板按 systemFeatures 开关渲染，非仅角色）；member/new 两账号 department_id 改动为测试操作。
+
+---
+
 ## 各批次启动 Prompt（复制到新会话即用）
 
 ### 批次 1

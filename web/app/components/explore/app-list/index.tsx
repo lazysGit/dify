@@ -67,7 +67,7 @@ const Apps = ({
     defaultValue: allCategoriesEn,
   })
 
-  const isDepartmentAccessEnabled = systemFeatures.department_access_control.enabled
+  const isDepartmentAccessEnabled = systemFeatures.department_access_control
   const {
     data: departmentData,
     isLoading: departmentLoading,

@@ -40,7 +40,7 @@ const CardView: FC<ICardViewProps> = ({ appId, isInPanel, className }) => {
   const appDetail = useAppStore(state => state.appDetail)
   const setAppDetail = useAppStore(state => state.setAppDetail)
   const systemFeatures = useGlobalPublicStore(s => s.systemFeatures)
-  const isDepartmentEnabled = systemFeatures.department_access_control.enabled
+  const isDepartmentEnabled = systemFeatures.department_access_control
 
   const isWorkflowApp = appDetail?.mode === AppModeEnum.WORKFLOW
   const showMCPCard = isInPanel

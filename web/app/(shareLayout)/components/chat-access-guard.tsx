@@ -17,7 +17,7 @@ const ChatAccessGuard = ({
   const { t } = useTranslation()
   const systemFeatures = useGlobalPublicStore(s => s.systemFeatures)
   const router = useRouter()
-  const flagEnabled = systemFeatures.department_access_control.enabled
+  const flagEnabled = systemFeatures.department_access_control
   const [state, setState] = useState<ChatAccessState>(() => flagEnabled ? 'loading' : 'granted')
   const mountedRef = useRef(false)
 

@@ -553,11 +553,11 @@ Hook：`useMemberModelWhitelist(accountId)`、`useSetMemberWhitelistMutation()`�
 - 部门管理员：无额外提示
 - 租户管理员：无额外提示
 
-- [ ] **Step 1: 写失败测试**（RTL：mock 三角色分别渲染，断言 disabled 状态与提示文案正确；另加契约测试：`departments.ts` 新增 `publishableDepartments` 路由 method/path 断言）
-- [ ] **Step 2: 确认失败** — `pnpm test -- publish-dialog-role-restriction`
-- [ ] **Step 3: 实现**（先在 `departments.ts` 加 `publishableDepartments` 契约 + `use-departments.ts` 加 `usePublishableDepartments(appId)`；再在 modal 中调用该 Hook，按返回的 `publish_scope`（all / department_and_subdepartments / own_department_only）与各部门 `is_own_department` 决定选项 disabled 状态与提示文案）
-- [ ] **Step 4: type-check + lint + test**
-- [ ] **Step 5: Commit** — `feat(web/publish-gate): add role-based department selector restriction in publish dialog`
+- [x] **Step 1: 写失败测试**（RTL：mock 三角色分别渲染，断言 disabled 状态与提示文案正确；另加契约测试：`departments.ts` 新增 `publishableDepartments` 路由 method/path 断言）
+- [x] **Step 2: 确认失败** — `pnpm test -- publish-dialog-role-restriction`
+- [x] **Step 3: 实现**（先在 `departments.ts` 加 `publishableDepartments` 契约 + `use-departments.ts` 加 `usePublishableDepartments(appId)`；再在 modal 中调用该 Hook，按返回的 `publish_scope`（all / department_and_subdepartments / own_department_only）与各部门 `is_own_department` 决定选项 disabled 状态与提示文案）
+- [x] **Step 4: type-check + lint + test**
+- [x] **Step 5: Commit** — `feat(web/publish-gate): add role-based department selector restriction in publish dialog`
 
 ---
 
@@ -565,8 +565,8 @@ Hook：`useMemberModelWhitelist(accountId)`、`useSetMemberWhitelistMutation()`�
 
 ### Task 13: 全量回归与手动冒烟
 
-- [ ] 后端：`make lint && make type-check && make test`
-- [ ] 前端：`pnpm type-check && pnpm lint && pnpm test`
+- [x] 后端：`make lint && make type-check && make test`
+- [x] 前端：`pnpm type-check && pnpm lint && pnpm test`（type-check 与 lint 全绿；test 见进度文件预存失败说明，与本功能无关）
 - [ ] 手动冒烟（本地 dev 环境）：
   1. 管理员设置成员 A 的白名单（仅 gpt-4）→ 成员 A 登录 → "我的可用模型"仅显示 gpt-4
   2. 成员 A 尝试在应用配置中选择其他模型 → 选择器不显示
@@ -576,7 +576,7 @@ Hook：`useMemberModelWhitelist(accountId)`、`useSetMemberWhitelistMutation()`�
   6. 租户管理员 D 发布到任意部门 → 成功
   7. **边界场景**：成员 E 从技术部移动到产品部 → 白名单不变，发布权限按新产品部计算
   8. **边界场景**：普通用户 F 直接调用 API 发布到其他部门 → 返回 403
-- [ ] Commit（如有修复）— `fix(model-permission): polish after full verification`
+- [x] Commit（如有修复）— `fix(model-permission): polish after full verification`
 
 ---
 

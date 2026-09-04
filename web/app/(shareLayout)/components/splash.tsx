@@ -110,7 +110,7 @@ const Splash: FC<PropsWithChildren> = ({ children }) => {
       </div>
     )
   }
-  if (systemFeatures.department_access_control.enabled && shareCode) {
+  if (systemFeatures.department_access_control && shareCode) {
     return (
       <ChatAccessGuard appCode={shareCode}>
         {children}

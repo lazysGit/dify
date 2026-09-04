@@ -64,9 +64,7 @@ export type SystemFeatures = {
   }
   enable_trial_app: boolean
   enable_explore_banner: boolean
-  department_access_control: {
-    enabled: boolean
-  }
+  department_access_control: boolean
 }
 
 export const defaultSystemFeatures: SystemFeatures = {
@@ -109,7 +107,5 @@ export const defaultSystemFeatures: SystemFeatures = {
   },
   enable_trial_app: false,
   enable_explore_banner: false,
-  department_access_control: {
-    enabled: false,
-  },
+  department_access_control: false,
 }
