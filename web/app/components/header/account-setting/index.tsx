@@ -70,6 +70,18 @@ export default function AccountSetting({
         icon: <span className={cn('i-ri-brain-2-line', iconClassName)} />,
         activeIcon: <span className={cn('i-ri-brain-2-fill', iconClassName)} />,
       },
+    ]
+
+    if (showDepartmentsTab) {
+      items.push({
+        key: ACCOUNT_SETTING_TAB.DEPARTMENTS,
+        name: t('settings.departments', { ns: 'common' }),
+        icon: <span className={cn('i-ri-organization-chart', iconClassName)} />,
+        activeIcon: <span className={cn('i-ri-organization-chart', iconClassName)} />,
+      })
+    }
+
+    items.push(
       {
         key: ACCOUNT_SETTING_TAB.MEMBERS,
         name: t('settings.members', { ns: 'common' }),
@@ -82,16 +94,7 @@ export default function AccountSetting({
         icon: <span className={cn('i-ri-shield-keyhole-line', iconClassName)} />,
         activeIcon: <span className={cn('i-ri-shield-keyhole-fill', iconClassName)} />,
       },
-    ]
-
-    if (showDepartmentsTab) {
-      items.push({
-        key: ACCOUNT_SETTING_TAB.DEPARTMENTS,
-        name: t('settings.departments', { ns: 'common' }),
-        icon: <span className={cn('i-ri-org-chart-line', iconClassName)} />,
-        activeIcon: <span className={cn('i-ri-org-chart-fill', iconClassName)} />,
-      })
-    }
+    )
 
     if (enableBilling) {
       items.push({

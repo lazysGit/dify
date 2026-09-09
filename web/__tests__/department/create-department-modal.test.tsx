@@ -1,5 +1,6 @@
 import type { DepartmentTreeNode } from '@/contract/console/departments'
 import { fireEvent, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import CreateDepartmentModal from '@/app/components/header/account-setting/department-page/create-department-modal'
 
@@ -98,6 +99,18 @@ describe('CreateDepartmentModal', () => {
 
     const selectTrigger = screen.getByRole('combobox')
     expect(selectTrigger).toBeInTheDocument()
+  })
+
+  it('should show parent department name instead of id after selection', async () => {
+    const user = userEvent.setup()
+    render(<CreateDepartmentModal tree={mockTree} onClose={vi.fn()} />)
+
+    const trigger = screen.getByRole('combobox')
+    await user.click(trigger)
+    await user.click(await screen.findByText('Engineering'))
+
+    expect(trigger).toHaveTextContent('Engineering')
+    expect(trigger).not.toHaveTextContent('dept-1')
   })
 
   it('should call onClose when cancel is clicked', () => {

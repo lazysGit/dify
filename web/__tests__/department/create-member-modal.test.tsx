@@ -3,10 +3,13 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import CreateMemberModal from '@/app/components/header/account-setting/members-page/create-member-modal'
+import { encryptPassword } from '@/utils/encryption'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string) => key,
+    t: (key: string, options?: { password?: string }) => (
+      options?.password ? `${key} ${options.password}` : key
+    ),
   }),
 }))
 
@@ -30,6 +33,9 @@ vi.mock('@/service/use-departments', () => ({
   useCreateMemberMutation: () => ({
     mutateAsync: mockMutateAsync,
     isPending: false,
+  }),
+  useInitialMemberPassword: () => ({
+    data: { password: 'Dify1234' },
   }),
 }))
 
@@ -63,7 +69,29 @@ describe('CreateMemberModal', () => {
     expect(screen.getByText('members.name')).toBeInTheDocument()
     expect(screen.getByText('members.email')).toBeInTheDocument()
     expect(screen.getByText('members.initialPassword')).toBeInTheDocument()
+    expect(screen.getByText(/members.initialPasswordHint/)).toBeInTheDocument()
     expect(screen.getByText('members.department')).toBeInTheDocument()
+  })
+
+  it('should prefill department when initialDepartmentId is provided', async () => {
+    render(
+      <CreateMemberModal
+        initialDepartmentId="dept-1"
+        onClose={vi.fn()}
+        onSuccess={vi.fn()}
+      />,
+    )
+    expect(screen.getAllByRole('combobox')[0]).toHaveTextContent('Engineering')
+  })
+
+  it('should prefill initial password from system config', async () => {
+    render(<CreateMemberModal onClose={vi.fn()} onSuccess={vi.fn()} />)
+    expect(await screen.findByDisplayValue('Dify1234')).toBeInTheDocument()
+  })
+
+  it('should display the default password in the hint under the input', async () => {
+    render(<CreateMemberModal onClose={vi.fn()} onSuccess={vi.fn()} />)
+    expect(await screen.findByText('members.initialPasswordHint Dify1234')).toBeInTheDocument()
   })
 
   it('should show set as department admin checkbox for owner/admin', () => {
@@ -85,6 +113,21 @@ describe('CreateMemberModal', () => {
     expect(screen.queryByText('members.sendInvite')).not.toBeInTheDocument()
   })
 
+  it('should show department name and role label instead of raw ids after selection', async () => {
+    const user = userEvent.setup()
+    render(<CreateMemberModal onClose={vi.fn()} onSuccess={vi.fn()} />)
+
+    const [deptTrigger, roleTrigger] = screen.getAllByRole('combobox')
+    expect(roleTrigger).toHaveTextContent('members.normal')
+    expect(roleTrigger).not.toHaveTextContent('dataset_operator')
+
+    await user.click(deptTrigger)
+    await user.click(await screen.findByText('Engineering'))
+
+    expect(deptTrigger).toHaveTextContent('Engineering')
+    expect(deptTrigger).not.toHaveTextContent('dept-1')
+  })
+
   it('should call mutateAsync with correct payload on submit', async () => {
     const user = userEvent.setup()
     mockMutateAsync.mockResolvedValueOnce({})
@@ -95,7 +138,9 @@ describe('CreateMemberModal', () => {
 
     await user.type(screen.getByPlaceholderText('members.namePlaceholder'), 'John Doe')
     await user.type(screen.getByPlaceholderText('members.emailPlaceholder'), 'john@example.com')
-    await user.type(screen.getByPlaceholderText('members.initialPasswordPlaceholder'), 'pass123')
+    const passwordInput = screen.getByPlaceholderText('members.initialPasswordPlaceholder')
+    await user.clear(passwordInput)
+    await user.type(passwordInput, 'pass123')
 
     const deptTrigger = screen.getAllByRole('combobox')[0]
     await user.click(deptTrigger)
@@ -109,7 +154,7 @@ describe('CreateMemberModal', () => {
       body: {
         name: 'John Doe',
         email: 'john@example.com',
-        password: 'pass123',
+        password: encryptPassword('pass123'),
         department_id: 'dept-1',
         role: 'normal',
         is_department_admin: false,
@@ -117,5 +162,34 @@ describe('CreateMemberModal', () => {
     })
     expect(onSuccess).toHaveBeenCalled()
     expect(onClose).toHaveBeenCalled()
+  })
+
+  it('should submit the prefilled default password when it is not edited', async () => {
+    const user = userEvent.setup()
+    mockMutateAsync.mockResolvedValueOnce({})
+    const onClose = vi.fn()
+    const onSuccess = vi.fn()
+
+    render(<CreateMemberModal onClose={onClose} onSuccess={onSuccess} />)
+
+    await user.type(screen.getByPlaceholderText('members.namePlaceholder'), 'Jane Doe')
+    await user.type(screen.getByPlaceholderText('members.emailPlaceholder'), 'jane@example.com')
+
+    const deptTrigger = screen.getAllByRole('combobox')[0]
+    await user.click(deptTrigger)
+    await user.click(await screen.findByText('Engineering'))
+
+    await user.click(screen.getByRole('button', { name: /operation\.create/i }))
+
+    expect(mockMutateAsync).toHaveBeenCalledWith({
+      body: {
+        name: 'Jane Doe',
+        email: 'jane@example.com',
+        password: encryptPassword('Dify1234'),
+        department_id: 'dept-1',
+        role: 'normal',
+        is_department_admin: false,
+      },
+    })
   })
 })

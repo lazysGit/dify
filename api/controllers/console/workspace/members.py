@@ -3,6 +3,7 @@ from flask_restx import Resource
 from pydantic import BaseModel, TypeAdapter
 
 import services
+from configs import dify_config
 from controllers.common.schema import register_enum_models, register_schema_models
 from controllers.console import console_ns
 from controllers.console.auth.error import (
@@ -36,7 +37,7 @@ DEFAULT_REF_TEMPLATE_SWAGGER_2_0 = "#/definitions/{model}"
 class MemberCreatePayload(BaseModel):
     name: str
     email: str
-    password: str
+    password: str = ""
     department_id: str
     role: str
 
@@ -178,6 +179,27 @@ class MemberUpdateRoleApi(Resource):
             raise ValueError(str(e))
 
         return {"result": "success"}
+
+
+@console_ns.route("/workspaces/current/members/initial-password")
+class MemberInitialPasswordApi(Resource):
+    """Return the configured default initial password for member creation."""
+
+    @setup_required
+    @login_required
+    @account_initialization_required
+    def get(self):
+        current_user, _ = current_account_with_tenant()
+        if not current_user.current_tenant:
+            raise ValueError("No current tenant")
+
+        tenant_id = current_user.current_tenant.id
+        if not current_user.is_admin_or_owner:
+            is_dept_admin = DepartmentService.is_department_admin(current_user.id, tenant_id)
+            if not is_dept_admin:
+                return {"code": "forbidden", "message": "Only admin or department admin can view default password"}, 403
+
+        return {"password": dify_config.DEFAULT_MEMBER_PASSWORD or ""}
 
 
 # Plan spec: POST /workspaces/current/members (same collection URL as MemberListApi; Flask-RESTx merges methods)

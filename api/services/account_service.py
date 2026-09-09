@@ -40,6 +40,7 @@ from services.errors.account import (
     AccountRegisterError,
     CannotOperateSelfError,
     CurrentPasswordIncorrectError,
+    DefaultPasswordNotAllowedError,
     InvalidActionError,
     LinkAccountIntegrateError,
     MemberNotInTenantError,
@@ -202,10 +203,22 @@ class AccountService:
         return account
 
     @staticmethod
+    def is_using_default_password(account: Account) -> bool:
+        """Return True when the stored password still matches DEFAULT_MEMBER_PASSWORD."""
+        default = dify_config.DEFAULT_MEMBER_PASSWORD
+        if not default or not isinstance(account.password, str) or not isinstance(account.password_salt, str):
+            return False
+        return compare_password(default, account.password, account.password_salt)
+
+    @staticmethod
     def update_account_password(account, password, new_password):
         """update account password"""
         if account.password and not compare_password(password, account.password, account.password_salt):
             raise CurrentPasswordIncorrectError("Current password is incorrect.")
+
+        default = dify_config.DEFAULT_MEMBER_PASSWORD
+        if default and new_password == default:
+            raise DefaultPasswordNotAllowedError("New password cannot be the default member password.")
 
         # may be raised
         valid_password(new_password)
@@ -1486,6 +1499,11 @@ class RegisterService:
             existing = db.session.query(Account).filter_by(email=email).first()
         if existing:
             raise AccountEmailAlreadyInUseError(f"Email {normalized_email} is already in use.")
+
+        if not password:
+            password = dify_config.DEFAULT_MEMBER_PASSWORD
+        if not password:
+            raise ValueError("Password is required")
 
         valid_password(password)
 

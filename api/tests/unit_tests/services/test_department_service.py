@@ -1,3 +1,5 @@
+import json
+from datetime import datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -483,3 +485,63 @@ class TestAssertDepartmentAccess:
         user = _make_user(is_admin_or_owner=False)
         with pytest.raises(DepartmentPermissionDeniedError):
             DepartmentService.assert_department_access(user, "t1", "d2")
+
+
+class TestGetDepartmentMembers:
+    @patch("services.department_service.db")
+    def test_joined_at_is_json_serializable_isoformat(self, mock_db):
+        joined_at = datetime(2026, 8, 20, 7, 16, 53)
+        join = MagicMock()
+        join.account_id = "u1"
+        join.role = "owner"
+        join.is_department_admin = False
+        join.created_at = joined_at
+
+        account = MagicMock()
+        account.id = "u1"
+        account.name = "Admin"
+        account.email = "admin@test.com"
+
+        mock_session = MagicMock()
+        mock_db.session = mock_session
+
+        join_query = MagicMock()
+        join_query.filter.return_value.all.return_value = [join]
+        account_query = MagicMock()
+        account_query.filter.return_value.first.return_value = account
+        mock_session.query.side_effect = [join_query, account_query]
+
+        members = DepartmentService.get_department_members("t1", "d1")
+
+        json.dumps(members)
+        assert members[0]["joined_at"] == "2026-08-20T07:16:53"
+        assert members[0]["id"] == "u1"
+        assert members[0]["account_id"] == "u1"
+        assert members[0]["is_department_admin"] is False
+
+    @patch("services.department_service.db")
+    def test_joined_at_none_serializes_to_null(self, mock_db):
+        join = MagicMock()
+        join.account_id = "u1"
+        join.role = "editor"
+        join.is_department_admin = False
+        join.created_at = None
+
+        account = MagicMock()
+        account.id = "u1"
+        account.name = "User"
+        account.email = "user@test.com"
+
+        mock_session = MagicMock()
+        mock_db.session = mock_session
+
+        join_query = MagicMock()
+        join_query.filter.return_value.all.return_value = [join]
+        account_query = MagicMock()
+        account_query.filter.return_value.first.return_value = account
+        mock_session.query.side_effect = [join_query, account_query]
+
+        members = DepartmentService.get_department_members("t1", "d1")
+
+        json.dumps(members)
+        assert members[0]["joined_at"] is None

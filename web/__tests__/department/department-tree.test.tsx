@@ -1,5 +1,6 @@
 import type { DepartmentTreeNode } from '@/contract/console/departments'
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import DepartmentTree from '@/app/components/header/account-setting/department-page/department-tree'
 import TreeItem from '@/app/components/header/account-setting/department-page/department-tree/tree-item'
@@ -10,11 +11,22 @@ vi.mock('react-i18next', () => ({
   }),
 }))
 
+const { mockMutateAsync } = vi.hoisted(() => ({
+  mockMutateAsync: vi.fn().mockResolvedValue({}),
+}))
+
 vi.mock('@/service/use-departments', () => ({
   useDeleteDepartmentMutation: () => ({
-    mutateAsync: vi.fn(),
+    mutateAsync: mockMutateAsync,
     isPending: false,
   }),
+}))
+
+vi.mock('@/app/components/base/ui/toast', () => ({
+  toast: {
+    success: vi.fn(),
+    error: vi.fn(),
+  },
 }))
 
 const mockTree: DepartmentTreeNode[] = [
@@ -82,6 +94,9 @@ describe('DepartmentTree', () => {
 })
 
 describe('TreeItem', () => {
+  beforeEach(() => {
+    mockMutateAsync.mockClear()
+  })
   it('should render node name and counts', () => {
     render(
       <TreeItem
@@ -103,7 +118,12 @@ describe('TreeItem', () => {
       />,
     )
 
-    expect(screen.getByText('department.default')).toBeInTheDocument()
+    const badge = screen.getByText('department.default')
+    expect(badge).toBeInTheDocument()
+    expect(badge).toHaveClass('bg-state-accent-solid')
+    expect(badge).toHaveClass('text-text-primary-on-surface')
+    expect(badge).not.toHaveClass('text-text-accent')
+    expect(badge.parentElement).not.toHaveClass('truncate')
   })
 
   it('should disable delete button for is_default node when admin', () => {
@@ -154,5 +174,25 @@ describe('TreeItem', () => {
     )
 
     expect(screen.getAllByText('department.manage').length).toBeGreaterThan(0)
+  })
+
+  it('should notify parent after a successful delete so parent does not delete again', async () => {
+    const user = userEvent.setup()
+    const onDelete = vi.fn()
+
+    render(
+      <TreeItem
+        node={mockTree[0].children[0]}
+        depth={0}
+        isAdmin={true}
+        onDelete={onDelete}
+      />,
+    )
+
+    await user.click(screen.getByText('department.delete'))
+    await user.click(screen.getByText('operation.confirm'))
+
+    expect(mockMutateAsync).toHaveBeenCalledTimes(1)
+    expect(onDelete).toHaveBeenCalledWith('child-1')
   })
 })

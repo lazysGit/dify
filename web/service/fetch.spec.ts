@@ -4,6 +4,7 @@ import { base } from './fetch'
 vi.mock('@/app/components/base/ui/toast', () => ({
   toast: {
     add: vi.fn(),
+    error: vi.fn(),
   },
 }))
 
@@ -46,6 +47,47 @@ describe('base', () => {
         code: 'unauthorized',
         message: 'Unauthorized',
         status: 401,
+      })
+    })
+
+    it('should redirect to force-change-password when the error code requires it', async () => {
+      const originalLocation = globalThis.location
+      const locationStub = {
+        origin: 'http://localhost',
+        pathname: '/apps',
+        href: 'http://localhost/apps',
+      }
+      Object.defineProperty(globalThis, 'location', {
+        configurable: true,
+        value: locationStub,
+      })
+
+      const mustChangeResponse = new Response(
+        JSON.stringify({
+          code: 'must_change_password',
+          message: 'Please change your password first.',
+          status: 400,
+        }),
+        {
+          status: 400,
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        },
+      )
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(mustChangeResponse)
+
+      try {
+        await base('/account/profile')
+      }
+      catch {
+        // expected
+      }
+
+      expect(locationStub.href).toBe('http://localhost/force-change-password')
+      Object.defineProperty(globalThis, 'location', {
+        configurable: true,
+        value: originalLocation,
       })
     })
   })

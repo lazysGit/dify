@@ -1,7 +1,7 @@
 'use client'
 
 import type { DepartmentMember, DepartmentTreeNode } from '@/contract/console/departments'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import Button from '@/app/components/base/button'
 import {
@@ -47,8 +47,13 @@ export default function MoveMemberModal({
   const { data: createdResources, isLoading: isLoadingResources } = useMemberCreatedResources(member.id)
 
   const availableDepartments = isAdmin
-    ? flattenNonDefaultExcluding(tree, currentDepartmentId)
+    ? flattenExcluding(tree, currentDepartmentId)
     : flattenFilteredByManageable(tree, manageableDepartmentIds, currentDepartmentId)
+
+  const departmentItems = useMemo(
+    () => Object.fromEntries(availableDepartments.map(d => [d.id, d.name])),
+    [availableDepartments],
+  )
 
   const handleConfirm = async () => {
     if (!selectedDepartmentId)
@@ -58,11 +63,11 @@ export default function MoveMemberModal({
       await moveMemberMutation.mutateAsync({
         params: { id: currentDepartmentId },
         body: {
-          account_ids: [member.id],
-          target_department_id: selectedDepartmentId,
+          member_id: member.id,
+          department_id: selectedDepartmentId,
         },
       })
-      toast.success(t('department.moveMemberConfirm', { ns: 'common' }))
+      toast.success(t('department.moveMemberSuccess', { ns: 'common' }))
       onClose()
     }
     catch {
@@ -86,7 +91,11 @@ export default function MoveMemberModal({
               <label className="text-text-secondary system-sm-medium">
                 {t('department.targetDepartment', { ns: 'common' })}
               </label>
-              <Select value={selectedDepartmentId} onValueChange={v => setSelectedDepartmentId(v ?? '')}>
+              <Select
+                value={selectedDepartmentId || null}
+                onValueChange={v => setSelectedDepartmentId(v ?? '')}
+                items={departmentItems}
+              >
                 <SelectTrigger className="h-9 rounded-lg">
                   <SelectValue placeholder={t('department.selectTarget', { ns: 'common' })} />
                 </SelectTrigger>
@@ -196,20 +205,24 @@ export default function MoveMemberModal({
   )
 }
 
-function flattenNonDefaultExcluding(nodes: DepartmentTreeNode[], excludeId: string): DepartmentTreeNode[] {
+function flattenExcluding(nodes: DepartmentTreeNode[], excludeId: string): DepartmentTreeNode[] {
   return nodes.reduce<DepartmentTreeNode[]>((acc, node) => {
-    if (node.is_default || node.id === excludeId)
+    if (node.id === excludeId) {
+      acc.push(...flattenExcluding(node.children, excludeId))
       return acc
+    }
     acc.push(node)
-    acc.push(...flattenNonDefaultExcluding(node.children, excludeId))
+    acc.push(...flattenExcluding(node.children, excludeId))
     return acc
   }, [])
 }
 
 function flattenFilteredByManageable(nodes: DepartmentTreeNode[], manageableIds: string[], excludeId: string): DepartmentTreeNode[] {
   return nodes.reduce<DepartmentTreeNode[]>((acc, node) => {
-    if (node.is_default || node.id === excludeId)
+    if (node.id === excludeId) {
+      acc.push(...flattenFilteredByManageable(node.children, manageableIds, excludeId))
       return acc
+    }
     if (manageableIds.includes(node.id))
       acc.push(node)
     acc.push(...flattenFilteredByManageable(node.children, manageableIds, excludeId))

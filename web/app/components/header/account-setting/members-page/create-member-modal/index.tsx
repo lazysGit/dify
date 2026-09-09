@@ -13,9 +13,11 @@ import {
 import { toast } from '@/app/components/base/ui/toast'
 import { useAppContext } from '@/context/app-context'
 import { useProviderContext } from '@/context/provider-context'
-import { useCreateMemberMutation, useDepartmentList } from '@/service/use-departments'
+import { useCreateMemberMutation, useDepartmentList, useInitialMemberPassword } from '@/service/use-departments'
+import { encryptPassword } from '@/utils/encryption'
 
 type CreateMemberModalProps = {
+  initialDepartmentId?: string
   onClose: () => void
   onSuccess: () => void
 }
@@ -32,11 +34,12 @@ const ROLE_I18N_MAP: Record<TenantRole, 'members.admin' | 'members.editor' | 'me
   dataset_operator: 'members.datasetOperator',
 }
 
-export default function CreateMemberModal({ onClose, onSuccess }: CreateMemberModalProps) {
+export default function CreateMemberModal({ initialDepartmentId, onClose, onSuccess }: CreateMemberModalProps) {
   const { t } = useTranslation()
   const { isCurrentWorkspaceOwner, isCurrentWorkspaceManager } = useAppContext()
   const { datasetOperatorEnabled } = useProviderContext()
   const { data: deptListData } = useDepartmentList()
+  const { data: initialPasswordData } = useInitialMemberPassword()
   const createMemberMutation = useCreateMemberMutation()
 
   const isTenantAdmin = isCurrentWorkspaceOwner || isCurrentWorkspaceManager
@@ -54,10 +57,11 @@ export default function CreateMemberModal({ onClose, onSuccess }: CreateMemberMo
 
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [departmentId, setDepartmentId] = useState('')
+  const [passwordOverride, setPasswordOverride] = useState<string | null>(null)
+  const [departmentId, setDepartmentId] = useState(initialDepartmentId ?? '')
   const [role, setRole] = useState<TenantRole>('normal')
   const [isDeptAdmin, setIsDeptAdmin] = useState(false)
+  const password = passwordOverride ?? initialPasswordData?.password ?? ''
 
   const roleOptions = useMemo(
     () => {
@@ -65,6 +69,16 @@ export default function CreateMemberModal({ onClose, onSuccess }: CreateMemberMo
       return datasetOperatorEnabled ? options : options.filter(r => r !== 'dataset_operator')
     },
     [isDepartmentAdmin, datasetOperatorEnabled],
+  )
+
+  const departmentItems = useMemo(
+    () => Object.fromEntries(selectableDepartments.map(d => [d.id, d.name])),
+    [selectableDepartments],
+  )
+
+  const roleItems = useMemo(
+    () => Object.fromEntries(roleOptions.map(r => [r, t(ROLE_I18N_MAP[r], { ns: 'common' })])),
+    [roleOptions, t],
   )
 
   const handleSubmit = async () => {
@@ -90,7 +104,7 @@ export default function CreateMemberModal({ onClose, onSuccess }: CreateMemberMo
         body: {
           name: name.trim(),
           email: email.trim(),
-          password,
+          password: encryptPassword(password),
           department_id: departmentId,
           role,
           is_department_admin: canShowAdminCheckbox ? isDeptAdmin : undefined,
@@ -154,10 +168,13 @@ export default function CreateMemberModal({ onClose, onSuccess }: CreateMemberMo
               <input
                 type="password"
                 value={password}
-                onChange={e => setPassword(e.target.value)}
+                onChange={e => setPasswordOverride(e.target.value)}
                 placeholder={t('members.initialPasswordPlaceholder', { ns: 'common' })}
                 className="border-components-input-border h-9 w-full rounded-lg border bg-components-input-bg-normal px-3 text-text-primary outline-none system-sm-regular hover:border-components-input-border-hover focus:border-components-input-border-active"
               />
+              <p className="text-text-tertiary system-xs-regular">
+                {t('members.initialPasswordHint', { ns: 'common', password: initialPasswordData?.password ?? '' })}
+              </p>
             </div>
 
             <div className="flex flex-col gap-1">
@@ -165,7 +182,11 @@ export default function CreateMemberModal({ onClose, onSuccess }: CreateMemberMo
                 {t('members.department', { ns: 'common' })}
                 <span className="text-text-destructive">*</span>
               </label>
-              <Select value={departmentId} onValueChange={v => setDepartmentId(v ?? '')}>
+              <Select
+                value={departmentId || null}
+                onValueChange={v => setDepartmentId(v ?? '')}
+                items={departmentItems}
+              >
                 <SelectTrigger className="h-9 rounded-lg">
                   <SelectValue placeholder={t('members.selectDepartment', { ns: 'common' })} />
                 </SelectTrigger>
@@ -183,7 +204,11 @@ export default function CreateMemberModal({ onClose, onSuccess }: CreateMemberMo
               <label className="text-text-secondary system-sm-medium">
                 {t('members.role', { ns: 'common' })}
               </label>
-              <Select value={role} onValueChange={v => setRole((v as TenantRole) ?? 'normal')}>
+              <Select
+                value={role}
+                onValueChange={v => setRole((v as TenantRole) ?? 'normal')}
+                items={roleItems}
+              >
                 <SelectTrigger className="h-9 rounded-lg">
                   <SelectValue />
                 </SelectTrigger>

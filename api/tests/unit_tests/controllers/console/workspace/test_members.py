@@ -17,6 +17,7 @@ from controllers.console.error import EmailSendIpLimitError
 from controllers.console.workspace.members import (
     DatasetOperatorMemberListApi,
     MemberCancelInviteApi,
+    MemberInitialPasswordApi,
     MemberListApi,
     MemberUpdateRoleApi,
     OwnerTransfer,
@@ -73,6 +74,39 @@ class TestMemberListApi:
         ):
             with pytest.raises(ValueError):
                 method(api)
+
+
+class TestMemberInitialPasswordApi:
+    def test_get_success_for_admin(self, app):
+        api = MemberInitialPasswordApi()
+        method = unwrap(api.get)
+        tenant = MagicMock(id="t1")
+        user = MagicMock(current_tenant=tenant, is_admin_or_owner=True, id="u1")
+
+        with (
+            app.test_request_context("/"),
+            patch("controllers.console.workspace.members.current_account_with_tenant", return_value=(user, "t1")),
+            patch("controllers.console.workspace.members.dify_config.DEFAULT_MEMBER_PASSWORD", "Dify1234"),
+        ):
+            result = method(api)
+
+        assert result == {"password": "Dify1234"}
+
+    def test_forbidden_for_normal_member(self, app):
+        api = MemberInitialPasswordApi()
+        method = unwrap(api.get)
+        tenant = MagicMock(id="t1")
+        user = MagicMock(current_tenant=tenant, is_admin_or_owner=False, id="u1")
+
+        with (
+            app.test_request_context("/"),
+            patch("controllers.console.workspace.members.current_account_with_tenant", return_value=(user, "t1")),
+            patch("controllers.console.workspace.members.DepartmentService.is_department_admin", return_value=False),
+        ):
+            result, status = method(api)
+
+        assert status == 403
+        assert result["code"] == "forbidden"
 
 
 class TestMemberCancelInviteApi:

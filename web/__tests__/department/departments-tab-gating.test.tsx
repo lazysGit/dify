@@ -76,6 +76,40 @@ describe('Departments Tab Gating', () => {
     expect(screen.getByText('settings.departments')).toBeInTheDocument()
   })
 
+  it('should place departments tab above members with organization-chart icon', async () => {
+    vi.resetModules()
+    vi.doMock('@/context/app-context', () => ({
+      useAppContext: () => ({
+        isCurrentWorkspaceManager: true,
+        isCurrentWorkspaceDatasetOperator: false,
+      }),
+    }))
+    vi.doMock('@/service/use-departments', () => ({
+      useDepartmentList: () => ({
+        data: { is_department_admin: false },
+        isError: false,
+        isLoading: false,
+      }),
+    }))
+
+    const { default: AccountSetting } = await import('@/app/components/header/account-setting/index')
+
+    render(
+      <AccountSetting
+        onCancelAction={vi.fn()}
+        activeTab={ACCOUNT_SETTING_TAB.MEMBERS}
+        onTabChangeAction={vi.fn()}
+      />,
+    )
+
+    const departments = screen.getByRole('button', { name: 'settings.departments' })
+    const members = screen.getByRole('button', { name: 'settings.members' })
+
+    expect(departments.compareDocumentPosition(members) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(departments.querySelector('.i-ri-organization-chart')).toBeInTheDocument()
+    expect(departments.querySelector('.i-ri-org-chart-line')).not.toBeInTheDocument()
+  })
+
   it('should show departments tab for department admin', async () => {
     vi.resetModules()
     vi.doMock('@/context/app-context', () => ({

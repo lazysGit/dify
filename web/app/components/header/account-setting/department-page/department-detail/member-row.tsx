@@ -2,7 +2,7 @@
 
 import type { DepartmentMember } from '@/contract/console/departments'
 import { useTranslation } from 'react-i18next'
-import Badge from '@/app/components/base/badge'
+import Badge, { BadgeState } from '@/app/components/base/badge/index'
 import Button from '@/app/components/base/button'
 
 type MemberRowProps = {
@@ -16,7 +16,15 @@ type MemberRowProps = {
   onUnsetAdmin: (member: DepartmentMember) => void
 }
 
-const ADMIN_ELIGIBLE_ROLES = ['normal', 'dataset_operator']
+const ADMIN_ELIGIBLE_ROLES = ['owner', 'admin', 'editor', 'normal']
+
+const ROLE_I18N_MAP: Record<string, 'members.owner' | 'members.admin' | 'members.editor' | 'members.normal' | 'members.datasetOperator'> = {
+  owner: 'members.owner',
+  admin: 'members.admin',
+  editor: 'members.editor',
+  normal: 'members.normal',
+  dataset_operator: 'members.datasetOperator',
+}
 
 export default function MemberRow({
   member,
@@ -32,6 +40,7 @@ export default function MemberRow({
   const canMoveOut = (isAdmin || isDepartmentAdmin) && !isSelf
   const canToggleAdmin = canManageAdmin && !isSelf
   const isEligibleForAdmin = ADMIN_ELIGIBLE_ROLES.includes(member.role)
+  const roleLabelKey = ROLE_I18N_MAP[member.role]
 
   return (
     <div className="flex items-center gap-3 border-b border-divider-subtle px-4 py-3 last:border-b-0">
@@ -41,11 +50,20 @@ export default function MemberRow({
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span className="truncate text-text-primary system-sm-medium">{member.name}</span>
-          {member.is_department_admin && (
-            <Badge>{t('department.admin', { ns: 'common' })}</Badge>
+          {member.is_department_admin
+            ? (
+                <Badge state={BadgeState.Accent}>{t('department.admin', { ns: 'common' })}</Badge>
+              )
+            : (
+                <Badge>{t('department.regularMember', { ns: 'common' })}</Badge>
+              )}
+        </div>
+        <div className="flex min-w-0 items-center gap-2 truncate text-text-tertiary system-xs-regular">
+          <span className="truncate">{member.email}</span>
+          {roleLabelKey && (
+            <span className="shrink-0">{t(roleLabelKey, { ns: 'common' })}</span>
           )}
         </div>
-        <span className="truncate text-text-tertiary system-xs-regular">{member.email}</span>
       </div>
       <div className="flex shrink-0 items-center gap-1">
         {canMoveOut && (

@@ -13,7 +13,7 @@ import { useRouter, useSearchParams } from '@/next/navigation'
 import { login } from '@/service/common'
 import { setWebAppAccessToken } from '@/service/webapp-auth'
 import { encryptPassword } from '@/utils/encryption'
-import { resolvePostLoginRedirect } from '../utils/post-login-redirect'
+import { resolveLoginLandingPath } from '../utils/post-login-redirect'
 
 type MailAndPasswordAuthProps = {
   isEmailSetup: boolean
@@ -66,8 +66,8 @@ export default function MailAndPasswordAuth({ isEmailSetup, allowRegistration: _
           method: 'email_password',
         })
 
-        const redirectUrl = resolvePostLoginRedirect()
-        router.replace(redirectUrl || '/apps')
+        const redirectUrl = resolveLoginLandingPath(res.must_change_password)
+        router.replace(redirectUrl)
       }
       else {
         toast.error(res.data)

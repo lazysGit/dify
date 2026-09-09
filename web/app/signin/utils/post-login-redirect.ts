@@ -13,3 +13,9 @@ export const resolvePostLoginRedirect = () => {
 
   return null
 }
+
+export const resolveLoginLandingPath = (mustChangePassword?: boolean) => {
+  if (mustChangePassword)
+    return '/force-change-password'
+  return resolvePostLoginRedirect() || '/apps'
+}

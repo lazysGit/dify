@@ -25,6 +25,10 @@ class CurrentPasswordIncorrectError(BaseServiceError):
     pass
 
 
+class DefaultPasswordNotAllowedError(BaseServiceError):
+    pass
+
+
 class LinkAccountIntegrateError(BaseServiceError):
     pass
 

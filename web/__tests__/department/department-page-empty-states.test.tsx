@@ -19,10 +19,15 @@ vi.mock('@/app/components/base/button', () => ({
 }))
 
 vi.mock('@/app/components/header/account-setting/department-page/department-tree', () => ({
-  default: ({ tree }: { tree: unknown[] }) => (
-    <div data-testid="dept-tree">
-      {tree.length}
-      {' nodes'}
+  default: ({ tree, onDelete }: { tree: unknown[], onDelete?: (id: string) => void }) => (
+    <div>
+      <div data-testid="dept-tree">
+        {tree.length}
+        {' nodes'}
+      </div>
+      <button type="button" data-testid="tree-on-delete" onClick={() => onDelete?.('1')}>
+        notify delete
+      </button>
     </div>
   ),
 }))
@@ -49,11 +54,14 @@ const mockDeptDataWithTree: DepartmentListResponse = {
   is_department_admin: false,
 }
 
-const mockUseDepartmentList = vi.fn()
+const { mockUseDepartmentList, mockMutate } = vi.hoisted(() => ({
+  mockUseDepartmentList: vi.fn(),
+  mockMutate: vi.fn(),
+}))
 
 vi.mock('@/service/use-departments', () => ({
   useDepartmentList: () => mockUseDepartmentList(),
-  useDeleteDepartmentMutation: () => ({ mutate: vi.fn() }),
+  useDeleteDepartmentMutation: () => ({ mutate: mockMutate }),
 }))
 
 vi.mock('@/context/app-context', () => ({
@@ -66,6 +74,7 @@ vi.mock('@/context/app-context', () => ({
 describe('DepartmentPage Empty States', () => {
   beforeEach(() => {
     vi.resetModules()
+    mockMutate.mockClear()
   })
 
   it('should show CTA for admin when no departments', async () => {
@@ -154,5 +163,20 @@ describe('DepartmentPage Empty States', () => {
     const { default: DepartmentPage } = await import('@/app/components/header/account-setting/department-page')
     render(<DepartmentPage isAdmin={true} isDepartmentAdmin={false} apiFailed={false} />)
     expect(screen.getByText('department.create')).toBeInTheDocument()
+  })
+
+  it('should not send another delete request when the tree reports a deleted department', async () => {
+    mockUseDepartmentList.mockReturnValue({
+      data: mockDeptDataWithTree,
+      isLoading: false,
+      isError: false,
+    })
+
+    const { default: DepartmentPage } = await import('@/app/components/header/account-setting/department-page')
+    render(<DepartmentPage isAdmin={true} isDepartmentAdmin={false} apiFailed={false} />)
+
+    screen.getByTestId('tree-on-delete').click()
+
+    expect(mockMutate).not.toHaveBeenCalled()
   })
 })

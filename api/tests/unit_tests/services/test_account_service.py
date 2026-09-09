@@ -11,6 +11,7 @@ from services.errors.account import (
     AccountPasswordError,
     AccountRegisterError,
     CurrentPasswordIncorrectError,
+    DefaultPasswordNotAllowedError,
 )
 from tests.unit_tests.services.services_test_help import ServiceDbTestHelper
 
@@ -411,6 +412,38 @@ class TestAccountService:
 
         # Verify password validation was called
         mock_password_dependencies["valid_password"].assert_called_once_with("short")
+
+    def test_is_using_default_password_true(self, mock_password_dependencies):
+        mock_account = TestAccountAssociatedDataFactory.create_account_mock()
+        mock_password_dependencies["compare_password"].return_value = True
+
+        with patch.object(dify_config, "DEFAULT_MEMBER_PASSWORD", "Dify1234"):
+            assert AccountService.is_using_default_password(mock_account) is True
+
+        mock_password_dependencies["compare_password"].assert_called_once_with("Dify1234", "hashed_password", "salt")
+
+    def test_is_using_default_password_false_when_config_empty(self, mock_password_dependencies):
+        mock_account = TestAccountAssociatedDataFactory.create_account_mock()
+
+        with patch.object(dify_config, "DEFAULT_MEMBER_PASSWORD", ""):
+            assert AccountService.is_using_default_password(mock_account) is False
+
+        mock_password_dependencies["compare_password"].assert_not_called()
+
+    def test_update_account_password_rejects_default_password(self, mock_password_dependencies):
+        mock_account = TestAccountAssociatedDataFactory.create_account_mock()
+        mock_password_dependencies["compare_password"].return_value = True
+
+        with patch.object(dify_config, "DEFAULT_MEMBER_PASSWORD", "Dify1234"):
+            self._assert_exception_raised(
+                DefaultPasswordNotAllowedError,
+                AccountService.update_account_password,
+                mock_account,
+                "old_password",
+                "Dify1234",
+            )
+
+        mock_password_dependencies["valid_password"].assert_not_called()
 
     # ==================== User Loading Tests ====================
 

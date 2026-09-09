@@ -1,7 +1,7 @@
 'use client'
 
 import type { DepartmentTreeNode } from '@/contract/console/departments'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import Button from '@/app/components/base/button'
 import {
@@ -40,6 +40,13 @@ export default function MoveDepartmentModal({
   const moveMutation = useMoveDepartmentMutation()
 
   const availableParents = flattenAvailableParents(tree, departmentId)
+  const parentItems = useMemo(
+    () => ({
+      '': t('department.noParent', { ns: 'common' }),
+      ...Object.fromEntries(availableParents.map(node => [node.id, node.name])),
+    }),
+    [availableParents, t],
+  )
 
   const handleConfirm = async () => {
     try {
@@ -49,7 +56,7 @@ export default function MoveDepartmentModal({
           parent_id: newParentId || null,
         },
       })
-      toast.success(t('department.moveDepartmentConfirm', { ns: 'common' }))
+      toast.success(t('department.moveDepartmentSuccess', { ns: 'common' }))
       onClose()
     }
     catch {
@@ -73,7 +80,11 @@ export default function MoveDepartmentModal({
               <label className="text-text-secondary system-sm-medium">
                 {t('department.newParent', { ns: 'common' })}
               </label>
-              <Select value={newParentId} onValueChange={v => setNewParentId(v ?? '')}>
+              <Select
+                value={newParentId || null}
+                onValueChange={v => setNewParentId(v ?? '')}
+                items={parentItems}
+              >
                 <SelectTrigger className="h-9 rounded-lg">
                   <SelectValue placeholder={t('department.selectParent', { ns: 'common' })} />
                 </SelectTrigger>

@@ -249,3 +249,25 @@ class TestCreateMemberByAdmin:
                 department_id="d1",
                 role=TenantAccountRole.NORMAL,
             )
+
+    @patch("services.account_service.send_member_created_mail_task")
+    @patch("services.department_service.DepartmentAuditLog")
+    @patch("services.account_service.TenantService")
+    @patch("services.account_service.db")
+    def test_empty_password_falls_back_to_default(self, mock_db, mock_ts, mock_audit, mock_mail):
+        _mock_db_queries(mock_db)
+        operator = _make_operator()
+
+        with patch("services.account_service.dify_config.DEFAULT_MEMBER_PASSWORD", "Dify1234"):
+            RegisterService.create_member_by_admin(
+                operator,
+                "t1",
+                name="New User",
+                email="new@example.com",
+                password="",
+                department_id="d1",
+                role=TenantAccountRole.NORMAL,
+            )
+
+        mock_mail.delay.assert_called_once()
+        assert mock_mail.delay.call_args.kwargs["initial_password"] == "Dify1234"

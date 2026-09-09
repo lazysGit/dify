@@ -13,7 +13,7 @@ import { useLocale } from '@/context/i18n'
 import { useRouter, useSearchParams } from '@/next/navigation'
 import { emailLoginWithCode, sendEMailLoginCode } from '@/service/common'
 import { encryptVerificationCode } from '@/utils/encryption'
-import { resolvePostLoginRedirect } from '../utils/post-login-redirect'
+import { resolveLoginLandingPath } from '../utils/post-login-redirect'
 
 export default function CheckCode() {
   const { t, i18n } = useTranslation()
@@ -44,8 +44,8 @@ export default function CheckCode() {
           method: 'email_code',
         })
 
-        const redirectUrl = resolvePostLoginRedirect()
-        router.replace(redirectUrl || '/apps')
+        const redirectUrl = resolveLoginLandingPath(ret.must_change_password)
+        router.replace(redirectUrl)
       }
     }
     catch (error) { console.error(error) }

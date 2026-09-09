@@ -4,7 +4,10 @@ import type { DepartmentMember, DepartmentTreeNode } from '@/contract/console/de
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import Button from '@/app/components/base/button'
-import { useDepartmentMembers } from '@/service/use-departments'
+import { toast } from '@/app/components/base/ui/toast'
+import CreateMemberModal from '@/app/components/header/account-setting/members-page/create-member-modal'
+import { useDepartmentMembers, useSetAdminMutation, useUnsetAdminMutation } from '@/service/use-departments'
+import EditDepartmentModal from '../edit-department-modal'
 import MoveDepartmentModal from '../move-department-modal'
 import MoveMemberModal from '../move-member-modal'
 import MemberRow from './member-row'
@@ -33,12 +36,45 @@ export default function DepartmentDetail({
 }: DepartmentDetailProps) {
   const { t } = useTranslation()
   const { data: membersData, isLoading } = useDepartmentMembers(department.id)
+  const setAdminMutation = useSetAdminMutation()
+  const unsetAdminMutation = useUnsetAdminMutation()
   const [moveMemberTarget, setMoveMemberTarget] = useState<DepartmentMember | null>(null)
   const [showMoveDepartment, setShowMoveDepartment] = useState(false)
+  const [showEditDepartment, setShowEditDepartment] = useState(false)
+  const [showCreateMember, setShowCreateMember] = useState(false)
 
-  const members = membersData?.members ?? []
+  const members = (membersData?.members ?? []).map(member => ({
+    ...member,
+    id: member.id || member.account_id || '',
+  }))
   const canEdit = isAdmin || isDepartmentAdmin
   const canManageAdmin = isAdmin
+
+  const handleSetAdmin = async (member: DepartmentMember) => {
+    try {
+      await setAdminMutation.mutateAsync({
+        params: { id: department.id },
+        body: { member_id: member.id },
+      })
+      toast.success(t('department.setAdminSuccess', { ns: 'common' }))
+    }
+    catch {
+      toast.error(t('department.setAdminFailed', { ns: 'common' }))
+    }
+  }
+
+  const handleUnsetAdmin = async (member: DepartmentMember) => {
+    try {
+      await unsetAdminMutation.mutateAsync({
+        params: { id: department.id },
+        body: { member_id: member.id },
+      })
+      toast.success(t('department.unsetAdminSuccess', { ns: 'common' }))
+    }
+    catch {
+      toast.error(t('department.unsetAdminFailed', { ns: 'common' }))
+    }
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -68,7 +104,7 @@ export default function DepartmentDetail({
                 {t('department.moveDepartment', { ns: 'common' })}
               </Button>
             )}
-            <Button size="small" variant="ghost">
+            <Button size="small" variant="ghost" onClick={() => setShowEditDepartment(true)}>
               {t('department.editDepartment', { ns: 'common' })}
             </Button>
           </div>
@@ -117,7 +153,7 @@ export default function DepartmentDetail({
                     ? (
                         <>
                           <p className="mb-3 system-sm-regular">{t('department.noMembersAdmin', { ns: 'common' })}</p>
-                          <Button variant="primary" size="small">
+                          <Button variant="primary" size="small" onClick={() => setShowCreateMember(true)}>
                             <span className="i-ri-add-line mr-1 h-4 w-4" />
                             {t('department.createMember', { ns: 'common' })}
                           </Button>
@@ -139,8 +175,8 @@ export default function DepartmentDetail({
                       isSelf={member.id === currentUserId}
                       canManageAdmin={canManageAdmin}
                       onMoveOut={m => setMoveMemberTarget(m)}
-                      onSetAdmin={() => {}}
-                      onUnsetAdmin={() => {}}
+                      onSetAdmin={handleSetAdmin}
+                      onUnsetAdmin={handleUnsetAdmin}
                     />
                   ))}
                 </div>
@@ -158,11 +194,26 @@ export default function DepartmentDetail({
         />
       )}
 
+      {showCreateMember && (
+        <CreateMemberModal
+          initialDepartmentId={department.id}
+          onClose={() => setShowCreateMember(false)}
+          onSuccess={() => setShowCreateMember(false)}
+        />
+      )}
+
       {showMoveDepartment && (
         <MoveDepartmentModal
           departmentId={department.id}
           tree={tree}
           onClose={() => setShowMoveDepartment(false)}
+        />
+      )}
+
+      {showEditDepartment && (
+        <EditDepartmentModal
+          department={department}
+          onClose={() => setShowEditDepartment(false)}
         />
       )}
     </div>

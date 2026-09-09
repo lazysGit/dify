@@ -1,7 +1,8 @@
 import type { AppContextValue } from '@/context/app-context'
-import type { DepartmentListResponse } from '@/contract/console/departments'
+import type { Department, DepartmentListResponse, DepartmentTreeNode } from '@/contract/console/departments'
 import type { Member } from '@/models/common'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { createMockProviderContextValue } from '@/__mocks__/provider-context'
 import MembersPage from '@/app/components/header/account-setting/members-page/index'
@@ -53,47 +54,55 @@ vi.mock('@/app/components/billing/upgrade-btn', () => ({
   default: () => <div>Upgrade Button</div>,
 }))
 
-const mockDeptListData: DepartmentListResponse = {
-  departments: [
-    { id: 'dept-1', name: 'Engineering', parent_id: null, path: '/dept-1', level: 0, is_default: false, member_count: 5, app_count: 3, dataset_count: 2 },
-    { id: 'dept-2', name: 'Marketing', parent_id: null, path: '/dept-2', level: 0, is_default: false, member_count: 3, app_count: 1, dataset_count: 1 },
-  ],
-  tree: [],
-  manageable_department_ids: ['dept-1', 'dept-2'],
-  is_department_admin: false,
+function dept(partial: Pick<Department, 'id' | 'name' | 'parent_id' | 'path' | 'level'>): Department {
+  return {
+    is_default: false,
+    member_count: 1,
+    app_count: 0,
+    dataset_count: 0,
+    ...partial,
+  }
 }
+
+const engineering = dept({ id: 'dept-1', name: 'Engineering', parent_id: null, path: '/dept-1', level: 0 })
+const backend = dept({ id: 'dept-1-1', name: 'Backend', parent_id: 'dept-1', path: '/dept-1/dept-1-1', level: 1 })
+const marketing = dept({ id: 'dept-2', name: 'Marketing', parent_id: null, path: '/dept-2', level: 0 })
+
+const nestedTree: DepartmentTreeNode[] = [
+  { ...engineering, children: [{ ...backend, children: [] }] },
+  { ...marketing, children: [] },
+]
+
+function createDeptListData(overrides?: Partial<DepartmentListResponse>): DepartmentListResponse {
+  return {
+    departments: [engineering, backend, marketing],
+    tree: nestedTree,
+    manageable_department_ids: ['dept-1', 'dept-1-1', 'dept-2'],
+    is_department_admin: false,
+    ...overrides,
+  }
+}
+
+function member(partial: Pick<Member, 'id' | 'name' | 'email' | 'role' | 'department_id'>): Member {
+  return {
+    avatar: '',
+    avatar_url: '',
+    last_active_at: '1731000000',
+    last_login_at: '1731000000',
+    created_at: '1731000000',
+    status: 'active',
+    ...partial,
+  }
+}
+
+const mockAccounts: Member[] = [
+  member({ id: '1', name: 'Owner User', email: 'owner@example.com', role: 'owner', department_id: 'dept-1' }),
+  member({ id: '2', name: 'Normal User', email: 'normal@example.com', role: 'normal', department_id: 'dept-2' }),
+  member({ id: '3', name: 'Backend User', email: 'backend@example.com', role: 'normal', department_id: 'dept-1-1' }),
+]
 
 describe('MembersPage - Department Features', () => {
   const mockRefetch = vi.fn()
-
-  const mockAccounts: Member[] = [
-    {
-      id: '1',
-      name: 'Owner User',
-      email: 'owner@example.com',
-      avatar: '',
-      avatar_url: '',
-      role: 'owner',
-      last_active_at: '1731000000',
-      last_login_at: '1731000000',
-      created_at: '1731000000',
-      status: 'active',
-      department_id: 'dept-1',
-    },
-    {
-      id: '2',
-      name: 'Normal User',
-      email: 'normal@example.com',
-      avatar: '',
-      avatar_url: '',
-      role: 'normal',
-      last_active_at: '1731000000',
-      last_login_at: '1731000000',
-      created_at: '1731000000',
-      status: 'active',
-      department_id: 'dept-2',
-    },
-  ]
 
   beforeEach(() => {
     vi.clearAllMocks()
@@ -111,7 +120,7 @@ describe('MembersPage - Department Features', () => {
     } as never)
 
     vi.mocked(useDepartmentList).mockReturnValue({
-      data: mockDeptListData,
+      data: createDeptListData(),
     } as never)
 
     vi.mocked(useGlobalPublicStore).mockImplementation(selector => selector({
@@ -128,9 +137,9 @@ describe('MembersPage - Department Features', () => {
     })
   })
 
-  it('should render department filter select', () => {
+  it('should render department filter trigger', () => {
     render(<MembersPage />)
-    expect(screen.getByRole('combobox')).toBeInTheDocument()
+    expect(screen.getByTestId('department-filter')).toBeInTheDocument()
   })
 
   it('should render create member button for owner/admin', () => {
@@ -146,7 +155,9 @@ describe('MembersPage - Department Features', () => {
       isCurrentWorkspaceOwner: false,
       isCurrentWorkspaceManager: false,
     } as unknown as AppContextValue)
-    mockDeptListData.is_department_admin = false
+    vi.mocked(useDepartmentList).mockReturnValue({
+      data: createDeptListData({ is_department_admin: false }),
+    } as never)
 
     render(<MembersPage />)
     expect(screen.queryByRole('button', { name: /members\.createMember/i })).not.toBeInTheDocument()
@@ -159,7 +170,9 @@ describe('MembersPage - Department Features', () => {
       isCurrentWorkspaceOwner: false,
       isCurrentWorkspaceManager: false,
     } as unknown as AppContextValue)
-    mockDeptListData.is_department_admin = true
+    vi.mocked(useDepartmentList).mockReturnValue({
+      data: createDeptListData({ is_department_admin: true }),
+    } as never)
 
     render(<MembersPage />)
     const btn = screen.getByRole('button', { name: /members\.createMember/i })
@@ -177,9 +190,139 @@ describe('MembersPage - Department Features', () => {
     expect(screen.queryByRole('button', { name: /members\.invite$/i })).not.toBeInTheDocument()
   })
 
-  it('should use manageable_department_ids for filter options', () => {
-    mockDeptListData.manageable_department_ids = ['dept-1']
+  it('should only show manageable departments in the tree', async () => {
+    const user = userEvent.setup()
+    vi.mocked(useDepartmentList).mockReturnValue({
+      data: createDeptListData({ manageable_department_ids: ['dept-1'] }),
+    } as never)
+
     render(<MembersPage />)
-    expect(screen.getByRole('combobox')).toBeInTheDocument()
+    await user.click(screen.getByTestId('department-filter'))
+
+    expect(screen.getByTestId('department-tree-item-dept-1')).toBeInTheDocument()
+    expect(screen.queryByTestId('department-tree-item-dept-2')).not.toBeInTheDocument()
+  })
+
+  it('should show department name instead of id after filter selection', async () => {
+    const user = userEvent.setup()
+    render(<MembersPage />)
+
+    const trigger = screen.getByTestId('department-filter')
+    await user.click(trigger)
+    await user.click(screen.getByTestId('department-tree-item-dept-1'))
+
+    expect(trigger).toHaveTextContent('Engineering')
+    expect(trigger).not.toHaveTextContent('dept-1')
+  })
+
+  it('should filter members by name', async () => {
+    const user = userEvent.setup()
+    render(<MembersPage />)
+
+    await user.type(
+      within(screen.getByTestId('member-search')).getByRole('textbox'),
+      'Owner',
+    )
+
+    expect(screen.getByText('Owner User')).toBeInTheDocument()
+    expect(screen.queryByText('Normal User')).not.toBeInTheDocument()
+    expect(screen.queryByText('Backend User')).not.toBeInTheDocument()
+  })
+
+  it('should filter members by email', async () => {
+    const user = userEvent.setup()
+    render(<MembersPage />)
+
+    await user.type(
+      within(screen.getByTestId('member-search')).getByRole('textbox'),
+      'backend@',
+    )
+
+    expect(screen.getByText('Backend User')).toBeInTheDocument()
+    expect(screen.queryByText('Owner User')).not.toBeInTheDocument()
+    expect(screen.queryByText('Normal User')).not.toBeInTheDocument()
+  })
+
+  it('should show empty state when search matches nobody', async () => {
+    const user = userEvent.setup()
+    render(<MembersPage />)
+
+    await user.type(
+      within(screen.getByTestId('member-search')).getByRole('textbox'),
+      'xyz-no-match',
+    )
+
+    expect(screen.getByText(/members\.noMatchingMembers/i)).toBeInTheDocument()
+    expect(screen.queryByText('Owner User')).not.toBeInTheDocument()
+  })
+
+  it('should show parent and child departments in the tree', async () => {
+    const user = userEvent.setup()
+    render(<MembersPage />)
+
+    await user.click(screen.getByTestId('department-filter'))
+
+    expect(screen.getByTestId('department-tree-item-dept-1')).toBeInTheDocument()
+    expect(screen.getByTestId('department-tree-item-dept-1-1')).toBeInTheDocument()
+    expect(screen.getByTestId('department-tree-item-dept-2')).toBeInTheDocument()
+  })
+
+  it('should include descendant members when a parent department is selected', async () => {
+    const user = userEvent.setup()
+    render(<MembersPage />)
+
+    await user.click(screen.getByTestId('department-filter'))
+    await user.click(screen.getByTestId('department-tree-item-dept-1'))
+
+    expect(screen.getByText('Owner User')).toBeInTheDocument()
+    expect(screen.getByText('Backend User')).toBeInTheDocument()
+    expect(screen.queryByText('Normal User')).not.toBeInTheDocument()
+  })
+
+  it('should not change selection when expand arrow is clicked', async () => {
+    const user = userEvent.setup()
+    render(<MembersPage />)
+
+    await user.click(screen.getByTestId('department-filter'))
+    const collapseButtons = screen.getAllByRole('button', { name: /department\.collapse/i })
+    await user.click(collapseButtons[0])
+
+    expect(screen.getByTestId('department-filter')).toHaveTextContent(/members\.allDepartments/i)
+    expect(screen.queryByTestId('department-tree-item-dept-1-1')).not.toBeInTheDocument()
+    expect(screen.getByText('Owner User')).toBeInTheDocument()
+    expect(screen.getByText('Backend User')).toBeInTheDocument()
+    expect(screen.getByText('Normal User')).toBeInTheDocument()
+  })
+
+  it('should restore all members when All Departments is selected', async () => {
+    const user = userEvent.setup()
+    render(<MembersPage />)
+
+    await user.click(screen.getByTestId('department-filter'))
+    await user.click(screen.getByTestId('department-tree-item-dept-2'))
+    expect(screen.queryByText('Owner User')).not.toBeInTheDocument()
+
+    await user.click(screen.getByTestId('department-filter'))
+    await user.click(screen.getByTestId('department-tree-item-all'))
+
+    expect(screen.getByText('Owner User')).toBeInTheDocument()
+    expect(screen.getByText('Normal User')).toBeInTheDocument()
+    expect(screen.getByText('Backend User')).toBeInTheDocument()
+  })
+
+  it('should apply department and keyword filters together', async () => {
+    const user = userEvent.setup()
+    render(<MembersPage />)
+
+    await user.click(screen.getByTestId('department-filter'))
+    await user.click(screen.getByTestId('department-tree-item-dept-1'))
+    await user.type(
+      within(screen.getByTestId('member-search')).getByRole('textbox'),
+      'Backend',
+    )
+
+    expect(screen.getByText('Backend User')).toBeInTheDocument()
+    expect(screen.queryByText('Owner User')).not.toBeInTheDocument()
+    expect(screen.queryByText('Normal User')).not.toBeInTheDocument()
   })
 })

@@ -107,10 +107,13 @@ class TestLoginApi:
         mock_login.return_value = mock_token_pair
 
         # Act
-        with app.test_request_context(
-            "/login",
-            method="POST",
-            json={"email": "test@example.com", "password": encode_password("ValidPass123!")},
+        with (
+            app.test_request_context(
+                "/login",
+                method="POST",
+                json={"email": "test@example.com", "password": encode_password("ValidPass123!")},
+            ),
+            patch("controllers.console.auth.login.AccountService.is_using_default_password", return_value=False),
         ):
             login_api = LoginApi()
             response = login_api.post()
@@ -120,6 +123,46 @@ class TestLoginApi:
         mock_login.assert_called_once()
         mock_reset_rate_limit.assert_called_once_with("test@example.com")
         assert response.json["result"] == "success"
+        assert response.json["must_change_password"] is False
+
+    @patch("controllers.console.wraps.db")
+    @patch("controllers.console.auth.login.dify_config.BILLING_ENABLED", False)
+    @patch("controllers.console.auth.login.AccountService.is_login_error_rate_limit")
+    @patch("controllers.console.auth.login.AccountService.authenticate")
+    @patch("controllers.console.auth.login.TenantService.get_join_tenants")
+    @patch("controllers.console.auth.login.AccountService.login")
+    @patch("controllers.console.auth.login.AccountService.reset_login_error_rate_limit")
+    def test_successful_login_flags_default_password(
+        self,
+        mock_reset_rate_limit,
+        mock_login,
+        mock_get_tenants,
+        mock_authenticate,
+        mock_is_rate_limit,
+        mock_db,
+        app,
+        mock_account,
+        mock_token_pair,
+    ):
+        mock_db.session.query.return_value.first.return_value = MagicMock()
+        mock_is_rate_limit.return_value = False
+        mock_authenticate.return_value = mock_account
+        mock_get_tenants.return_value = [MagicMock()]
+        mock_login.return_value = mock_token_pair
+
+        with (
+            app.test_request_context(
+                "/login",
+                method="POST",
+                json={"email": "test@example.com", "password": encode_password("Dify1234")},
+            ),
+            patch("controllers.console.auth.login.AccountService.is_using_default_password", return_value=True),
+        ):
+            login_api = LoginApi()
+            response = login_api.post()
+
+        assert response.json["result"] == "success"
+        assert response.json["must_change_password"] is True
 
     @patch("controllers.console.wraps.db")
     @patch("controllers.console.auth.login.dify_config.BILLING_ENABLED", False)

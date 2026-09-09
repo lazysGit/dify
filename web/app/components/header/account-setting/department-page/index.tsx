@@ -6,10 +6,7 @@ import { useTranslation } from 'react-i18next'
 import Button from '@/app/components/base/button'
 import SearchInput from '@/app/components/base/search-input'
 import { useAppContext } from '@/context/app-context'
-import {
-  useDeleteDepartmentMutation,
-  useDepartmentList,
-} from '@/service/use-departments'
+import { useDepartmentList } from '@/service/use-departments'
 import CreateDepartmentModal from './create-department-modal'
 import DepartmentDetail from './department-detail'
 import DepartmentTree from './department-tree'
@@ -27,9 +24,8 @@ export default function DepartmentPage({ isAdmin, isDepartmentAdmin, apiFailed }
   const [searchValue, setSearchValue] = useState('')
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [selectedDepartmentId, setSelectedDepartmentId] = useState<string | null>(null)
-  const deleteMutation = useDeleteDepartmentMutation()
 
-  const tree = data?.tree ?? []
+  const tree = useMemo(() => data?.tree ?? [], [data?.tree])
   const canCreate = isAdmin
   const manageableDepartmentIds = data?.manageable_department_ids ?? []
   const selectedDepartment = selectedDepartmentId ? findNode(tree, selectedDepartmentId) : undefined
@@ -78,7 +74,7 @@ export default function DepartmentPage({ isAdmin, isDepartmentAdmin, apiFailed }
         {canCreate
           ? (
               <>
-                <span className="i-ri-org-chart-line mb-2 h-8 w-8" />
+                <span className="i-ri-organization-chart mb-2 h-8 w-8" />
                 <p className="mb-4 system-sm-regular">{t('department.emptyAdmin', { ns: 'common' })}</p>
                 <Button
                   variant="primary"
@@ -91,7 +87,7 @@ export default function DepartmentPage({ isAdmin, isDepartmentAdmin, apiFailed }
             )
           : (
               <>
-                <span className="i-ri-org-chart-line mb-2 h-8 w-8" />
+                <span className="i-ri-organization-chart mb-2 h-8 w-8" />
                 <p className="system-sm-regular">{t('department.emptyDeptAdmin', { ns: 'common' })}</p>
               </>
             )}
@@ -128,7 +124,6 @@ export default function DepartmentPage({ isAdmin, isDepartmentAdmin, apiFailed }
         isAdmin={isAdmin}
         onManage={id => setSelectedDepartmentId(id)}
         onDelete={(id) => {
-          deleteMutation.mutate({ params: { id } })
           if (selectedDepartmentId === id)
             setSelectedDepartmentId(null)
         }}

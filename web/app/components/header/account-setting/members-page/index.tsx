@@ -3,13 +3,7 @@ import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Avatar } from '@/app/components/base/avatar'
 import Button from '@/app/components/base/button'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/app/components/base/ui/select'
+import SearchInput from '@/app/components/base/search-input'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/app/components/base/ui/tooltip'
 import { NUM_INFINITE } from '@/app/components/billing/config'
 import { Plan } from '@/app/components/billing/type'
@@ -22,6 +16,8 @@ import { LanguagesSupported } from '@/i18n-config/language'
 import { useMembers } from '@/service/use-common'
 import { useDepartmentList } from '@/service/use-departments'
 import CreateMemberModal from './create-member-modal'
+import DepartmentTreeSelect from './department-tree-select'
+import { collectSelfAndDescendantIds, matchNameOrEmail } from './department-tree-select/utils'
 import EditWorkspaceModal from './edit-workspace-modal'
 import ModelWhitelistModal from './model-whitelist-modal'
 import Operation from './operation'
@@ -42,7 +38,7 @@ const MembersPage = () => {
   const { userProfile, currentWorkspace, isCurrentWorkspaceOwner, isCurrentWorkspaceManager } = useAppContext()
   const { data, refetch } = useMembers()
   const { formatTimeFromNow } = useFormatTimeFromNow()
-  const accounts = data?.accounts || []
+  const accounts = useMemo(() => data?.accounts || [], [data?.accounts])
   const { plan, enableBilling, isAllowTransferWorkspace } = useProviderContext()
   const isNotUnlimitedMemberPlan = enableBilling && plan.type !== Plan.team && plan.type !== Plan.enterprise
   const isMemberFull = enableBilling && isNotUnlimitedMemberPlan && accounts.length >= plan.total.teamMembers
@@ -50,10 +46,12 @@ const MembersPage = () => {
   const [showTransferOwnershipModal, setShowTransferOwnershipModal] = useState(false)
 
   const departmentListQuery = useDepartmentList()
-  const departments = departmentListQuery.data?.departments ?? []
+  const departments = useMemo(() => departmentListQuery.data?.departments ?? [], [departmentListQuery.data?.departments])
+  const tree = useMemo(() => departmentListQuery.data?.tree ?? [], [departmentListQuery.data?.tree])
   const manageableDepartmentIds = departmentListQuery.data?.manageable_department_ids ?? []
   const isDepartmentAdmin = departmentListQuery.data?.is_department_admin ?? false
   const [selectedDepartmentId, setSelectedDepartmentId] = useState<string>('')
+  const [searchKeyword, setSearchKeyword] = useState('')
 
   const deptNameMap = useMemo(() => {
     const map: Record<string, string> = {}
@@ -63,10 +61,15 @@ const MembersPage = () => {
   }, [departments])
 
   const filteredAccounts = useMemo(() => {
-    if (!selectedDepartmentId)
-      return accounts
-    return accounts.filter(a => a.department_id === selectedDepartmentId)
-  }, [accounts, selectedDepartmentId])
+    const allowedDeptIds = selectedDepartmentId
+      ? collectSelfAndDescendantIds(tree, selectedDepartmentId)
+      : null
+    return accounts.filter((account) => {
+      if (allowedDeptIds && !allowedDeptIds.has(account.department_id ?? ''))
+        return false
+      return matchNameOrEmail(account, searchKeyword)
+    })
+  }, [accounts, selectedDepartmentId, searchKeyword, tree])
 
   const canCreateMember = isCurrentWorkspaceOwner || isCurrentWorkspaceManager || isDepartmentAdmin
   const [showCreateMemberModal, setShowCreateMemberModal] = useState(false)
@@ -146,26 +149,19 @@ const MembersPage = () => {
           </div>
         </div>
         <div className="mb-3 flex items-center gap-2">
-          <Select value={selectedDepartmentId} onValueChange={v => setSelectedDepartmentId(v ?? '')}>
-            <SelectTrigger className="h-8 w-[200px] rounded-lg">
-              <SelectValue placeholder={t('members.allDepartments', { ns: 'common' })} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="">
-                {t('members.allDepartments', { ns: 'common' })}
-              </SelectItem>
-              {manageableDepartmentIds.map((id) => {
-                const dept = departments.find(d => d.id === id)
-                if (!dept)
-                  return null
-                return (
-                  <SelectItem key={id} value={id}>
-                    {dept.name}
-                  </SelectItem>
-                )
-              })}
-            </SelectContent>
-          </Select>
+          <DepartmentTreeSelect
+            tree={tree}
+            manageableDepartmentIds={manageableDepartmentIds}
+            value={selectedDepartmentId}
+            onChange={setSelectedDepartmentId}
+          />
+          <div className="w-[240px]" data-testid="member-search">
+            <SearchInput
+              value={searchKeyword}
+              onChange={setSearchKeyword}
+              placeholder={t('members.searchPlaceholder', { ns: 'common' })}
+            />
+          </div>
         </div>
         <div className="overflow-visible lg:overflow-visible">
           <div className="flex min-w-[480px] items-center border-b border-divider-regular py-[7px]">
@@ -177,6 +173,11 @@ const MembersPage = () => {
             )}
           </div>
           <div className="relative min-w-[480px]">
+            {filteredAccounts.length === 0 && (
+              <div className="px-3 py-8 text-center text-text-tertiary system-sm-regular">
+                {t('members.noMatchingMembers', { ns: 'common' })}
+              </div>
+            )}
             {
               filteredAccounts.map(account => (
                 <div key={account.id} className="flex border-b border-divider-subtle">

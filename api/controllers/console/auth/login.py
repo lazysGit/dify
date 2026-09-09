@@ -121,7 +121,12 @@ class LoginApi(Resource):
         AccountService.reset_login_error_rate_limit(normalized_email)
 
         # Create response with cookies instead of returning tokens in body
-        response = make_response({"result": "success"})
+        response = make_response(
+            {
+                "result": "success",
+                "must_change_password": AccountService.is_using_default_password(account),
+            }
+        )
 
         set_access_token_to_cookie(request, response, token_pair.access_token)
         set_refresh_token_to_cookie(request, response, token_pair.refresh_token)
@@ -271,7 +276,12 @@ class EmailCodeLoginApi(Resource):
         AccountService.reset_login_error_rate_limit(user_email)
 
         # Create response with cookies instead of returning tokens in body
-        response = make_response({"result": "success"})
+        response = make_response(
+            {
+                "result": "success",
+                "must_change_password": AccountService.is_using_default_password(account),
+            }
+        )
 
         set_csrf_token_to_cookie(request, response, token_pair.csrf_token)
         # Set HTTP-only secure cookies for tokens

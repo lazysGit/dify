@@ -25,6 +25,7 @@ from controllers.console.error import AccountInFreezeError, AccountNotFound, Ema
 from controllers.console.workspace.error import (
     AccountAlreadyInitedError,
     CurrentPasswordIncorrectError,
+    DefaultPasswordNotAllowedError,
     InvalidAccountDeletionCodeError,
     InvalidInvitationCodeError,
     RepeatPasswordNotMatchError,
@@ -47,6 +48,7 @@ from models.account import AccountStatus, InvitationCodeStatus
 from services.account_service import AccountService
 from services.billing_service import BillingService
 from services.errors.account import CurrentPasswordIncorrectError as ServiceCurrentPasswordIncorrectError
+from services.errors.account import DefaultPasswordNotAllowedError as ServiceDefaultPasswordNotAllowedError
 
 DEFAULT_REF_TEMPLATE_SWAGGER_2_0 = "#/definitions/{model}"
 
@@ -340,7 +342,6 @@ class AccountPasswordApi(Resource):
     @console_ns.expect(console_ns.models[AccountPasswordPayload.__name__])
     @setup_required
     @login_required
-    @account_initialization_required
     @console_ns.response(200, "Success", console_ns.models[AccountResponse.__name__])
     def post(self):
         current_user, _ = current_account_with_tenant()
@@ -351,6 +352,8 @@ class AccountPasswordApi(Resource):
             AccountService.update_account_password(current_user, args.password, args.new_password)
         except ServiceCurrentPasswordIncorrectError:
             raise CurrentPasswordIncorrectError()
+        except ServiceDefaultPasswordNotAllowedError:
+            raise DefaultPasswordNotAllowedError()
 
         return _serialize_account(current_user)
 

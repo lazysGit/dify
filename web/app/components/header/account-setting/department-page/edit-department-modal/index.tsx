@@ -1,40 +1,23 @@
 'use client'
 
 import type { DepartmentTreeNode } from '@/contract/console/departments'
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import Button from '@/app/components/base/button'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/app/components/base/ui/select'
 import { toast } from '@/app/components/base/ui/toast'
-import { useCreateDepartmentMutation } from '@/service/use-departments'
+import { useUpdateDepartmentMutation } from '@/service/use-departments'
 
-type CreateDepartmentModalProps = {
-  tree: DepartmentTreeNode[]
+type EditDepartmentModalProps = {
+  department: DepartmentTreeNode
   onClose: () => void
 }
 
-export default function CreateDepartmentModal({ tree, onClose }: CreateDepartmentModalProps) {
+export default function EditDepartmentModal({ department, onClose }: EditDepartmentModalProps) {
   const { t } = useTranslation()
-  const [name, setName] = useState('')
-  const [parentId, setParentId] = useState<string>('')
-  const [description, setDescription] = useState('')
+  const [name, setName] = useState(department.name)
+  const [description, setDescription] = useState(department.description ?? '')
   const [nameError, setNameError] = useState('')
-  const createMutation = useCreateDepartmentMutation()
-
-  const nonDefaultNodes = useMemo(() => filterNonDefault(tree), [tree])
-  const parentItems = useMemo(
-    () => ({
-      '': t('department.noParent', { ns: 'common' }),
-      ...Object.fromEntries(nonDefaultNodes.map(node => [node.id, node.name])),
-    }),
-    [nonDefaultNodes, t],
-  )
+  const updateMutation = useUpdateDepartmentMutation()
 
   const handleSubmit = async () => {
     if (!name.trim()) {
@@ -44,18 +27,18 @@ export default function CreateDepartmentModal({ tree, onClose }: CreateDepartmen
     setNameError('')
 
     try {
-      await createMutation.mutateAsync({
+      await updateMutation.mutateAsync({
+        params: { id: department.id },
         body: {
           name: name.trim(),
-          parent_id: parentId || null,
           description: description.trim() || undefined,
         },
       })
-      toast.success(t('department.createSuccess', { ns: 'common' }))
+      toast.success(t('department.updateSuccess', { ns: 'common' }))
       onClose()
     }
     catch {
-      toast.error(t('department.createFailed', { ns: 'common' }))
+      toast.error(t('department.updateFailed', { ns: 'common' }))
     }
   }
 
@@ -67,7 +50,7 @@ export default function CreateDepartmentModal({ tree, onClose }: CreateDepartmen
       >
         <div className="p-6">
           <h2 className="text-text-primary title-2xl-semi-bold">
-            {t('department.createTitle', { ns: 'common' })}
+            {t('department.editDepartment', { ns: 'common' })}
           </h2>
 
           <div className="mt-4 flex flex-col gap-4">
@@ -94,31 +77,6 @@ export default function CreateDepartmentModal({ tree, onClose }: CreateDepartmen
 
             <div className="flex flex-col gap-1">
               <label className="text-text-secondary system-sm-medium">
-                {t('department.parentDepartment', { ns: 'common' })}
-              </label>
-              <Select
-                value={parentId || null}
-                onValueChange={v => setParentId(v ?? '')}
-                items={parentItems}
-              >
-                <SelectTrigger className="h-9 rounded-lg">
-                  <SelectValue placeholder={t('department.selectParent', { ns: 'common' })} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">
-                    {t('department.noParent', { ns: 'common' })}
-                  </SelectItem>
-                  {nonDefaultNodes.map(node => (
-                    <SelectItem key={node.id} value={node.id}>
-                      {node.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label className="text-text-secondary system-sm-medium">
                 {t('department.description', { ns: 'common' })}
               </label>
               <textarea
@@ -138,24 +96,14 @@ export default function CreateDepartmentModal({ tree, onClose }: CreateDepartmen
           </Button>
           <Button
             variant="primary"
-            loading={createMutation.isPending}
-            disabled={createMutation.isPending}
+            loading={updateMutation.isPending}
+            disabled={updateMutation.isPending}
             onClick={handleSubmit}
           >
-            {t('operation.create', { ns: 'common' })}
+            {t('operation.save', { ns: 'common' })}
           </Button>
         </div>
       </div>
     </div>
   )
-}
-
-function filterNonDefault(nodes: DepartmentTreeNode[]): DepartmentTreeNode[] {
-  return nodes.reduce<DepartmentTreeNode[]>((acc, node) => {
-    if (node.is_default)
-      return acc
-    const filteredChildren = filterNonDefault(node.children)
-    acc.push({ ...node, children: filteredChildren })
-    return acc
-  }, [])
 }

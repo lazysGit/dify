@@ -74,12 +74,12 @@ export default function TreeItem({ node, depth, isAdmin, onManage, onDelete }: T
 
         <span className="min-w-0 flex-1 truncate text-text-primary system-sm-medium">
           {node.name}
-          {isDefault && (
-            <span className="ml-1.5 rounded bg-state-accent-solid px-1 py-0.5 text-text-accent system-2xs-medium">
-              {t('department.default', { ns: 'common' })}
-            </span>
-          )}
         </span>
+        {isDefault && (
+          <span className="inline-flex shrink-0 items-center rounded bg-state-accent-solid px-1 py-0.5 text-text-primary-on-surface system-2xs-medium">
+            {t('department.default', { ns: 'common' })}
+          </span>
+        )}
 
         <span className="flex shrink-0 items-center gap-2 text-text-quaternary system-xs-regular">
           <span title={t('department.memberCount', { ns: 'common' })}>

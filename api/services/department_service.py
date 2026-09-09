@@ -464,6 +464,11 @@ class DepartmentService:
 
     @staticmethod
     def get_department_members(tenant_id: str, department_id: str) -> list[dict]:
+        """Return department members as JSON-serializable dicts.
+
+        ``joined_at`` is ISO-8601 text (or None). Flask-RESTX dumps responses with
+        stdlib ``json.dumps``, which cannot encode ``datetime``.
+        """
         from models.account import Account
 
         joins = (
@@ -480,12 +485,14 @@ class DepartmentService:
             if account:
                 result.append(
                     {
+                        "id": account.id,
                         "account_id": account.id,
                         "name": account.name,
                         "email": account.email,
                         "role": join.role,
+                        "department_id": department_id,
                         "is_department_admin": join.is_department_admin,
-                        "joined_at": join.created_at,
+                        "joined_at": join.created_at.isoformat() if join.created_at else None,
                     }
                 )
         return result
@@ -520,9 +527,14 @@ class DepartmentService:
         if join.department_id != department_id:
             raise DepartmentValidationError("Member does not belong to this department")
 
-        allowed_roles = {TenantAccountRole.OWNER, TenantAccountRole.ADMIN, TenantAccountRole.EDITOR}
+        allowed_roles = {
+            TenantAccountRole.OWNER,
+            TenantAccountRole.ADMIN,
+            TenantAccountRole.EDITOR,
+            TenantAccountRole.NORMAL,
+        }
         if join.role not in allowed_roles:
-            raise DepartmentValidationError("Only owner, admin, or editor can be set as department admin")
+            raise DepartmentValidationError("Only owner, admin, editor, or normal can be set as department admin")
 
         join.is_department_admin = True
         db.session.commit()

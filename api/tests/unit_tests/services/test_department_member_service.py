@@ -69,9 +69,10 @@ class TestSetAdminRequiresMembership:
             )
 
 
-class TestSetAdminRejectsNormalRole:
+class TestSetAdminAllowsNormalRole:
+    @patch("services.department_service.DepartmentAuditLog")
     @patch("services.department_service.db")
-    def test_set_admin_rejects_normal_role(self, mock_db):
+    def test_set_admin_allows_normal_role(self, mock_db, mock_audit):
         mock_session = MagicMock()
         mock_db.session = mock_session
 
@@ -93,7 +94,39 @@ class TestSetAdminRejectsNormalRole:
 
         mock_session.query.side_effect = query_side_effect
 
-        with pytest.raises(DepartmentValidationError, match="Only owner, admin, or editor"):
+        DepartmentService.set_department_admin(
+            tenant_id="t1", department_id="d1", member_account_id="u1", operator_id="op1"
+        )
+
+        assert join.is_department_admin is True
+        mock_session.commit.assert_called()
+
+
+class TestSetAdminRejectsDatasetOperatorRole:
+    @patch("services.department_service.db")
+    def test_set_admin_rejects_dataset_operator_role(self, mock_db):
+        mock_session = MagicMock()
+        mock_db.session = mock_session
+
+        dept = _make_dept()
+        join = _make_join(account_id="u1", department_id="d1", role=TenantAccountRole.DATASET_OPERATOR)
+
+        query_calls = [0]
+
+        def query_side_effect(model):
+            query_calls[0] += 1
+            mock_q = MagicMock()
+            mock_f = MagicMock()
+            if query_calls[0] == 1:
+                mock_f.first.return_value = dept
+            else:
+                mock_f.first.return_value = join
+            mock_q.filter.return_value = mock_f
+            return mock_q
+
+        mock_session.query.side_effect = query_side_effect
+
+        with pytest.raises(DepartmentValidationError, match="Only owner, admin, editor, or normal"):
             DepartmentService.set_department_admin(
                 tenant_id="t1", department_id="d1", member_account_id="u1", operator_id="op1"
             )

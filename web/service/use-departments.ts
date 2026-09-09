@@ -72,6 +72,9 @@ export const useSetAdminMutation = () => {
       queryClient.invalidateQueries({
         queryKey: consoleQuery.departments.list.key(),
       })
+      queryClient.invalidateQueries({
+        queryKey: consoleQuery.departments.members.key(),
+      })
     },
   }))
 }
@@ -82,6 +85,9 @@ export const useUnsetAdminMutation = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: consoleQuery.departments.list.key(),
+      })
+      queryClient.invalidateQueries({
+        queryKey: consoleQuery.departments.members.key(),
       })
     },
   }))
@@ -94,8 +100,15 @@ export const useCreateMemberMutation = () => {
       queryClient.invalidateQueries({
         queryKey: consoleQuery.departments.list.key(),
       })
+      queryClient.invalidateQueries({
+        queryKey: consoleQuery.departments.members.key(),
+      })
     },
   }))
+}
+
+export const useInitialMemberPassword = () => {
+  return useQuery(consoleQuery.departments.initialPassword.queryOptions({}))
 }
 
 export const useTransferAppMutation = () => {

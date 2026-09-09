@@ -11,6 +11,7 @@ export type Department = {
   member_count: number
   app_count: number
   dataset_count: number
+  description?: string | null
 }
 
 export type DepartmentTreeNode = Department & {
@@ -32,6 +33,7 @@ export type DepartmentMember = {
   department_id: string
   is_department_admin: boolean
   avatar?: string
+  account_id?: string
 }
 
 export type DepartmentMembersResponse = {
@@ -137,8 +139,8 @@ export const departmentMoveMemberContract = base
   .input(type<{
     params: { id: string }
     body: {
-      account_ids: string[]
-      target_department_id: string
+      member_id: string
+      department_id: string
     }
   }>())
   .output(type<unknown>())
@@ -151,7 +153,7 @@ export const departmentSetAdminContract = base
   .input(type<{
     params: { id: string }
     body: {
-      account_id: string
+      member_id: string
     }
   }>())
   .output(type<unknown>())
@@ -164,7 +166,7 @@ export const departmentUnsetAdminContract = base
   .input(type<{
     params: { id: string }
     body: {
-      account_id: string
+      member_id: string
     }
   }>())
   .output(type<unknown>())
@@ -185,6 +187,13 @@ export const departmentCreateMemberContract = base
     }
   }>())
   .output(type<unknown>())
+
+export const departmentInitialPasswordContract = base
+  .route({
+    path: '/workspaces/current/members/initial-password',
+    method: 'GET',
+  })
+  .output(type<{ password: string }>())
 
 export const departmentTransferAppContract = base
   .route({
@@ -307,6 +316,7 @@ export const departmentRouterContract = {
   setAdmin: departmentSetAdminContract,
   unsetAdmin: departmentUnsetAdminContract,
   createMember: departmentCreateMemberContract,
+  initialPassword: departmentInitialPasswordContract,
   transferApp: departmentTransferAppContract,
   transferDataset: departmentTransferDatasetContract,
   createdResources: departmentCreatedResourcesContract,
