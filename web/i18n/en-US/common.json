@@ -169,6 +169,7 @@
   "department.createdApps": "Created Apps",
   "department.createdDatasets": "Created Datasets",
   "department.createdResources": "Created Resources",
+  "department.currentPath": "Current department",
   "department.datasetCount": "Datasets",
   "department.default": "Default",
   "department.delete": "Delete",

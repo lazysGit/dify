@@ -545,3 +545,67 @@ class TestGetDepartmentMembers:
 
         json.dumps(members)
         assert members[0]["joined_at"] is None
+
+
+class TestBuildDisplayPath:
+    def test_nested_department_joins_ancestor_names_with_slash(self):
+        rd = _make_dept("rd", name="研发部", path="/t1/rd")
+        fe = _make_dept("fe", name="前端组", parent_id="rd", path="/t1/rd/fe")
+        dept_map = {"rd": rd, "fe": fe}
+
+        assert DepartmentService.build_display_path(fe, dept_map) == "研发部/前端组"
+
+    def test_skips_tenant_id_segment_that_is_not_a_department(self):
+        root = _make_dept("rd", name="研发部", path="/t1/rd")
+        dept_map = {"rd": root}
+
+        assert DepartmentService.build_display_path(root, dept_map) == "研发部"
+
+    def test_falls_back_to_department_name_when_path_has_no_known_segments(self):
+        orphan = _make_dept("x", name="孤立部门", path="/unknown/ids")
+
+        assert DepartmentService.build_display_path(orphan, {}) == "孤立部门"
+
+    def test_returns_empty_string_for_missing_department(self):
+        assert DepartmentService.build_display_path(None, {}) == ""
+
+    def test_custom_separator(self):
+        rd = _make_dept("rd", name="技术部", path="/t1/rd")
+        fe = _make_dept("fe", name="前端组", parent_id="rd", path="/t1/rd/fe")
+
+        assert DepartmentService.build_display_path(fe, {"rd": rd, "fe": fe}, separator=" > ") == "技术部 > 前端组"
+
+    @patch("services.department_service.db")
+    def test_get_user_department_display_path_returns_id_and_slash_path(self, mock_db):
+        rd = _make_dept("rd", name="研发部", path="/t1/rd")
+        fe = _make_dept("fe", name="前端组", parent_id="rd", path="/t1/rd/fe")
+        join = MagicMock()
+        join.department_id = "fe"
+
+        mock_session = MagicMock()
+        mock_db.session = mock_session
+        join_query = MagicMock()
+        join_query.filter.return_value.first.return_value = join
+        dept_query = MagicMock()
+        dept_query.filter.return_value.all.return_value = [rd, fe]
+        mock_session.query.side_effect = [join_query, dept_query]
+
+        dept_id, path = DepartmentService.get_user_department_display_path("u1", "t1")
+
+        assert dept_id == "fe"
+        assert path == "研发部/前端组"
+
+    @patch("services.department_service.db")
+    def test_get_user_department_display_path_none_when_user_has_no_department(self, mock_db):
+        join = MagicMock()
+        join.department_id = None
+        mock_session = MagicMock()
+        mock_db.session = mock_session
+        join_query = MagicMock()
+        join_query.filter.return_value.first.return_value = join
+        mock_session.query.return_value = join_query
+
+        dept_id, path = DepartmentService.get_user_department_display_path("u1", "t1")
+
+        assert dept_id is None
+        assert path is None

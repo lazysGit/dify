@@ -53,7 +53,20 @@ const mockTree: DepartmentTreeNode[] = [
         member_count: 2,
         app_count: 1,
         dataset_count: 0,
-        children: [],
+        children: [
+          {
+            id: 'dept-3',
+            name: 'Design System',
+            parent_id: 'dept-2',
+            path: '/dept-1/dept-2/dept-3',
+            level: 2,
+            is_default: false,
+            member_count: 1,
+            app_count: 0,
+            dataset_count: 0,
+            children: [],
+          },
+        ],
       },
     ],
   },
@@ -94,23 +107,58 @@ describe('CreateDepartmentModal', () => {
     })
   })
 
-  it('should filter out default department from parent options', () => {
+  it('should filter out default department from parent options', async () => {
+    const user = userEvent.setup()
     render(<CreateDepartmentModal tree={mockTree} onClose={vi.fn()} />)
 
-    const selectTrigger = screen.getByRole('combobox')
-    expect(selectTrigger).toBeInTheDocument()
+    await user.click(screen.getByTestId('parent-department-select'))
+    expect(screen.queryByText('Default Department')).not.toBeInTheDocument()
   })
 
   it('should show parent department name instead of id after selection', async () => {
     const user = userEvent.setup()
     render(<CreateDepartmentModal tree={mockTree} onClose={vi.fn()} />)
 
-    const trigger = screen.getByRole('combobox')
+    const trigger = screen.getByTestId('parent-department-select')
     await user.click(trigger)
     await user.click(await screen.findByText('Engineering'))
 
     expect(trigger).toHaveTextContent('Engineering')
     expect(trigger).not.toHaveTextContent('dept-1')
+  })
+
+  it('should list nested departments in the parent tree, not only top-level nodes', async () => {
+    const user = userEvent.setup()
+    render(<CreateDepartmentModal tree={mockTree} onClose={vi.fn()} />)
+
+    await user.click(screen.getByTestId('parent-department-select'))
+
+    expect(screen.getByRole('tree')).toBeInTheDocument()
+    expect(screen.getByTestId('department-tree-item-dept-1')).toBeInTheDocument()
+    expect(screen.getByTestId('department-tree-item-dept-2')).toBeInTheDocument()
+    expect(screen.getByTestId('department-tree-item-dept-3')).toBeInTheDocument()
+    expect(screen.queryByText('Default Department')).not.toBeInTheDocument()
+  })
+
+  it('should submit a third-level department as parent_id', async () => {
+    const user = userEvent.setup()
+    mockMutateAsync.mockResolvedValueOnce({})
+    render(<CreateDepartmentModal tree={mockTree} onClose={vi.fn()} />)
+
+    fireEvent.change(screen.getByPlaceholderText('department.namePlaceholder'), {
+      target: { value: 'Leaf Team' },
+    })
+    await user.click(screen.getByTestId('parent-department-select'))
+    await user.click(screen.getByTestId('department-tree-item-dept-3'))
+    fireEvent.click(screen.getByText('operation.create'))
+
+    expect(mockMutateAsync).toHaveBeenCalledWith({
+      body: {
+        name: 'Leaf Team',
+        parent_id: 'dept-3',
+        description: undefined,
+      },
+    })
   })
 
   it('should call onClose when cancel is clicked', () => {

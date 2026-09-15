@@ -17,6 +17,10 @@ type DepartmentTreeSelectProps = {
   manageableDepartmentIds: string[]
   value: string
   onChange: (id: string) => void
+  emptyLabel?: string
+  triggerTestId?: string
+  triggerClassName?: string
+  contentClassName?: string
 }
 
 export default function DepartmentTreeSelect({
@@ -24,9 +28,14 @@ export default function DepartmentTreeSelect({
   manageableDepartmentIds,
   value,
   onChange,
+  emptyLabel,
+  triggerTestId = 'department-filter',
+  triggerClassName,
+  contentClassName,
 }: DepartmentTreeSelectProps) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
+  const noneLabel = emptyLabel ?? t('members.allDepartments', { ns: 'common' })
 
   const visibleTree = useMemo(() => {
     if (manageableDepartmentIds.length === 0)
@@ -35,8 +44,8 @@ export default function DepartmentTreeSelect({
   }, [tree, manageableDepartmentIds])
 
   const selectedLabel = value
-    ? (findNode(tree, value)?.name ?? t('members.allDepartments', { ns: 'common' }))
-    : t('members.allDepartments', { ns: 'common' })
+    ? (findNode(tree, value)?.name ?? noneLabel)
+    : noneLabel
 
   const handleSelect = (id: string) => {
     onChange(id)
@@ -46,11 +55,12 @@ export default function DepartmentTreeSelect({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
-        data-testid="department-filter"
+        data-testid={triggerTestId}
         aria-label={selectedLabel}
         className={cn(
           'group relative flex h-8 w-[200px] items-center rounded-lg border-0 bg-components-input-bg-normal px-2 py-1 text-left text-components-input-text-filled outline-none system-sm-regular',
           'hover:bg-state-base-hover-alt focus-visible:bg-state-base-hover-alt',
+          triggerClassName,
         )}
       >
         <span className="min-w-0 grow truncate">{selectedLabel}</span>
@@ -59,6 +69,7 @@ export default function DepartmentTreeSelect({
       <PopoverContent
         placement="bottom-start"
         sideOffset={4}
+        className={contentClassName}
         popupClassName="max-h-[320px] min-w-[240px] overflow-auto p-1"
       >
         <div role="tree">
@@ -71,7 +82,7 @@ export default function DepartmentTreeSelect({
             )}
             onClick={() => handleSelect('')}
           >
-            {t('members.allDepartments', { ns: 'common' })}
+            {noneLabel}
           </button>
           {visibleTree.map(node => (
             <TreeItem

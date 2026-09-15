@@ -4,14 +4,8 @@ import type { DepartmentTreeNode } from '@/contract/console/departments'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import Button from '@/app/components/base/button'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/app/components/base/ui/select'
 import { toast } from '@/app/components/base/ui/toast'
+import DepartmentTreeSelect from '@/app/components/header/account-setting/members-page/department-tree-select'
 import { useCreateDepartmentMutation } from '@/service/use-departments'
 
 type CreateDepartmentModalProps = {
@@ -28,13 +22,6 @@ export default function CreateDepartmentModal({ tree, onClose }: CreateDepartmen
   const createMutation = useCreateDepartmentMutation()
 
   const nonDefaultNodes = useMemo(() => filterNonDefault(tree), [tree])
-  const parentItems = useMemo(
-    () => ({
-      '': t('department.noParent', { ns: 'common' }),
-      ...Object.fromEntries(nonDefaultNodes.map(node => [node.id, node.name])),
-    }),
-    [nonDefaultNodes, t],
-  )
 
   const handleSubmit = async () => {
     if (!name.trim()) {
@@ -96,25 +83,16 @@ export default function CreateDepartmentModal({ tree, onClose }: CreateDepartmen
               <label className="text-text-secondary system-sm-medium">
                 {t('department.parentDepartment', { ns: 'common' })}
               </label>
-              <Select
-                value={parentId || null}
-                onValueChange={v => setParentId(v ?? '')}
-                items={parentItems}
-              >
-                <SelectTrigger className="h-9 rounded-lg">
-                  <SelectValue placeholder={t('department.selectParent', { ns: 'common' })} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">
-                    {t('department.noParent', { ns: 'common' })}
-                  </SelectItem>
-                  {nonDefaultNodes.map(node => (
-                    <SelectItem key={node.id} value={node.id}>
-                      {node.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <DepartmentTreeSelect
+                tree={nonDefaultNodes}
+                manageableDepartmentIds={[]}
+                value={parentId}
+                onChange={setParentId}
+                emptyLabel={t('department.noParent', { ns: 'common' })}
+                triggerTestId="parent-department-select"
+                triggerClassName="h-9 w-full"
+                contentClassName="z-[1100]"
+              />
             </div>
 
             <div className="flex flex-col gap-1">

@@ -71,8 +71,8 @@ def _make_pool(quota_limit: int, quota_used: int) -> MagicMock:
     return pool
 
 
-def _make_tenant_account_join(role: str = "normal") -> SimpleNamespace:
-    return SimpleNamespace(role=role)
+def _make_tenant_account_join(role: str = "normal", department_id: str | None = None) -> SimpleNamespace:
+    return SimpleNamespace(role=role, department_id=department_id)
 
 
 def _tenant_info(result: object) -> dict[str, Any] | None:
@@ -574,3 +574,41 @@ def test_get_tenant_info_should_query_tenant_account_join_with_correct_ids(
 
     # Assert — db.session.query was invoked (at least once)
     basic_mocks["db_session"].query.assert_called()
+
+
+def test_get_tenant_info_should_include_department_path_for_current_user(
+    mocker: MockerFixture,
+    basic_mocks: dict,
+) -> None:
+    from services.workspace_service import WorkspaceService
+
+    basic_mocks["query_chain"].first.return_value = _make_tenant_account_join(
+        role="editor",
+        department_id="fe",
+    )
+    mocker.patch(
+        "services.workspace_service.DepartmentService.get_department_display_path",
+        return_value="研发部/前端组",
+    )
+    tenant = _make_tenant()
+
+    result = _tenant_info(WorkspaceService.get_tenant_info(tenant))
+
+    assert result is not None
+    assert result["department_id"] == "fe"
+    assert result["department_path"] == "研发部/前端组"
+
+
+def test_get_tenant_info_should_set_department_fields_none_when_user_has_no_department(
+    mocker: MockerFixture,
+    basic_mocks: dict,
+) -> None:
+    from services.workspace_service import WorkspaceService
+
+    tenant = _make_tenant()
+
+    result = _tenant_info(WorkspaceService.get_tenant_info(tenant))
+
+    assert result is not None
+    assert result["department_id"] is None
+    assert result["department_path"] is None

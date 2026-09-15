@@ -169,6 +169,7 @@
   "department.createdApps": "创建的应用",
   "department.createdDatasets": "创建的知识库",
   "department.createdResources": "创建的资源",
+  "department.currentPath": "当前部门",
   "department.datasetCount": "知识库",
   "department.default": "默认",
   "department.delete": "删除",

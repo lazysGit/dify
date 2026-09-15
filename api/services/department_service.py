@@ -401,6 +401,36 @@ class DepartmentService:
         return join_record.department_id if join_record else None
 
     @staticmethod
+    def build_display_path(
+        department: Department | None,
+        dept_by_id: dict[str, Department],
+        separator: str = "/",
+    ) -> str:
+        if department is None:
+            return ""
+        segment_ids = [segment for segment in department.path.split("/") if segment]
+        names = [dept_by_id[segment_id].name for segment_id in segment_ids if segment_id in dept_by_id]
+        return separator.join(names) if names else department.name
+
+    @staticmethod
+    def get_department_display_path(department_id: str, tenant_id: str, separator: str = "/") -> str | None:
+        all_depts = db.session.query(Department).filter(Department.tenant_id == tenant_id).all()
+        dept_map = {dept.id: dept for dept in all_depts}
+        path = DepartmentService.build_display_path(dept_map.get(department_id), dept_map, separator)
+        return path or None
+
+    @staticmethod
+    def get_user_department_display_path(
+        account_id: str,
+        tenant_id: str,
+        separator: str = "/",
+    ) -> tuple[str | None, str | None]:
+        dept_id = DepartmentService.get_user_department_id(account_id, tenant_id)
+        if not dept_id:
+            return None, None
+        return dept_id, DepartmentService.get_department_display_path(dept_id, tenant_id, separator)
+
+    @staticmethod
     def is_department_admin(account_id: str, tenant_id: str) -> bool:
         join_record = (
             db.session.query(TenantAccountJoin)

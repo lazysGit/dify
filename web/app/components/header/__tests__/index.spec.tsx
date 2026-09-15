@@ -10,6 +10,10 @@ vi.mock('@/app/components/header/account-dropdown/workplace-selector', () => ({
   default: createMockComponent('workplace-selector'),
 }))
 
+vi.mock('@/app/components/header/current-department-path', () => ({
+  default: createMockComponent('current-department-path'),
+}))
+
 vi.mock('@/app/components/header/account-dropdown', () => ({
   default: createMockComponent('account-dropdown'),
 }))
@@ -127,6 +131,7 @@ describe('Header', () => {
 
     expect(screen.getByRole('img', { name: /dify logo/i })).toBeInTheDocument()
     expect(screen.getByTestId('workplace-selector')).toBeInTheDocument()
+    expect(screen.getByTestId('current-department-path')).toBeInTheDocument()
     expect(screen.getByTestId('app-nav')).toBeInTheDocument()
     expect(screen.getByTestId('account-dropdown')).toBeInTheDocument()
   })

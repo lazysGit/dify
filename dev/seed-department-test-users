@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -euo pipefail
+ROOT="$(cd "$(dirname "$(realpath "$0")")/.." && pwd)"
+cd "$ROOT/dev"
+if [[ " $* " == *" --dry-run "* ]] || [[ "${1:-}" == "--dry-run" ]]; then
+  exec uv run python -m department_test_users.cli "$@"
+fi
+exec uv run --with playwright python -m department_test_users.cli "$@"

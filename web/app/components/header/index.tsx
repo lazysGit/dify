@@ -3,6 +3,7 @@ import { useCallback } from 'react'
 import DifyLogo from '@/app/components/base/logo/dify-logo'
 import WorkplaceSelector from '@/app/components/header/account-dropdown/workplace-selector'
 import { ACCOUNT_SETTING_TAB } from '@/app/components/header/account-setting/constants'
+import CurrentDepartmentPath from '@/app/components/header/current-department-path'
 import { useAppContext } from '@/context/app-context'
 import { useGlobalPublicStore } from '@/context/global-public-context'
 import { useModalContext } from '@/context/modal-context'
@@ -70,6 +71,7 @@ const Header = () => {
             <WorkspaceProvider>
               <WorkplaceSelector />
             </WorkspaceProvider>
+            <CurrentDepartmentPath />
             {enableBilling ? <PlanBadge allowHover sandboxAsUpgrade plan={plan.type} onClick={handlePlanClick} /> : <LicenseNav />}
           </div>
           <div className="flex items-center">
@@ -97,6 +99,7 @@ const Header = () => {
         <WorkspaceProvider>
           <WorkplaceSelector />
         </WorkspaceProvider>
+        <CurrentDepartmentPath />
         {enableBilling ? <PlanBadge allowHover sandboxAsUpgrade plan={plan.type} onClick={handlePlanClick} /> : <LicenseNav />}
       </div>
       <div className="flex items-center space-x-2">
