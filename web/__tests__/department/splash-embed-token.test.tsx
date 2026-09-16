@@ -2,10 +2,12 @@ import { render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import AuthenticatedLayout from '@/app/(shareLayout)/components/authenticated-layout'
-import { isChatbotPath } from '@/app/(shareLayout)/components/embed-access'
+import { isChatbotPath, isEmbedPassport, shouldSkipWebSsoRedirect } from '@/app/(shareLayout)/components/embed-access'
 import Splash from '@/app/(shareLayout)/components/splash'
 
 const mockSetWebAppPassport = vi.fn()
+const mockGetWebAppPassport = vi.fn()
+const mockClearWebAppPassport = vi.fn()
 const mockWebAppLoginStatus = vi.fn()
 const mockFetchAccessToken = vi.fn()
 const mockUpdateAppInfo = vi.fn()
@@ -63,6 +65,8 @@ vi.mock('@/context/web-app-context', () => ({
 vi.mock('@/service/webapp-auth', () => ({
   setWebAppAccessToken: vi.fn(),
   setWebAppPassport: (...args: unknown[]) => mockSetWebAppPassport(...args),
+  getWebAppPassport: (...args: unknown[]) => mockGetWebAppPassport(...args),
+  clearWebAppPassport: (...args: unknown[]) => mockClearWebAppPassport(...args),
   webAppLoginStatus: (...args: unknown[]) => mockWebAppLoginStatus(...args),
   webAppLogout: vi.fn(),
 }))
@@ -106,6 +110,14 @@ vi.mock('@/service/access-control', () => ({
   }),
 }))
 
+const unsignedJwt = (payload: Record<string, unknown>) => {
+  const encode = (value: object) => {
+    const json = JSON.stringify(value)
+    return btoa(json).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
+  }
+  return `${encode({ alg: 'none' })}.${encode(payload)}.sig`
+}
+
 describe('isChatbotPath', () => {
   it('returns true when pathname starts with /chatbot', () => {
     expect(isChatbotPath('/chatbot')).toBe(true)
@@ -118,6 +130,28 @@ describe('isChatbotPath', () => {
   })
 })
 
+describe('isEmbedPassport', () => {
+  it('returns true when jwt payload channel is embed', () => {
+    expect(isEmbedPassport(unsignedJwt({ channel: 'embed' }))).toBe(true)
+  })
+
+  it('returns false for non-embed or invalid tokens', () => {
+    expect(isEmbedPassport(unsignedJwt({ channel: 'web' }))).toBe(false)
+    expect(isEmbedPassport(unsignedJwt({ app_code: 'code1' }))).toBe(false)
+    expect(isEmbedPassport('')).toBe(false)
+    expect(isEmbedPassport('not-a-jwt')).toBe(false)
+  })
+})
+
+describe('shouldSkipWebSsoRedirect', () => {
+  it('skips only on chatbot path when department ACL is on', () => {
+    expect(shouldSkipWebSsoRedirect('/chatbot/code1', true)).toBe(true)
+    expect(shouldSkipWebSsoRedirect('/chatbot/code1', false)).toBe(false)
+    expect(shouldSkipWebSsoRedirect('/chat/code1', true)).toBe(false)
+    expect(shouldSkipWebSsoRedirect('/chat/code1', false)).toBe(false)
+  })
+})
+
 describe('Splash embed token', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -127,7 +161,9 @@ describe('Splash embed token', () => {
     mockShareCode = 'code1'
     mockAppInfoError = null
     mockAppParamsError = null
+    mockGetWebAppPassport.mockReturnValue('')
     mockWebAppLoginStatus.mockResolvedValue({ userLoggedIn: true, appLoggedIn: true })
+    mockFetchAccessToken.mockResolvedValue({ access_token: 'console-passport' })
   })
 
   it('writes embed passport before children first render on chatbot path when ACL is on', () => {
@@ -217,6 +253,28 @@ describe('Splash embed token', () => {
     expect(mockSetWebAppPassport).not.toHaveBeenCalledWith('code1', 'jwt')
     expect(mockWebAppLoginStatus).toHaveBeenCalled()
   })
+
+  it('does not treat a stored embed jwt as app login on /chat when ACL is on', async () => {
+    const embedJwt = unsignedJwt({ channel: 'embed', app_code: 'code1' })
+    mockPathname = '/chat/code1'
+    mockGetWebAppPassport.mockReturnValue(embedJwt)
+    mockWebAppLoginStatus.mockResolvedValue({ userLoggedIn: true, appLoggedIn: true })
+
+    render(
+      <Splash>
+        <div data-testid="child">Chat Content</div>
+      </Splash>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByTestId('chat-access-guard')).toBeTruthy()
+    })
+    expect(mockClearWebAppPassport).toHaveBeenCalledWith('code1')
+    expect(mockWebAppLoginStatus).toHaveBeenCalled()
+    expect(mockFetchAccessToken).toHaveBeenCalled()
+    expect(mockSetWebAppPassport).toHaveBeenCalledWith('code1', 'console-passport')
+    expect(mockSetWebAppPassport).not.toHaveBeenCalledWith('code1', embedJwt)
+  })
 })
 
 describe('AuthenticatedLayout embed invalid', () => {
@@ -227,6 +285,7 @@ describe('AuthenticatedLayout embed invalid', () => {
     mockShareCode = 'code1'
     mockAppInfoError = null
     mockAppParamsError = null
+    mockDepartmentAccessEnabled = true
   })
 
   it('shows embed invalid copy on chatbot path when app info fails', () => {
@@ -257,6 +316,20 @@ describe('AuthenticatedLayout embed invalid', () => {
 
   it('keeps generic error copy on /chat when app info fails', () => {
     mockPathname = '/chat/code1'
+    mockAppInfoError = new Error('generic unknown reason')
+
+    render(
+      <AuthenticatedLayout>
+        <div data-testid="child">Chat Content</div>
+      </AuthenticatedLayout>,
+    )
+
+    expect(screen.getByText('generic unknown reason')).toBeTruthy()
+    expect(screen.queryByText('common.embedLinkInvalid')).toBeNull()
+  })
+
+  it('keeps generic error copy on /chatbot when ACL is off', () => {
+    mockDepartmentAccessEnabled = false
     mockAppInfoError = new Error('generic unknown reason')
 
     render(

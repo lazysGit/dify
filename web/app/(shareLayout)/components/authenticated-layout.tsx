@@ -3,9 +3,10 @@
 import * as React from 'react'
 import { useCallback, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { isChatbotPath } from '@/app/(shareLayout)/components/embed-access'
+import { shouldSkipWebSsoRedirect } from '@/app/(shareLayout)/components/embed-access'
 import AppUnavailable from '@/app/components/base/app-unavailable'
 import Loading from '@/app/components/base/loading'
+import { useGlobalPublicStore } from '@/context/global-public-context'
 import { useWebAppStore } from '@/context/web-app-context'
 import { usePathname, useRouter, useSearchParams } from '@/next/navigation'
 import { useGetUserCanAccessApp } from '@/service/access-control'
@@ -14,6 +15,7 @@ import { webAppLogout } from '@/service/webapp-auth'
 
 const AuthenticatedLayout = ({ children }: { children: React.ReactNode }) => {
   const { t } = useTranslation()
+  const departmentAccessControl = useGlobalPublicStore(s => s.systemFeatures.department_access_control)
   const shareCode = useWebAppStore(s => s.shareCode)
   const updateAppInfo = useWebAppStore(s => s.updateAppInfo)
   const updateAppParams = useWebAppStore(s => s.updateAppParams)
@@ -37,7 +39,7 @@ const AuthenticatedLayout = ({ children }: { children: React.ReactNode }) => {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const embedUnavailableReason = isChatbotPath(pathname)
+  const embedUnavailableReason = shouldSkipWebSsoRedirect(pathname, departmentAccessControl)
     ? t('common.embedLinkInvalid', { ns: 'share' })
     : undefined
   const getSigninUrl = useCallback(() => {

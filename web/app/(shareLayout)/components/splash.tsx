@@ -3,14 +3,14 @@ import type { FC, PropsWithChildren } from 'react'
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import ChatAccessGuard from '@/app/(shareLayout)/components/chat-access-guard'
-import { isChatbotPath } from '@/app/(shareLayout)/components/embed-access'
+import { isChatbotPath, isEmbedPassport, setDepartmentAccessControlEnabled } from '@/app/(shareLayout)/components/embed-access'
 import AppUnavailable from '@/app/components/base/app-unavailable'
 import Loading from '@/app/components/base/loading'
 import { useGlobalPublicStore } from '@/context/global-public-context'
 import { useWebAppStore } from '@/context/web-app-context'
 import { usePathname, useRouter, useSearchParams } from '@/next/navigation'
 import { fetchAccessToken } from '@/service/share'
-import { setWebAppAccessToken, setWebAppPassport, webAppLoginStatus, webAppLogout } from '@/service/webapp-auth'
+import { clearWebAppPassport, getWebAppPassport, setWebAppAccessToken, setWebAppPassport, webAppLoginStatus, webAppLogout } from '@/service/webapp-auth'
 
 const Splash: FC<PropsWithChildren> = ({ children }) => {
   const { t } = useTranslation()
@@ -27,6 +27,7 @@ const Splash: FC<PropsWithChildren> = ({ children }) => {
   const tokenFromUrl = searchParams.get('web_sso_token')
   const embedToken = searchParams.get('embed_token')
   const skipDepartmentGuard = Boolean(systemFeatures.department_access_control && isChatbotPath(pathname))
+  setDepartmentAccessControlEnabled(Boolean(systemFeatures.department_access_control))
   const getSigninUrl = useCallback(() => {
     const params = new URLSearchParams(searchParams)
     params.delete('message')
@@ -63,8 +64,14 @@ const Splash: FC<PropsWithChildren> = ({ children }) => {
     }
 
     (async () => {
+      const storedPassport = shareCode ? getWebAppPassport(shareCode) : ''
+      const storedEmbedPassport = isEmbedPassport(storedPassport)
+      if (shareCode && storedEmbedPassport)
+        clearWebAppPassport(shareCode)
+
       // if access mode is public, user login is always true, but the app login(passport) may be expired
-      const { userLoggedIn, appLoggedIn } = await webAppLoginStatus(shareCode!, embeddedUserId || undefined)
+      const { userLoggedIn, appLoggedIn: remoteAppLoggedIn } = await webAppLoginStatus(shareCode!, embeddedUserId || undefined)
+      const appLoggedIn = storedEmbedPassport ? false : remoteAppLoggedIn
       if (userLoggedIn && appLoggedIn) {
         redirectOrFinish()
       }
