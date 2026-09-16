@@ -100,3 +100,16 @@ class TestCheckDatasetPermissionDepartmentGuard:
             with pytest.raises(NoPermissionError, match="You do not have permission"):
                 DatasetService.check_dataset_permission(dataset, user)
             mock_check.assert_not_called()
+
+    def test_department_admin_can_access_only_me_in_department(self) -> None:
+        user = _make_user(role=TenantAccountRole.EDITOR)
+        dataset = _make_dataset(permission=DatasetPermissionEnum.ONLY_ME, created_by="other-user")
+
+        from services.department_service import DepartmentService
+
+        with (
+            patch.object(DepartmentService, "is_department_admin", return_value=True),
+            patch.object(DepartmentService, "assert_department_access", return_value=None) as mock_check,
+        ):
+            DatasetService.check_dataset_permission(dataset, user)
+            mock_check.assert_called_once()

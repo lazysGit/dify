@@ -24,7 +24,6 @@ import LanguagePage from './language-page'
 import MembersPage from './members-page'
 import ModelProviderPage from './model-provider-page'
 import { useResetModelProviderListExpanded } from './model-provider-page/atoms'
-import ModelSettingsPage from './model-settings-page'
 
 const iconClassName = `
   w-5 h-5 mr-2
@@ -87,12 +86,6 @@ export default function AccountSetting({
         name: t('settings.members', { ns: 'common' }),
         icon: <span className={cn('i-ri-group-2-line', iconClassName)} />,
         activeIcon: <span className={cn('i-ri-group-2-fill', iconClassName)} />,
-      },
-      {
-        key: ACCOUNT_SETTING_TAB.MODEL_SETTINGS,
-        name: t('settings.model_settings', { ns: 'common' }),
-        icon: <span className={cn('i-ri-shield-keyhole-line', iconClassName)} />,
-        activeIcon: <span className={cn('i-ri-shield-keyhole-fill', iconClassName)} />,
       },
     )
 
@@ -253,7 +246,6 @@ export default function AccountSetting({
             <div className="px-4 pt-2 sm:px-8">
               {activeMenu === ACCOUNT_SETTING_TAB.PROVIDER && <ModelProviderPage searchText={searchValue} />}
               {activeMenu === ACCOUNT_SETTING_TAB.MEMBERS && <MembersPage />}
-              {activeMenu === ACCOUNT_SETTING_TAB.MODEL_SETTINGS && <ModelSettingsPage />}
               {activeMenu === ACCOUNT_SETTING_TAB.DEPARTMENTS && (
                 <DepartmentPage
                   isAdmin={isCurrentWorkspaceManager}

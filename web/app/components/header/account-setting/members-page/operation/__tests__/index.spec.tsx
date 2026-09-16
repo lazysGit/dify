@@ -34,11 +34,21 @@ const defaultMember: Member = {
   created_at: '',
 }
 
-const renderOperation = (propsOverride: Partial<Member> = {}, operatorRole = 'owner', onOperate?: () => void) => {
+const renderOperation = (
+  propsOverride: Partial<Member> = {},
+  operatorRole = 'owner',
+  onOperate?: () => void,
+  isDepartmentAdmin = false,
+) => {
   const mergedMember = { ...defaultMember, ...propsOverride }
   return render(
     <ToastContext.Provider value={{ notify: vi.fn(), close: vi.fn() }}>
-      <Operation member={mergedMember} operatorRole={operatorRole} onOperate={onOperate ?? vi.fn()} />
+      <Operation
+        member={mergedMember}
+        operatorRole={operatorRole}
+        onOperate={onOperate ?? vi.fn()}
+        isDepartmentAdmin={isDepartmentAdmin}
+      />
     </ToastContext.Provider>,
   )
 }
@@ -131,5 +141,16 @@ describe('Operation', () => {
       expect(mockDeleteMemberOrCancelInvitation).toHaveBeenCalled()
       expect(onOperate).toHaveBeenCalled()
     })
+  })
+
+  it('should let department admin pick editor or normal and hide remove-from-team', async () => {
+    const user = userEvent.setup()
+    renderOperation({}, 'editor', vi.fn(), true)
+
+    await user.click(screen.getByText('common.members.editor'))
+
+    expect(screen.getByText('common.members.normal')).toBeInTheDocument()
+    expect(screen.queryByText('common.members.admin')).not.toBeInTheDocument()
+    expect(screen.queryByText('common.members.removeFromTeam')).not.toBeInTheDocument()
   })
 })

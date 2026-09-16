@@ -132,15 +132,17 @@ const Operation = ({
               ))
             }
           </div>
-          <div className="border-t border-divider-subtle p-1">
-            <div className="flex cursor-pointer rounded-lg px-3 py-2 hover:bg-state-base-hover" onClick={handleDeleteMemberOrCancelInvitation}>
-              <div className="mr-1 mt-[2px] h-4 w-4 text-text-accent" />
-              <div>
-                <div className="whitespace-nowrap text-text-secondary system-sm-semibold">{t('members.removeFromTeam', { ns: 'common' })}</div>
-                <div className="whitespace-nowrap text-text-tertiary system-xs-regular">{t('members.removeFromTeamTip', { ns: 'common' })}</div>
+          {!isDepartmentAdmin && (
+            <div className="border-t border-divider-subtle p-1">
+              <div className="flex cursor-pointer rounded-lg px-3 py-2 hover:bg-state-base-hover" onClick={handleDeleteMemberOrCancelInvitation}>
+                <div className="mr-1 mt-[2px] h-4 w-4 text-text-accent" />
+                <div>
+                  <div className="whitespace-nowrap text-text-secondary system-sm-semibold">{t('members.removeFromTeam', { ns: 'common' })}</div>
+                  <div className="whitespace-nowrap text-text-tertiary system-xs-regular">{t('members.removeFromTeamTip', { ns: 'common' })}</div>
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
       </PortalToFollowElemContent>
     </PortalToFollowElem>

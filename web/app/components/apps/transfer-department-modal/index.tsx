@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   AlertDialog,
@@ -12,6 +12,8 @@ import {
   AlertDialogTitle,
 } from '@/app/components/base/ui/alert-dialog'
 import { toast } from '@/app/components/base/ui/toast'
+import TreeItem from '@/app/components/header/account-setting/members-page/department-tree-select/tree-item'
+import { pruneTreeToIds } from '@/app/components/header/account-setting/members-page/department-tree-select/utils'
 import { useDepartmentList, useTransferAppMutation, useTransferDatasetMutation } from '@/service/use-departments'
 
 type ResourceType = 'app' | 'dataset'
@@ -38,15 +40,24 @@ const TransferDepartmentModal = ({
   const { mutateAsync: transferApp, isPending: isTransferringApp } = useTransferAppMutation()
   const { mutateAsync: transferDataset, isPending: isTransferringDataset } = useTransferDatasetMutation()
 
-  const [selectedDepartmentId, setSelectedDepartmentId] = useState<string | undefined>(undefined)
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState('')
 
   const departments = deptListData?.departments ?? []
-  const availableDepartments = departments.filter(d => d.id !== currentDepartmentId)
+  const departmentTree = deptListData?.tree ?? []
+  const availableDepartmentIds = useMemo(
+    () => departments.filter(d => d.id !== currentDepartmentId).map(d => d.id),
+    [departments, currentDepartmentId],
+  )
+  const visibleTree = useMemo(() => {
+    if (availableDepartmentIds.length === 0)
+      return []
+    return pruneTreeToIds(departmentTree, new Set(availableDepartmentIds))
+  }, [departmentTree, availableDepartmentIds])
   const isPending = isTransferringApp || isTransferringDataset
 
   const handleOpenChange = useCallback((open: boolean) => {
     if (!open) {
-      setSelectedDepartmentId(undefined)
+      setSelectedDepartmentId('')
       onClose()
     }
   }, [onClose])
@@ -62,7 +73,7 @@ const TransferDepartmentModal = ({
         await transferDataset({ params: { id: resourceId }, body: { department_id: selectedDepartmentId } })
 
       toast.success(t('transferDepartment.success', { ns: 'app' }))
-      setSelectedDepartmentId(undefined)
+      setSelectedDepartmentId('')
       onSuccess()
     }
     catch {
@@ -84,29 +95,30 @@ const TransferDepartmentModal = ({
             <label className="text-text-secondary system-sm-medium">
               {t('transferDepartment.targetDepartment', { ns: 'app' })}
             </label>
-            <div className="flex max-h-[200px] flex-col gap-1 overflow-y-auto">
-              {availableDepartments.map(dept => (
-                <label
-                  key={dept.id}
-                  className="flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 hover:bg-state-base-hover"
-                >
-                  <input
-                    type="radio"
-                    name="target-department"
-                    value={dept.id}
-                    checked={selectedDepartmentId === dept.id}
-                    onChange={() => setSelectedDepartmentId(dept.id)}
-                    className="h-4 w-4 text-text-accent"
-                  />
-                  <span className="text-text-secondary system-sm-regular">{dept.name}</span>
-                </label>
-              ))}
-              {availableDepartments.length === 0 && (
-                <div className="py-4 text-center text-text-quaternary system-sm-regular">
-                  {t('transferDepartment.noAvailableDepartments', { ns: 'app' })}
-                </div>
-              )}
-            </div>
+            {visibleTree.length === 0
+              ? (
+                  <div className="py-4 text-center text-text-quaternary system-sm-regular">
+                    {t('transferDepartment.noAvailableDepartments', { ns: 'app' })}
+                  </div>
+                )
+              : (
+                  <div
+                    data-testid="transfer-department-tree"
+                    className="max-h-[240px] overflow-y-auto rounded-lg bg-components-input-bg-normal p-1"
+                  >
+                    <div role="tree">
+                      {visibleTree.map(node => (
+                        <TreeItem
+                          key={node.id}
+                          node={node}
+                          depth={0}
+                          selectedId={selectedDepartmentId}
+                          onSelect={setSelectedDepartmentId}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
           </div>
         </div>
         <AlertDialogActions>
@@ -115,7 +127,7 @@ const TransferDepartmentModal = ({
           </AlertDialogCancelButton>
           <AlertDialogConfirmButton
             loading={isPending}
-            disabled={isPending || !selectedDepartmentId || availableDepartments.length === 0}
+            disabled={isPending || !selectedDepartmentId || visibleTree.length === 0}
             onClick={handleConfirm}
           >
             {t('operation.confirm', { ns: 'common' })}

@@ -986,6 +986,29 @@ class TestTenantService:
             "add",
         )
 
+    def test_check_member_permission_department_admin_can_update(self, mock_db_dependencies):
+        mock_tenant = MagicMock()
+        mock_tenant.id = "tenant-456"
+        mock_operator = TestAccountAssociatedDataFactory.create_account_mock(account_id="operator-123")
+        mock_operator.is_admin_or_owner = False
+        mock_member = TestAccountAssociatedDataFactory.create_account_mock(account_id="member-789")
+        mock_operator_join = TestAccountAssociatedDataFactory.create_tenant_join_mock(
+            tenant_id="tenant-456", account_id="operator-123", role="editor"
+        )
+        mock_operator_join.is_department_admin = True
+
+        query_results = {("TenantAccountJoin", "tenant_id", "tenant-456"): mock_operator_join}
+        ServiceDbTestHelper.setup_db_query_filter_by_mock(mock_db_dependencies["db"], query_results)
+
+        with patch(
+            "services.department_service.DepartmentService.get_accessible_department_ids",
+            return_value=["d1"],
+        ), patch(
+            "services.department_service.DepartmentService.get_user_department_id",
+            return_value="d1",
+        ):
+            TenantService.check_member_permission(mock_tenant, mock_operator, mock_member, "update")
+
 
 class TestRegisterService:
     """

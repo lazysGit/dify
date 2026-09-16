@@ -73,9 +73,11 @@ describe('PublishDepartmentPanel', () => {
     expect(screen.getByText('Engineering')).toBeInTheDocument()
   })
 
-  it('should show edit button for manager role', () => {
+  it('should show edit button for manager role as a secondary button', () => {
     render(<PublishDepartmentPanel appId="app-1" />)
-    expect(screen.getByText('department.publishEditButton')).toBeInTheDocument()
+    const editButton = screen.getByRole('button', { name: 'department.publishEditButton' })
+    expect(editButton).toBeInTheDocument()
+    expect(editButton.className).toContain('btn-secondary')
   })
 
   it('should show empty message when no departments published', () => {

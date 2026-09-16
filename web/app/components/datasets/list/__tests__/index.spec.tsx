@@ -62,6 +62,17 @@ vi.mock('@/hooks/use-knowledge', () => ({
   }),
 }))
 
+vi.mock('@/service/use-departments', () => ({
+  useDepartmentList: () => ({
+    data: {
+      departments: [],
+      tree: [],
+      manageable_department_ids: [],
+      is_department_admin: false,
+    },
+  }),
+}))
+
 vi.mock('@/service/knowledge/use-dataset', () => ({
   useDatasetList: vi.fn(() => ({
     data: { pages: [{ data: [] }] },
@@ -213,6 +224,17 @@ describe('List', () => {
       render(<List />)
       expect(screen.getByTestId('include-all-checkbox')).toBeInTheDocument()
     })
+
+    it('should place department filter after include-all and before tag filter', () => {
+      render(<List />)
+
+      const includeAll = screen.getByTestId('include-all-checkbox')
+      const departmentFilter = screen.getByTestId('department-filter-select')
+      const tagFilter = screen.getByTestId('tag-filter')
+
+      expect(includeAll.compareDocumentPosition(departmentFilter) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+      expect(departmentFilter.compareDocumentPosition(tagFilter) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    })
   })
 
   describe('Styles', () => {
@@ -335,13 +357,33 @@ describe('List', () => {
       expect(screen.queryByTestId('dataset-footer')).not.toBeInTheDocument()
     })
 
-    it('should not show include all checkbox when not workspace owner', async () => {
+    it('should show include all checkbox for workspace admin', async () => {
+      vi.doMock('@/context/app-context', () => ({
+        useAppContext: () => ({
+          currentWorkspace: { role: 'admin' },
+          isCurrentWorkspaceOwner: false,
+          isCurrentWorkspaceManager: true,
+        }),
+        useSelector: () => true,
+      }))
+
+      vi.resetModules()
+      const { default: ListComponent } = await import('../index')
+
+      render(<ListComponent />)
+
+      expect(screen.getByTestId('include-all-checkbox')).toBeInTheDocument()
+      expect(screen.getByTestId('include-all')).toHaveTextContent('true')
+    })
+
+    it('should not show include all checkbox when not workspace manager', async () => {
       vi.doMock('@/context/app-context', () => ({
         useAppContext: () => ({
           currentWorkspace: { role: 'editor' },
           isCurrentWorkspaceOwner: false,
+          isCurrentWorkspaceManager: false,
         }),
-        useSelector: () => true,
+        useSelector: () => false,
       }))
 
       vi.resetModules()

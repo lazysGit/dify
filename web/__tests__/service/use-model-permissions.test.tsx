@@ -1,7 +1,6 @@
 import {
   memberModelWhitelistContract,
   modelPermissionsRouterContract,
-  myModelSettingsContract,
   setMemberModelWhitelistContract,
 } from '@/contract/console/model_permissions'
 import { consoleRouterContract } from '@/contract/router'
@@ -9,7 +8,6 @@ import { consoleQuery } from '@/service/client'
 import {
   useInvalidateModelWhitelist,
   useMemberModelWhitelist,
-  useMyModelSettings,
   useSetMemberWhitelistMutation,
 } from '@/service/use-model-permissions'
 
@@ -31,7 +29,6 @@ function getRouteMeta(contract: unknown) {
 const routeSpecs: RouteSpec[] = [
   { name: 'getMemberWhitelist', contract: memberModelWhitelistContract, expectedMethod: 'GET', expectedPath: '/workspaces/current/members/{account_id}/model-whitelist', expectsInput: true },
   { name: 'setMemberWhitelist', contract: setMemberModelWhitelistContract, expectedMethod: 'PUT', expectedPath: '/workspaces/current/members/{account_id}/model-whitelist', expectsInput: true },
-  { name: 'getMyModelSettings', contract: myModelSettingsContract, expectedMethod: 'GET', expectedPath: '/account/model-settings', expectsInput: false },
 ]
 
 describe('model permission contracts', () => {
@@ -52,8 +49,8 @@ describe('model permission contracts', () => {
     })
   })
 
-  it('should have exactly 3 routes in modelPermissionsRouterContract', () => {
-    expect(Object.keys(modelPermissionsRouterContract)).toHaveLength(3)
+  it('should have exactly 2 routes in modelPermissionsRouterContract', () => {
+    expect(Object.keys(modelPermissionsRouterContract)).toHaveLength(2)
   })
 })
 
@@ -66,7 +63,7 @@ describe('router registration', () => {
     const permissions = consoleRouterContract.modelPermissions
     expect(permissions).toHaveProperty('getMemberWhitelist')
     expect(permissions).toHaveProperty('setMemberWhitelist')
-    expect(permissions).toHaveProperty('getMyModelSettings')
+    expect(permissions).not.toHaveProperty('getMyModelSettings')
   })
 })
 
@@ -82,19 +79,12 @@ describe('queryKey stability', () => {
     const key2 = consoleQuery.modelPermissions.getMemberWhitelist.key({ input: { params: { account_id: 'u-2' } } })
     expect(key1).not.toEqual(key2)
   })
-
-  it('my model settings queryKey should be stable across calls', () => {
-    const key1 = consoleQuery.modelPermissions.getMyModelSettings.key()
-    const key2 = consoleQuery.modelPermissions.getMyModelSettings.key()
-    expect(key1).toStrictEqual(key2)
-  })
 })
 
 describe('service hooks', () => {
   it('should export all model permission hooks', () => {
     expect(typeof useMemberModelWhitelist).toBe('function')
     expect(typeof useSetMemberWhitelistMutation).toBe('function')
-    expect(typeof useMyModelSettings).toBe('function')
     expect(typeof useInvalidateModelWhitelist).toBe('function')
   })
 })

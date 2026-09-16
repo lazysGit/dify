@@ -1086,7 +1086,11 @@ class TenantService:
 
     @staticmethod
     def create_tenant_member(
-        tenant: Tenant, account: Account, role: str = "normal", department_id: str | None = None
+        tenant: Tenant,
+        account: Account,
+        role: str = "normal",
+        department_id: str | None = None,
+        is_department_admin: bool | None = None,
     ) -> TenantAccountJoin:
         """Create tenant member"""
         if role == TenantAccountRole.OWNER:
@@ -1108,12 +1112,15 @@ class TenantService:
         if ta:
             ta.role = TenantAccountRole(role)
             ta.department_id = department_id
+            if is_department_admin is not None:
+                ta.is_department_admin = is_department_admin
         else:
             ta = TenantAccountJoin(
                 tenant_id=tenant.id,
                 account_id=account.id,
                 role=TenantAccountRole(role),
                 department_id=department_id,
+                is_department_admin=bool(is_department_admin),
             )
             db.session.add(ta)
 
@@ -1275,8 +1282,18 @@ class TenantService:
 
         ta_operator = db.session.query(TenantAccountJoin).filter_by(tenant_id=tenant.id, account_id=operator.id).first()
 
-        if not ta_operator or ta_operator.role not in perms[action]:
-            raise NoPermissionError(f"No permission to {action} member.")
+        if ta_operator and ta_operator.role in perms[action]:
+            return
+
+        if action == "update" and ta_operator and ta_operator.is_department_admin and member is not None:
+            from services.department_service import DepartmentService
+
+            accessible = DepartmentService.get_accessible_department_ids(operator, tenant.id)
+            member_dept = DepartmentService.get_user_department_id(member.id, tenant.id)
+            if accessible is not None and member_dept and member_dept in accessible:
+                return
+
+        raise NoPermissionError(f"No permission to {action} member.")
 
     @staticmethod
     def remove_member_from_tenant(tenant: Tenant, account: Account, operator: Account):
@@ -1350,6 +1367,18 @@ class TenantService:
 
         if target_member_join.role == new_role:
             raise RoleAlreadyAssignedError("The provided role is already assigned to the member.")
+
+        if not operator.is_admin_or_owner:
+            allowed_roles = {
+                TenantAccountRole.EDITOR,
+                TenantAccountRole.NORMAL,
+                TenantAccountRole.DATASET_OPERATOR,
+            }
+            if new_role not in allowed_roles or target_member_join.role in {
+                TenantAccountRole.OWNER,
+                TenantAccountRole.ADMIN,
+            }:
+                raise NoPermissionError("Department admin can only update editor, normal, or dataset_operator roles.")
 
         if new_role == "owner":
             # Find the current owner and change their role to 'admin'
@@ -1490,6 +1519,7 @@ class RegisterService:
         password: str,
         department_id: str,
         role: TenantAccountRole,
+        is_department_admin: bool = False,
     ) -> Account:
         normalized_email = email.lower()
 
@@ -1545,7 +1575,13 @@ class RegisterService:
         if not tenant:
             raise TenantNotFoundError("Tenant not found.")
 
-        TenantService.create_tenant_member(tenant, account, role=role.value, department_id=department_id)
+        TenantService.create_tenant_member(
+            tenant,
+            account,
+            role=role.value,
+            department_id=department_id,
+            is_department_admin=is_department_admin,
+        )
         TenantService.switch_tenant(account, tenant.id)
 
         from services.department_service import DepartmentAuditLog

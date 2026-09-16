@@ -271,3 +271,25 @@ class TestCreateMemberByAdmin:
 
         mock_mail.delay.assert_called_once()
         assert mock_mail.delay.call_args.kwargs["initial_password"] == "Dify1234"
+
+    @patch("services.account_service.send_member_created_mail_task")
+    @patch("services.department_service.DepartmentAuditLog")
+    @patch("services.account_service.TenantService")
+    @patch("services.account_service.db")
+    def test_is_department_admin_passed_to_join(self, mock_db, mock_ts, mock_audit, mock_mail):
+        _mock_db_queries(mock_db)
+        operator = _make_operator()
+
+        RegisterService.create_member_by_admin(
+            operator,
+            "t1",
+            name="Dept Lead",
+            email="lead@example.com",
+            password="Valid1234",
+            department_id="d1",
+            role=TenantAccountRole.EDITOR,
+            is_department_admin=True,
+        )
+
+        call_kwargs = mock_ts.create_tenant_member.call_args.kwargs
+        assert call_kwargs["is_department_admin"] is True

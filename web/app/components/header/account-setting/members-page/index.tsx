@@ -72,6 +72,15 @@ const MembersPage = () => {
   }, [accounts, selectedDepartmentId, searchKeyword, tree])
 
   const canCreateMember = isCurrentWorkspaceOwner || isCurrentWorkspaceManager || isDepartmentAdmin
+  const canEditMemberRole = (account: (typeof accounts)[number]) => {
+    if (account.role === 'owner')
+      return false
+    if (isCurrentWorkspaceOwner)
+      return true
+    if (!isDepartmentAdmin || userProfile.email === account.email)
+      return false
+    return !!account.department_id && manageableDepartmentIds.includes(account.department_id)
+  }
   const [showCreateMemberModal, setShowCreateMemberModal] = useState(false)
   const canManageModelPermission = isCurrentWorkspaceOwner || isCurrentWorkspaceManager
   const [modelPermissionAccount, setModelPermissionAccount] = useState<{ id: string, name: string } | null>(null)
@@ -208,10 +217,13 @@ const MembersPage = () => {
                     {isCurrentWorkspaceOwner && account.role === 'owner' && !isAllowTransferWorkspace && (
                       <div className="px-3 text-text-secondary system-sm-regular">{RoleMap[account.role] || RoleMap.normal}</div>
                     )}
-                    {isCurrentWorkspaceOwner && account.role !== 'owner' && (
+                    {canEditMemberRole(account) && (
                       <Operation member={account} operatorRole={currentWorkspace.role} onOperate={refetch} isDepartmentAdmin={isDepartmentAdmin} />
                     )}
-                    {!isCurrentWorkspaceOwner && (
+                    {!canEditMemberRole(account) && account.role !== 'owner' && (
+                      <div className="px-3 text-text-secondary system-sm-regular">{RoleMap[account.role] || RoleMap.normal}</div>
+                    )}
+                    {!isCurrentWorkspaceOwner && account.role === 'owner' && (
                       <div className="px-3 text-text-secondary system-sm-regular">{RoleMap[account.role] || RoleMap.normal}</div>
                     )}
                   </div>

@@ -39,7 +39,7 @@
   "deleteAppConfirmInputLabel": "请在下方输入框中输入\"{{appName}}\"以确认：",
   "deleteAppConfirmInputPlaceholder": "输入应用名称",
   "deleteAppConfirmTitle": "确认删除应用？",
-  "department.filter.all": "全部",
+  "department.filter.allDepartments": "全部部门",
   "dslUploader.browse": "选择文件",
   "dslUploader.button": "拖拽文件至此，或者",
   "duplicate": "复制",

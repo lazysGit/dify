@@ -325,4 +325,24 @@ describe('MembersPage - Department Features', () => {
     expect(screen.queryByText('Owner User')).not.toBeInTheDocument()
     expect(screen.queryByText('Normal User')).not.toBeInTheDocument()
   })
+
+  it('should let department admin edit roles of other members in manageable departments', () => {
+    vi.mocked(useAppContext).mockReturnValue({
+      userProfile: { email: 'lead@example.com' },
+      currentWorkspace: { name: 'Test Workspace', role: 'editor' } as never,
+      isCurrentWorkspaceOwner: false,
+      isCurrentWorkspaceManager: false,
+    } as unknown as AppContextValue)
+    vi.mocked(useDepartmentList).mockReturnValue({
+      data: createDeptListData({
+        is_department_admin: true,
+        manageable_department_ids: ['dept-1', 'dept-1-1'],
+      }),
+    } as never)
+
+    render(<MembersPage />)
+
+    expect(screen.getAllByText('Member Operation').length).toBeGreaterThan(0)
+    expect(screen.queryByText('members.normal')).not.toBeInTheDocument()
+  })
 })

@@ -198,22 +198,14 @@ const List: FC<Props> = ({
         )}
 
         <div className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-y-2 bg-background-body px-12 pb-5 pt-7">
-          <div className="flex flex-col gap-2">
-            <TabSliderNew
-              value={activeTab}
-              onChange={(nextValue) => {
-                if (isAppListCategory(nextValue))
-                  setActiveTab(nextValue)
-              }}
-              options={options}
-            />
-            <DepartmentFilterTabs
-              selectedDepartmentId={departmentId}
-              onDepartmentChange={(deptId) => {
-                setQuery(prev => ({ ...prev, departmentId: deptId }))
-              }}
-            />
-          </div>
+          <TabSliderNew
+            value={activeTab}
+            onChange={(nextValue) => {
+              if (isAppListCategory(nextValue))
+                setActiveTab(nextValue)
+            }}
+            options={options}
+          />
           <div className="flex items-center gap-2">
             <label className="mr-2 flex h-7 items-center space-x-2">
               <Checkbox checked={isCreatedByMe} onCheck={handleCreatedByMeChange} />
@@ -221,6 +213,12 @@ const List: FC<Props> = ({
                 {t('showMyCreatedAppsOnly', { ns: 'app' })}
               </div>
             </label>
+            <DepartmentFilterTabs
+              selectedDepartmentId={departmentId}
+              onDepartmentChange={(deptId) => {
+                setQuery(prev => ({ ...prev, departmentId: deptId }))
+              }}
+            />
             <TagFilter type="app" value={tagFilterValue} onChange={handleTagsChange} />
             <Input
               showLeftIcon

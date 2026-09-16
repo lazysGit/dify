@@ -30,6 +30,17 @@ vi.mock('@/context/global-public-context', () => ({
   }),
 }))
 
+vi.mock('@/service/use-departments', () => ({
+  useDepartmentList: () => ({
+    data: {
+      departments: [],
+      tree: [],
+      manageable_department_ids: [],
+      is_department_admin: false,
+    },
+  }),
+}))
+
 const mockSetQuery = vi.fn()
 const mockQueryState = {
   tagIDs: [] as string[],
@@ -247,6 +258,17 @@ describe('List', () => {
       expect(screen.getByText('app.showMyCreatedAppsOnly')).toBeInTheDocument()
     })
 
+    it('should place department filter after created-by-me and before tag filter', () => {
+      renderList()
+
+      const createdByMe = screen.getByText('app.showMyCreatedAppsOnly')
+      const departmentFilter = screen.getByTestId('department-filter-select')
+      const tagFilter = screen.getByText('common.tag.placeholder')
+
+      expect(createdByMe.compareDocumentPosition(departmentFilter) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+      expect(departmentFilter.compareDocumentPosition(tagFilter) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    })
+
     it('should render app cards when apps exist', () => {
       renderList()
 
@@ -313,10 +335,8 @@ describe('List', () => {
 
       renderList()
 
-      const clearButton = document.querySelector('.group')
-      expect(clearButton).toBeInTheDocument()
-      if (clearButton)
-        fireEvent.click(clearButton)
+      const clearButton = screen.getByTestId('input-clear')
+      fireEvent.click(clearButton)
 
       expect(mockSetQuery).toHaveBeenCalled()
     })

@@ -122,7 +122,11 @@ export default function DepartmentPage({ isAdmin, isDepartmentAdmin, apiFailed }
       <DepartmentTree
         tree={filteredTree}
         isAdmin={isAdmin}
-        onManage={id => setSelectedDepartmentId(id)}
+        manageableDepartmentIds={manageableDepartmentIds}
+        onManage={(id) => {
+          if (isAdmin || manageableDepartmentIds.includes(id))
+            setSelectedDepartmentId(id)
+        }}
         onDelete={(id) => {
           if (selectedDepartmentId === id)
             setSelectedDepartmentId(null)

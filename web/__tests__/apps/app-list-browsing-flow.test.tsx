@@ -110,6 +110,17 @@ vi.mock('@/service/use-apps', () => ({
   }),
 }))
 
+vi.mock('@/service/use-departments', () => ({
+  useDepartmentList: () => ({
+    data: {
+      departments: [],
+      tree: [],
+      manageable_department_ids: [],
+      is_department_admin: false,
+    },
+  }),
+}))
+
 vi.mock('@/hooks/use-pay', () => ({
   CheckModal: () => null,
 }))

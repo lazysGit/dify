@@ -21,6 +21,8 @@ type DepartmentTreeSelectProps = {
   triggerTestId?: string
   triggerClassName?: string
   contentClassName?: string
+  getCount?: (node: DepartmentTreeNode) => number
+  hideEmptyOption?: boolean
 }
 
 export default function DepartmentTreeSelect({
@@ -32,6 +34,8 @@ export default function DepartmentTreeSelect({
   triggerTestId = 'department-filter',
   triggerClassName,
   contentClassName,
+  getCount,
+  hideEmptyOption = false,
 }: DepartmentTreeSelectProps) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
@@ -43,8 +47,10 @@ export default function DepartmentTreeSelect({
     return pruneTreeToIds(tree, new Set(manageableDepartmentIds))
   }, [tree, manageableDepartmentIds])
 
-  const selectedLabel = value
-    ? (findNode(tree, value)?.name ?? noneLabel)
+  const selectedNode = value ? findNode(tree, value) : undefined
+  const selectedCount = selectedNode && getCount ? getCount(selectedNode) : undefined
+  const selectedLabel = selectedNode
+    ? (selectedCount == null ? selectedNode.name : `${selectedNode.name} (${selectedCount})`)
     : noneLabel
 
   const handleSelect = (id: string) => {
@@ -73,17 +79,19 @@ export default function DepartmentTreeSelect({
         popupClassName="max-h-[320px] min-w-[240px] overflow-auto p-1"
       >
         <div role="tree">
-          <button
-            type="button"
-            data-testid="department-tree-item-all"
-            className={cn(
-              'flex w-full items-center rounded-lg px-2 py-1.5 text-left text-text-primary system-sm-medium hover:bg-state-base-hover',
-              !value && 'bg-state-base-active',
-            )}
-            onClick={() => handleSelect('')}
-          >
-            {noneLabel}
-          </button>
+          {!hideEmptyOption && (
+            <button
+              type="button"
+              data-testid="department-tree-item-all"
+              className={cn(
+                'flex w-full items-center rounded-lg px-2 py-1.5 text-left text-text-primary system-sm-medium hover:bg-state-base-hover',
+                !value && 'bg-state-base-active',
+              )}
+              onClick={() => handleSelect('')}
+            >
+              {noneLabel}
+            </button>
+          )}
           {visibleTree.map(node => (
             <TreeItem
               key={node.id}
@@ -91,6 +99,7 @@ export default function DepartmentTreeSelect({
               depth={0}
               selectedId={value}
               onSelect={handleSelect}
+              getCount={getCount}
             />
           ))}
         </div>

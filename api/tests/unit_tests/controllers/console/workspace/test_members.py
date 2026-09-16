@@ -17,6 +17,7 @@ from controllers.console.error import EmailSendIpLimitError
 from controllers.console.workspace.members import (
     DatasetOperatorMemberListApi,
     MemberCancelInviteApi,
+    MemberCreatePayload,
     MemberInitialPasswordApi,
     MemberListApi,
     MemberUpdateRoleApi,
@@ -529,3 +530,18 @@ class TestOwnerTransferApi:
         ):
             with pytest.raises(MemberNotInTenantError):
                 method(api, "2")
+
+
+class TestMemberCreatePayload:
+    def test_keeps_is_department_admin_flag(self):
+        payload = MemberCreatePayload.model_validate(
+            {
+                "name": "Lead",
+                "email": "lead@test.com",
+                "password": "Valid1234",
+                "department_id": "d1",
+                "role": "editor",
+                "is_department_admin": True,
+            }
+        )
+        assert payload.is_department_admin is True

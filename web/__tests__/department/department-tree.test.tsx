@@ -1,5 +1,5 @@
 import type { DepartmentTreeNode } from '@/contract/console/departments'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import DepartmentTree from '@/app/components/header/account-setting/department-page/department-tree'
@@ -194,5 +194,32 @@ describe('TreeItem', () => {
 
     expect(mockMutateAsync).toHaveBeenCalledTimes(1)
     expect(onDelete).toHaveBeenCalledWith('child-1')
+  })
+
+  it('should disable manage for departments outside the manageable scope', async () => {
+    const user = userEvent.setup()
+    const onManage = vi.fn()
+    render(
+      <DepartmentTree
+        tree={mockTree}
+        isAdmin={false}
+        manageableDepartmentIds={['root-1', 'child-1']}
+        onManage={onManage}
+      />,
+    )
+
+    const ownManage = within(screen.getByText('Root Department').closest('[role="treeitem"]')!).getByRole('button', { name: 'department.manage' })
+    const childManage = within(screen.getByText('Child Department').closest('[role="treeitem"]')!).getByRole('button', { name: 'department.manage' })
+    const otherManage = within(screen.getByText('Default Department').closest('[role="treeitem"]')!).getByRole('button', { name: 'department.manage' })
+
+    expect(ownManage).toBeEnabled()
+    expect(childManage).toBeEnabled()
+    expect(otherManage).toBeDisabled()
+
+    await user.click(otherManage)
+    expect(onManage).not.toHaveBeenCalled()
+
+    await user.click(ownManage)
+    expect(onManage).toHaveBeenCalledWith('root-1')
   })
 })

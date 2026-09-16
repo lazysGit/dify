@@ -16,6 +16,24 @@ vi.mock('@/service/use-model-permissions', () => ({
   useSetMemberWhitelistMutation: () => ({ mutateAsync: mockMutateAsync, isPending: false }),
 }))
 
+vi.mock('@/app/components/header/account-setting/model-provider-page/hooks', () => ({
+  useDefaultModel: (type: string) => {
+    if (type === 'llm') {
+      return {
+        data: { model: 'gpt-4', model_type: 'llm', provider: { provider: 'openai' } },
+        isLoading: false,
+      }
+    }
+    if (type === 'text-embedding') {
+      return {
+        data: { model: 'text-embedding-3-small', model_type: 'text-embedding', provider: { provider: 'openai' } },
+        isLoading: false,
+      }
+    }
+    return { data: undefined, isLoading: false }
+  },
+}))
+
 vi.mock('@/service/use-common', () => ({
   useMembers: () => ({
     data: {
@@ -53,6 +71,10 @@ vi.mock('@/context/provider-context', () => ({
     plan: { type: 'professional', total: { teamMembers: 100 } },
     enableBilling: false,
     isAllowTransferWorkspace: false,
+    modelProviders: [
+      { provider: 'openai', label: { en_US: 'OpenAI', zh_Hans: 'OpenAI' } },
+      { provider: 'anthropic', label: { en_US: 'Anthropic', zh_Hans: 'Anthropic' } },
+    ],
   }),
 }))
 
@@ -155,7 +177,7 @@ describe('MembersPage model permission', () => {
     expect(screen.queryByText('members.model_permission')).not.toBeInTheDocument()
   })
 
-  it('should open modal and check only whitelisted models', async () => {
+  it('should keep default models checked even when whitelist omitted them', async () => {
     mockUseMemberModelWhitelist.mockReturnValue({
       data: {
         is_restricted: true,
@@ -170,8 +192,73 @@ describe('MembersPage model permission', () => {
 
     expect(screen.getByText('model_whitelist.member_title')).toBeInTheDocument()
     expect(screen.getByTestId('checkbox-openai:llm:gpt-4')).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByTestId('checkbox-openai:text-embedding:text-embedding-3-small')).toHaveAttribute('aria-checked', 'true')
     expect(screen.getByTestId('checkbox-anthropic:llm:claude-3')).toHaveAttribute('aria-checked', 'false')
     expect(container).toBeDefined()
+  })
+
+  it('should check only workspace default models when unrestricted', async () => {
+    await renderPage({ isOwner: true, isManager: true })
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'members.model_permission' })[0])
+
+    expect(screen.getByTestId('checkbox-openai:llm:gpt-4')).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByTestId('checkbox-openai:text-embedding:text-embedding-3-small')).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByTestId('checkbox-anthropic:llm:claude-3')).toHaveAttribute('aria-checked', 'false')
+  })
+
+  it('should group models by type then localized provider name', async () => {
+    await renderPage({ isOwner: true, isManager: true })
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'members.model_permission' })[0])
+
+    const llmHeading = screen.getByRole('button', { name: 'modelProvider.systemReasoningModel.key' })
+    const embeddingHeading = screen.getByRole('button', { name: 'modelProvider.embeddingModel.key' })
+    expect(llmHeading.compareDocumentPosition(embeddingHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.getByText('Anthropic')).toBeInTheDocument()
+    expect(screen.getAllByText('OpenAI').length).toBeGreaterThanOrEqual(2)
+    expect(screen.queryByText('openai')).not.toBeInTheDocument()
+    expect(screen.queryByText('anthropic')).not.toBeInTheDocument()
+  })
+
+  it('should collapse and expand a model type section', async () => {
+    await renderPage({ isOwner: true, isManager: true })
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'members.model_permission' })[0])
+
+    const llmHeading = screen.getByRole('button', { name: 'modelProvider.systemReasoningModel.key' })
+    expect(llmHeading).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByTestId('checkbox-openai:llm:gpt-4')).toBeInTheDocument()
+
+    fireEvent.click(llmHeading)
+
+    expect(llmHeading).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByTestId('checkbox-openai:llm:gpt-4')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('checkbox-anthropic:llm:claude-3')).not.toBeInTheDocument()
+    expect(screen.getByTestId('checkbox-openai:text-embedding:text-embedding-3-small')).toBeInTheDocument()
+
+    fireEvent.click(llmHeading)
+
+    expect(llmHeading).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByTestId('checkbox-openai:llm:gpt-4')).toBeInTheDocument()
+  })
+
+  it('should keep workspace default models checked and not uncheckable', async () => {
+    await renderPage({ isOwner: true, isManager: true })
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'members.model_permission' })[0])
+
+    const gpt4 = screen.getByTestId('checkbox-openai:llm:gpt-4')
+    const embedding = screen.getByTestId('checkbox-openai:text-embedding:text-embedding-3-small')
+    const claude = screen.getByTestId('checkbox-anthropic:llm:claude-3')
+    expect(gpt4).toHaveAttribute('aria-checked', 'true')
+    expect(gpt4).toHaveAttribute('aria-disabled', 'true')
+    expect(embedding).toHaveAttribute('aria-disabled', 'true')
+    expect(claude).toHaveAttribute('aria-disabled', 'false')
+
+    fireEvent.click(gpt4)
+    expect(gpt4).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByRole('button', { name: 'operation.save' })).toBeDisabled()
   })
 
   it('should disable save until the selection changes', async () => {
@@ -190,8 +277,7 @@ describe('MembersPage model permission', () => {
     await renderPage({ isOwner: true, isManager: true })
 
     fireEvent.click(screen.getAllByRole('button', { name: 'members.model_permission' })[0])
-    // 取消 gpt-4 勾选使状态变脏，保存应只含剩余两个模型
-    fireEvent.click(screen.getByTestId('checkbox-openai:llm:gpt-4'))
+    fireEvent.click(screen.getByTestId('checkbox-anthropic:llm:claude-3'))
     fireEvent.click(screen.getByRole('button', { name: 'operation.save' }))
 
     await waitFor(() => {
@@ -199,6 +285,7 @@ describe('MembersPage model permission', () => {
         params: { account_id: 'a1' },
         body: {
           models: [
+            { provider: 'openai', model: 'gpt-4', model_type: 'llm' },
             { provider: 'openai', model: 'text-embedding-3-small', model_type: 'text-embedding' },
             { provider: 'anthropic', model: 'claude-3', model_type: 'llm' },
           ],
@@ -207,17 +294,23 @@ describe('MembersPage model permission', () => {
     })
   })
 
-  it('should save empty models when select-all unchecked', async () => {
+  it('should keep default models when select-all is unchecked', async () => {
     await renderPage({ isOwner: true, isManager: true })
 
     fireEvent.click(screen.getAllByRole('button', { name: 'members.model_permission' })[0])
+    fireEvent.click(screen.getByTestId('checkbox-model-whitelist-all'))
     fireEvent.click(screen.getByTestId('checkbox-model-whitelist-all'))
     fireEvent.click(screen.getByText('operation.save'))
 
     await waitFor(() => {
       expect(mockMutateAsync).toHaveBeenCalledWith({
         params: { account_id: 'a1' },
-        body: { models: [] },
+        body: {
+          models: [
+            { provider: 'openai', model: 'gpt-4', model_type: 'llm' },
+            { provider: 'openai', model: 'text-embedding-3-small', model_type: 'text-embedding' },
+          ],
+        },
       })
     })
   })

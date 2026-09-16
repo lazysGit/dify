@@ -10,13 +10,15 @@ type TreeItemProps = {
   depth: number
   selectedId: string
   onSelect: (id: string) => void
+  getCount?: (node: DepartmentTreeNode) => number
 }
 
-export default function TreeItem({ node, depth, selectedId, onSelect }: TreeItemProps) {
+export default function TreeItem({ node, depth, selectedId, onSelect, getCount }: TreeItemProps) {
   const { t } = useTranslation()
   const [expanded, setExpanded] = useState(true)
   const hasChildren = node.children.length > 0
   const selected = selectedId === node.id
+  const count = getCount?.(node)
 
   return (
     <>
@@ -51,6 +53,13 @@ export default function TreeItem({ node, depth, selectedId, onSelect }: TreeItem
         <span className="i-ri-folder-line h-4 w-4 shrink-0 text-text-tertiary" />
         <span className="min-w-0 flex-1 truncate text-text-primary system-sm-medium">
           {node.name}
+          {count != null && (
+            <span className="ml-1 text-text-quaternary">
+              (
+              {count}
+              )
+            </span>
+          )}
         </span>
       </div>
       {hasChildren && expanded && (
@@ -62,6 +71,7 @@ export default function TreeItem({ node, depth, selectedId, onSelect }: TreeItem
               depth={depth + 1}
               selectedId={selectedId}
               onSelect={onSelect}
+              getCount={getCount}
             />
           ))}
         </div>

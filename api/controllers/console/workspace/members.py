@@ -40,6 +40,7 @@ class MemberCreatePayload(BaseModel):
     password: str = ""
     department_id: str
     role: str
+    is_department_admin: bool = False
 
 
 class MemberRoleUpdatePayload(BaseModel):
@@ -240,6 +241,7 @@ class MemberCreateApi(Resource):
                 password=args.password,
                 department_id=args.department_id,
                 role=TenantAccountRole(args.role),
+                is_department_admin=args.is_department_admin,
             )
         except Exception as e:
             raise ValueError(str(e))

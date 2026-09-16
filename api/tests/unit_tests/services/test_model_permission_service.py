@@ -279,38 +279,6 @@ class TestGetFilteredModels:
         assert result_te == []
 
 
-class TestGetAvailableModelsFlat:
-    @patch("services.model_permission_service.ModelProviderService")
-    @patch("services.model_permission_service.db")
-    def test_get_available_models_flat_admin_returns_all_not_restricted(self, mock_db, mock_svc_cls):
-        mock_session = MagicMock()
-        mock_db.session = mock_session
-        _mock_query_chain(mock_session)
-        _patch_system_models(mock_svc_cls)
-
-        user = _make_user(user_id="u1", is_admin_or_owner=True)
-        models, is_restricted = ModelPermissionService.get_available_models_flat("u1", "t1", user)
-
-        assert is_restricted is False
-        assert len(models) == 3
-        assert models[0] == {"provider": "openai", "model": "gpt-4", "model_type": "llm", "label": "gpt-4"}
-
-    @patch("services.model_permission_service.ModelProviderService")
-    @patch("services.model_permission_service.db")
-    def test_get_available_models_flat_whitelist_filters_and_marks_restricted(self, mock_db, mock_svc_cls):
-        mock_session = MagicMock()
-        mock_db.session = mock_session
-        rows = [_make_whitelist_row(provider_name="openai", model_name="gpt-4", model_type="llm")]
-        _mock_query_chain(mock_session, first_return=MagicMock(), all_return=rows)
-        _patch_system_models(mock_svc_cls)
-
-        user = _make_user(user_id="u2", is_admin_or_owner=False)
-        models, is_restricted = ModelPermissionService.get_available_models_flat("u2", "t1", user)
-
-        assert is_restricted is True
-        assert models == [{"provider": "openai", "model": "gpt-4", "model_type": "llm", "label": "gpt-4"}]
-
-
 class TestMisc:
     @patch("services.model_permission_service.db")
     def test_is_restricted_false_when_no_records(self, mock_db):

@@ -172,6 +172,7 @@ describe('AccountSetting', () => {
       expect(screen.getByText('common.settings.apiBasedExtension')).toBeInTheDocument()
       expect(screen.getByText('custom.custom')).toBeInTheDocument()
       expect(screen.getAllByText('common.settings.language').length).toBeGreaterThan(0)
+      expect(screen.queryByText('common.settings.model_settings')).not.toBeInTheDocument()
     })
 
     it('should respect the initial tab', () => {

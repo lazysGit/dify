@@ -525,6 +525,18 @@ class TestDatasetServiceCheckDatasetPermission:
         # Verify no permission queries were made (OWNER bypasses)
         mock_db_session.query.assert_not_called()
 
+    def test_check_dataset_permission_admin_bypass(self, mock_db_session):
+        user = DatasetPermissionTestDataFactory.create_user_mock(role=TenantAccountRole.ADMIN, tenant_id="tenant-123")
+        dataset = DatasetPermissionTestDataFactory.create_dataset_mock(
+            tenant_id="tenant-123",
+            permission=DatasetPermissionEnum.ONLY_ME,
+            created_by="other-user-123",
+        )
+
+        DatasetService.check_dataset_permission(dataset, user)
+
+        mock_db_session.query.assert_not_called()
+
     def test_check_dataset_permission_tenant_mismatch_error(self):
         """
         Test error when user and dataset are in different tenants.
@@ -588,9 +600,11 @@ class TestDatasetServiceCheckDatasetPermission:
             created_by="other-user-456",  # Different creator
         )
 
-        # Act & Assert
-        with pytest.raises(NoPermissionError, match="You do not have permission to access this dataset"):
-            DatasetService.check_dataset_permission(dataset, user)
+        from services.department_service import DepartmentService
+
+        with patch.object(DepartmentService, "is_department_admin", return_value=False):
+            with pytest.raises(NoPermissionError, match="You do not have permission to access this dataset"):
+                DatasetService.check_dataset_permission(dataset, user)
 
     def test_check_dataset_permission_partial_members_creator_success(self, mock_db_session):
         """
@@ -741,6 +755,16 @@ class TestDatasetServiceCheckDatasetOperatorPermission:
         )
 
         # Act (should not raise)
+        DatasetService.check_dataset_operator_permission(user=user, dataset=dataset)
+
+    def test_check_dataset_operator_permission_admin_bypass(self):
+        user = DatasetPermissionTestDataFactory.create_user_mock(role=TenantAccountRole.ADMIN, tenant_id="tenant-123")
+        dataset = DatasetPermissionTestDataFactory.create_dataset_mock(
+            tenant_id="tenant-123",
+            permission=DatasetPermissionEnum.ONLY_ME,
+            created_by="other-user-123",
+        )
+
         DatasetService.check_dataset_operator_permission(user=user, dataset=dataset)
 
     def test_check_dataset_operator_permission_only_me_creator_success(self):

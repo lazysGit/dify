@@ -14,15 +14,8 @@ export const useSetMemberWhitelistMutation = () => {
       queryClient.invalidateQueries({
         queryKey: consoleQuery.modelPermissions.getMemberWhitelist.key(),
       })
-      queryClient.invalidateQueries({
-        queryKey: consoleQuery.modelPermissions.getMyModelSettings.key(),
-      })
     },
   }))
-}
-
-export const useMyModelSettings = () => {
-  return useQuery(consoleQuery.modelPermissions.getMyModelSettings.queryOptions())
 }
 
 export const useInvalidateModelWhitelist = () => {

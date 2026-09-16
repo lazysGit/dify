@@ -46,9 +46,6 @@ from . import (
     version,
 )
 
-# Import account controllers
-from .account import model_settings
-
 # Import app controllers
 from .app import (
     advanced_prompt_template,
@@ -143,7 +140,6 @@ from .workspace import (
 api.add_namespace(console_ns)
 
 __all__ = [
-    "account",
     "admin",
     "advanced_prompt_template",
     "agent",
@@ -190,7 +186,6 @@ __all__ = [
     "model_config",
     "model_permission",
     "model_providers",
-    "model_settings",
     "models",
     "notification",
     "oauth",

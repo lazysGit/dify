@@ -39,7 +39,7 @@
   "deleteAppConfirmInputLabel": "To confirm, type \"{{appName}}\" in the box below:",
   "deleteAppConfirmInputPlaceholder": "Enter app name",
   "deleteAppConfirmTitle": "Delete this app?",
-  "department.filter.all": "All",
+  "department.filter.allDepartments": "All departments",
   "dslUploader.browse": "Browse",
   "dslUploader.button": "Drag and drop file, or",
   "duplicate": "Duplicate",

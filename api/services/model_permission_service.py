@@ -12,9 +12,9 @@ Semantics (see docs plan 2026-09-03 model-permissions-and-publish-gate):
 Audit trail: whitelist writes land in ``OperationLog`` via ``DepartmentAuditLog.log``
 with actions ``set_model_whitelist`` / ``remove_model_whitelist``.
 
-Consumers: workspace member-whitelist admin APIs, the read-only "my models"
-API, and the single filtering chokepoint ``workspaces/current/models/model-types``
-controller (all frontend model selectors funnel through that endpoint).
+Consumers: workspace member-whitelist admin APIs, and the single filtering
+chokepoint ``workspaces/current/models/model-types`` controller (all frontend
+model selectors funnel through that endpoint).
 """
 
 from __future__ import annotations
@@ -166,23 +166,3 @@ class ModelPermissionService:
             if kept_models:
                 filtered.append(response.model_copy(update={"models": kept_models}))
         return filtered
-
-    @staticmethod
-    def get_available_models_flat(account_id: str, tenant_id: str, user: Account) -> tuple[list[dict[str, str]], bool]:
-        """Flat catalogue for the read-only "my available models" page.
-
-        :return: ``(models, is_restricted)`` — filtered according to the same
-            admin/whitelist rules as :meth:`get_filtered_models`.
-        """
-        all_models = ModelPermissionService.get_all_system_models(tenant_id)
-        if user.is_admin_or_owner or not ModelPermissionService.is_restricted(account_id, tenant_id):
-            return all_models, False
-
-        allowed = {
-            (entry["provider_name"], entry["model_name"], entry["model_type"])
-            for entry in ModelPermissionService.get_whitelist(account_id, tenant_id)
-        }
-        filtered = [
-            model for model in all_models if (model["provider"], model["model"], model["model_type"]) in allowed
-        ]
-        return filtered, True

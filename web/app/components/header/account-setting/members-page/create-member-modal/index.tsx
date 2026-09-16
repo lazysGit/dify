@@ -15,6 +15,7 @@ import { useAppContext } from '@/context/app-context'
 import { useProviderContext } from '@/context/provider-context'
 import { useCreateMemberMutation, useDepartmentList, useInitialMemberPassword } from '@/service/use-departments'
 import { encryptPassword } from '@/utils/encryption'
+import DepartmentTreeSelect from '../department-tree-select'
 
 type CreateMemberModalProps = {
   initialDepartmentId?: string
@@ -46,14 +47,8 @@ export default function CreateMemberModal({ initialDepartmentId, onClose, onSucc
   const isDepartmentAdmin = deptListData?.is_department_admin ?? false
   const canShowAdminCheckbox = isTenantAdmin
 
-  const selectableDepartments = useMemo(
-    () => {
-      const ids = deptListData?.manageable_department_ids ?? []
-      const depts = deptListData?.departments ?? []
-      return depts.filter(d => ids.includes(d.id))
-    },
-    [deptListData],
-  )
+  const departmentTree = deptListData?.tree ?? []
+  const manageableDepartmentIds = deptListData?.manageable_department_ids ?? []
 
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -69,11 +64,6 @@ export default function CreateMemberModal({ initialDepartmentId, onClose, onSucc
       return datasetOperatorEnabled ? options : options.filter(r => r !== 'dataset_operator')
     },
     [isDepartmentAdmin, datasetOperatorEnabled],
-  )
-
-  const departmentItems = useMemo(
-    () => Object.fromEntries(selectableDepartments.map(d => [d.id, d.name])),
-    [selectableDepartments],
   )
 
   const roleItems = useMemo(
@@ -182,22 +172,17 @@ export default function CreateMemberModal({ initialDepartmentId, onClose, onSucc
                 {t('members.department', { ns: 'common' })}
                 <span className="text-text-destructive">*</span>
               </label>
-              <Select
-                value={departmentId || null}
-                onValueChange={v => setDepartmentId(v ?? '')}
-                items={departmentItems}
-              >
-                <SelectTrigger className="h-9 rounded-lg">
-                  <SelectValue placeholder={t('members.selectDepartment', { ns: 'common' })} />
-                </SelectTrigger>
-                <SelectContent>
-                  {selectableDepartments.map(dept => (
-                    <SelectItem key={dept.id} value={dept.id}>
-                      {dept.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <DepartmentTreeSelect
+                tree={manageableDepartmentIds.length === 0 ? [] : departmentTree}
+                manageableDepartmentIds={manageableDepartmentIds}
+                value={departmentId}
+                onChange={setDepartmentId}
+                emptyLabel={t('members.selectDepartment', { ns: 'common' })}
+                hideEmptyOption
+                triggerTestId="create-member-department-select"
+                triggerClassName="h-9 w-full"
+                contentClassName="z-[1100]"
+              />
             </div>
 
             <div className="flex flex-col gap-1">

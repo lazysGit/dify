@@ -33,11 +33,6 @@ export type SetMemberModelWhitelistResponse = {
   whitelist_count: number
 }
 
-export type MyModelSettingsResponse = {
-  available_models: SystemModelEntry[]
-  is_restricted: boolean
-}
-
 export const memberModelWhitelistContract = base
   .route({
     path: '/workspaces/current/members/{account_id}/model-whitelist',
@@ -56,15 +51,7 @@ export const setMemberModelWhitelistContract = base
   .input(type<SetMemberModelWhitelistInput>())
   .output(type<SetMemberModelWhitelistResponse>())
 
-export const myModelSettingsContract = base
-  .route({
-    path: '/account/model-settings',
-    method: 'GET',
-  })
-  .output(type<MyModelSettingsResponse>())
-
 export const modelPermissionsRouterContract = {
   getMemberWhitelist: memberModelWhitelistContract,
   setMemberWhitelist: setMemberModelWhitelistContract,
-  getMyModelSettings: myModelSettingsContract,
 }

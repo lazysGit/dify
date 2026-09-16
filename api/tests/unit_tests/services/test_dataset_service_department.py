@@ -200,6 +200,70 @@ class TestGetDatasetsDepartmentFiltering:
         assert "coalesce" in compiled.lower() or "COALESCE" in compiled
 
 
+def _compiled_get_datasets_sql(mock_db) -> str:
+    call_args = mock_db.paginate.call_args
+    stmt = call_args[1]["select"] if "select" in call_args[1] else call_args[0][0]
+    return str(stmt.compile(compile_kwargs={"literal_binds": True}))
+
+
+def _stub_get_datasets_db(mock_db, mock_dept_service) -> None:
+    mock_dept_service.get_accessible_department_ids.return_value = None
+    mock_dept_service.is_department_admin.return_value = False
+    mock_pagination = MagicMock()
+    mock_pagination.items = []
+    mock_pagination.total = 0
+    mock_db.paginate.return_value = mock_pagination
+    mock_db.session.query.return_value.filter_by.return_value.all.return_value = []
+
+
+class TestGetDatasetsAdminIncludeAll:
+    @patch("services.department_service.DepartmentService")
+    @patch("services.dataset_service.db")
+    def test_admin_with_include_all_skips_sharing_filter(self, mock_db, mock_dept_service):
+        _stub_get_datasets_db(mock_db, mock_dept_service)
+        user = _make_user(role=TenantAccountRole.ADMIN, is_admin_or_owner=True)
+
+        DatasetService.get_datasets(1, 20, "t1", user, include_all=True)
+
+        compiled = _compiled_get_datasets_sql(mock_db).lower()
+        assert "only_me" not in compiled
+
+    @patch("services.department_service.DepartmentService")
+    @patch("services.dataset_service.db")
+    def test_admin_without_include_all_applies_sharing_filter(self, mock_db, mock_dept_service):
+        _stub_get_datasets_db(mock_db, mock_dept_service)
+        user = _make_user(role=TenantAccountRole.ADMIN, is_admin_or_owner=True)
+
+        DatasetService.get_datasets(1, 20, "t1", user, include_all=False)
+
+        compiled = _compiled_get_datasets_sql(mock_db).lower()
+        assert "only_me" in compiled
+
+    @patch("services.department_service.DepartmentService")
+    @patch("services.dataset_service.db")
+    def test_editor_with_include_all_still_applies_sharing_filter(self, mock_db, mock_dept_service):
+        _stub_get_datasets_db(mock_db, mock_dept_service)
+        user = _make_user(role=TenantAccountRole.EDITOR, is_admin_or_owner=False)
+
+        DatasetService.get_datasets(1, 20, "t1", user, include_all=True)
+
+        compiled = _compiled_get_datasets_sql(mock_db).lower()
+        assert "only_me" in compiled
+
+    @patch("services.department_service.DepartmentService")
+    @patch("services.dataset_service.db")
+    def test_department_admin_skips_sharing_filter(self, mock_db, mock_dept_service):
+        _stub_get_datasets_db(mock_db, mock_dept_service)
+        mock_dept_service.is_department_admin.return_value = True
+        user = _make_user(role=TenantAccountRole.EDITOR, is_admin_or_owner=False)
+
+        DatasetService.get_datasets(1, 20, "t1", user)
+
+        compiled = _compiled_get_datasets_sql(mock_db).lower()
+        assert "only_me" not in compiled
+        mock_dept_service.is_department_admin.assert_called_once_with(user.id, "t1")
+
+
 class TestCreateDatasetDepartmentOwnership:
     @patch("services.department_service.DepartmentService")
     @patch("services.dataset_service.db")

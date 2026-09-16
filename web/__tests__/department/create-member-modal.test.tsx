@@ -1,4 +1,4 @@
-import type { DepartmentListResponse } from '@/contract/console/departments'
+import type { Department, DepartmentListResponse, DepartmentTreeNode } from '@/contract/console/departments'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
@@ -13,14 +13,29 @@ vi.mock('react-i18next', () => ({
   }),
 }))
 
+function dept(partial: Pick<Department, 'id' | 'name' | 'parent_id' | 'path' | 'level'>): Department {
+  return {
+    is_default: false,
+    member_count: 1,
+    app_count: 0,
+    dataset_count: 0,
+    ...partial,
+  }
+}
+
+const engineering = dept({ id: 'dept-1', name: 'Engineering', parent_id: null, path: '/dept-1', level: 0 })
+const frontend = dept({ id: 'dept-1-1', name: 'Frontend', parent_id: 'dept-1', path: '/dept-1/dept-1-1', level: 1 })
+const marketing = dept({ id: 'dept-2', name: 'Marketing', parent_id: null, path: '/dept-2', level: 0 })
+const sales = dept({ id: 'dept-3', name: 'Sales', parent_id: null, path: '/dept-3', level: 0 })
+
 const mockDepartments: DepartmentListResponse = {
-  departments: [
-    { id: 'dept-1', name: 'Engineering', parent_id: null, path: '/dept-1', level: 0, is_default: false, member_count: 5, app_count: 3, dataset_count: 2 },
-    { id: 'dept-2', name: 'Marketing', parent_id: null, path: '/dept-2', level: 0, is_default: false, member_count: 3, app_count: 1, dataset_count: 1 },
-    { id: 'dept-3', name: 'Sales', parent_id: null, path: '/dept-3', level: 0, is_default: false, member_count: 2, app_count: 0, dataset_count: 0 },
-  ],
-  tree: [],
-  manageable_department_ids: ['dept-1', 'dept-2'],
+  departments: [engineering, frontend, marketing, sales],
+  tree: [
+    { ...engineering, children: [{ ...frontend, children: [] }] },
+    { ...marketing, children: [] },
+    { ...sales, children: [] },
+  ] satisfies DepartmentTreeNode[],
+  manageable_department_ids: ['dept-1', 'dept-1-1', 'dept-2'],
   is_department_admin: false,
 }
 
@@ -60,7 +75,7 @@ describe('CreateMemberModal', () => {
     mockAppContext.isCurrentWorkspaceOwner = true
     mockAppContext.isCurrentWorkspaceManager = true
     mockDepartments.is_department_admin = false
-    mockDepartments.manageable_department_ids = ['dept-1', 'dept-2']
+    mockDepartments.manageable_department_ids = ['dept-1', 'dept-1-1', 'dept-2']
   })
 
   it('should render all form fields', () => {
@@ -81,7 +96,29 @@ describe('CreateMemberModal', () => {
         onSuccess={vi.fn()}
       />,
     )
-    expect(screen.getAllByRole('combobox')[0]).toHaveTextContent('Engineering')
+    expect(screen.getByTestId('create-member-department-select')).toHaveTextContent('Engineering')
+  })
+
+  it('should keep nested departments collapsed until the tree select is opened', () => {
+    render(<CreateMemberModal onClose={vi.fn()} onSuccess={vi.fn()} />)
+
+    expect(screen.getByTestId('create-member-department-select')).toHaveTextContent('members.selectDepartment')
+    expect(screen.queryByTestId('department-tree-item-dept-1')).not.toBeInTheDocument()
+    expect(screen.queryByText('Engineering')).not.toBeInTheDocument()
+  })
+
+  it('should show nested departments as a tree and hide unmanageable ones', async () => {
+    const user = userEvent.setup()
+    render(<CreateMemberModal onClose={vi.fn()} onSuccess={vi.fn()} />)
+
+    await user.click(screen.getByTestId('create-member-department-select'))
+
+    expect(screen.getByTestId('department-tree-item-dept-1')).toHaveTextContent('Engineering')
+    expect(screen.getByTestId('department-tree-item-dept-1-1')).toHaveTextContent('Frontend')
+    expect(screen.getByTestId('department-tree-item-dept-2')).toHaveTextContent('Marketing')
+    expect(screen.queryByTestId('department-tree-item-dept-3')).not.toBeInTheDocument()
+    expect(screen.queryByText('Sales')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('department-tree-item-all')).not.toBeInTheDocument()
   })
 
   it('should prefill initial password from system config', async () => {
@@ -117,12 +154,13 @@ describe('CreateMemberModal', () => {
     const user = userEvent.setup()
     render(<CreateMemberModal onClose={vi.fn()} onSuccess={vi.fn()} />)
 
-    const [deptTrigger, roleTrigger] = screen.getAllByRole('combobox')
+    const deptTrigger = screen.getByTestId('create-member-department-select')
+    const roleTrigger = screen.getByRole('combobox')
     expect(roleTrigger).toHaveTextContent('members.normal')
     expect(roleTrigger).not.toHaveTextContent('dataset_operator')
 
     await user.click(deptTrigger)
-    await user.click(await screen.findByText('Engineering'))
+    await user.click(screen.getByTestId('department-tree-item-dept-1'))
 
     expect(deptTrigger).toHaveTextContent('Engineering')
     expect(deptTrigger).not.toHaveTextContent('dept-1')
@@ -142,10 +180,8 @@ describe('CreateMemberModal', () => {
     await user.clear(passwordInput)
     await user.type(passwordInput, 'pass123')
 
-    const deptTrigger = screen.getAllByRole('combobox')[0]
-    await user.click(deptTrigger)
-    const deptOption = await screen.findByText('Engineering')
-    await user.click(deptOption)
+    await user.click(screen.getByTestId('create-member-department-select'))
+    await user.click(screen.getByTestId('department-tree-item-dept-1-1'))
 
     const createBtn = screen.getByRole('button', { name: /operation\.create/i })
     await user.click(createBtn)
@@ -155,7 +191,7 @@ describe('CreateMemberModal', () => {
         name: 'John Doe',
         email: 'john@example.com',
         password: encryptPassword('pass123'),
-        department_id: 'dept-1',
+        department_id: 'dept-1-1',
         role: 'normal',
         is_department_admin: false,
       },
@@ -175,9 +211,8 @@ describe('CreateMemberModal', () => {
     await user.type(screen.getByPlaceholderText('members.namePlaceholder'), 'Jane Doe')
     await user.type(screen.getByPlaceholderText('members.emailPlaceholder'), 'jane@example.com')
 
-    const deptTrigger = screen.getAllByRole('combobox')[0]
-    await user.click(deptTrigger)
-    await user.click(await screen.findByText('Engineering'))
+    await user.click(screen.getByTestId('create-member-department-select'))
+    await user.click(screen.getByTestId('department-tree-item-dept-1'))
 
     await user.click(screen.getByRole('button', { name: /operation\.create/i }))
 

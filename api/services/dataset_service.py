@@ -128,7 +128,10 @@ class DatasetService:
                 else:
                     return [], 0
             else:
-                if user.current_role != TenantAccountRole.OWNER or not include_all:
+                skip_sharing_filter = TenantAccountRole.is_privileged_role(user.current_role) and include_all
+                if not skip_sharing_filter and tenant_id:
+                    skip_sharing_filter = DepartmentService.is_department_admin(user.id, tenant_id)
+                if not skip_sharing_filter:
                     if permitted_dataset_ids and len(permitted_dataset_ids) > 0:
                         query = query.where(
                             sa.or_(
@@ -1139,22 +1142,22 @@ class DatasetService:
         if dataset.tenant_id != user.current_tenant_id:
             logger.debug("User %s does not have permission to access dataset %s", user.id, dataset.id)
             raise NoPermissionError("You do not have permission to access this dataset.")
-        if user.current_role != TenantAccountRole.OWNER:
-            if dataset.permission == DatasetPermissionEnum.ONLY_ME and dataset.created_by != user.id:
-                logger.debug("User %s does not have permission to access dataset %s", user.id, dataset.id)
-                raise NoPermissionError("You do not have permission to access this dataset.")
-            if dataset.permission == DatasetPermissionEnum.PARTIAL_TEAM:
-                # For partial team permission, user needs explicit permission or be the creator
-                if dataset.created_by != user.id:
-                    user_permission = (
-                        db.session.query(DatasetPermission).filter_by(dataset_id=dataset.id, account_id=user.id).first()
-                    )
-                    if not user_permission:
-                        logger.debug("User %s does not have permission to access dataset %s", user.id, dataset.id)
-                        raise NoPermissionError("You do not have permission to access this dataset.")
-
         from services.department_service import DepartmentService
         from services.errors.department import DepartmentPermissionDeniedError
+
+        if not TenantAccountRole.is_privileged_role(user.current_role):
+            sharing_denied = False
+            if dataset.permission == DatasetPermissionEnum.ONLY_ME and dataset.created_by != user.id:
+                sharing_denied = True
+            elif dataset.permission == DatasetPermissionEnum.PARTIAL_TEAM and dataset.created_by != user.id:
+                user_permission = (
+                    db.session.query(DatasetPermission).filter_by(dataset_id=dataset.id, account_id=user.id).first()
+                )
+                if not user_permission:
+                    sharing_denied = True
+            if sharing_denied and not DepartmentService.is_department_admin(user.id, user.current_tenant_id):
+                logger.debug("User %s does not have permission to access dataset %s", user.id, dataset.id)
+                raise NoPermissionError("You do not have permission to access this dataset.")
 
         try:
             DepartmentService.assert_department_access(
@@ -1192,7 +1195,7 @@ class DatasetService:
         if not user:
             raise ValueError("User not found")
 
-        if user.current_role != TenantAccountRole.OWNER:
+        if not TenantAccountRole.is_privileged_role(user.current_role):
             if dataset.permission == DatasetPermissionEnum.ONLY_ME:
                 if dataset.created_by != user.id:
                     raise NoPermissionError("You do not have permission to access this dataset.")

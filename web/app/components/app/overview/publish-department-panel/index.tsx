@@ -50,7 +50,13 @@ const PublishDepartmentPanel: FC<PublishDepartmentPanelProps> = ({ appId }) => {
             : publishedDepts.map(d => d.name).join(', ')}
         </div>
         {canEdit && (
-          <Button size="small" variant="ghost" onClick={() => setModalOpen(true)}>
+          <Button
+            size="small"
+            variant="secondary"
+            className="min-w-[88px] gap-1"
+            onClick={() => setModalOpen(true)}
+          >
+            <span className="i-ri-edit-line h-3.5 w-3.5" />
             {t('department.publishEditButton', { ns: 'common' })}
           </Button>
         )}

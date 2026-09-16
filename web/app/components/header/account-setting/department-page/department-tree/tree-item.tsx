@@ -21,17 +21,26 @@ type TreeItemProps = {
   node: DepartmentTreeNode
   depth: number
   isAdmin: boolean
+  manageableDepartmentIds?: string[]
   onManage?: (id: string) => void
   onDelete?: (id: string) => void
 }
 
-export default function TreeItem({ node, depth, isAdmin, onManage, onDelete }: TreeItemProps) {
+export default function TreeItem({
+  node,
+  depth,
+  isAdmin,
+  manageableDepartmentIds = [],
+  onManage,
+  onDelete,
+}: TreeItemProps) {
   const { t } = useTranslation()
   const [expanded, setExpanded] = useState(true)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const deleteMutation = useDeleteDepartmentMutation()
   const hasChildren = node.children.length > 0
   const isDefault = node.is_default
+  const canManage = isAdmin || manageableDepartmentIds.includes(node.id)
 
   const handleToggle = () => {
     if (hasChildren)
@@ -100,7 +109,12 @@ export default function TreeItem({ node, depth, isAdmin, onManage, onDelete }: T
           <Button
             size="small"
             variant="ghost"
-            onClick={() => onManage?.(node.id)}
+            disabled={!canManage}
+            onClick={() => {
+              if (!canManage)
+                return
+              onManage?.(node.id)
+            }}
           >
             {t('department.manage', { ns: 'common' })}
           </Button>
@@ -126,6 +140,7 @@ export default function TreeItem({ node, depth, isAdmin, onManage, onDelete }: T
               node={child}
               depth={depth + 1}
               isAdmin={isAdmin}
+              manageableDepartmentIds={manageableDepartmentIds}
               onManage={onManage}
               onDelete={onDelete}
             />

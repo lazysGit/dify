@@ -26,9 +26,12 @@ const List = () => {
   const { t } = useTranslation()
   const { systemFeatures } = useGlobalPublicStore()
   const { isCurrentWorkspaceOwner } = useAppContext()
+  const isCurrentWorkspaceManager = useAppContextSelector(state => state.isCurrentWorkspaceManager)
   const showTagManagementModal = useTagStore(s => s.showTagManagementModal)
   const { showExternalApiPanel, setShowExternalApiPanel } = useExternalApiPanel()
-  const [includeAll, { toggle: toggleIncludeAll }] = useBoolean(false)
+  const [includeAll, { toggle: toggleIncludeAll }] = useBoolean(
+    isCurrentWorkspaceManager && !isCurrentWorkspaceOwner,
+  )
   useDocumentTitle(t('knowledge', { ns: 'dataset' }))
 
   const [keywords, setKeywords] = useState('')
@@ -51,20 +54,14 @@ const List = () => {
     handleTagsUpdate()
   }
 
-  const isCurrentWorkspaceManager = useAppContextSelector(state => state.isCurrentWorkspaceManager)
   const { data: apiBaseInfo } = useDatasetApiBaseUrl()
 
   return (
     <div className="scroll-container relative flex grow flex-col overflow-y-auto bg-background-body">
       <div className="sticky top-0 z-10 flex flex-col gap-2 bg-background-body px-12 pb-2 pt-4">
-        <DepartmentFilterTabs
-          resourceType="dataset"
-          selectedDepartmentId={departmentId}
-          onDepartmentChange={setDepartmentId}
-        />
         <div className="flex items-center justify-end gap-x-1">
           <div className="flex items-center justify-center gap-2">
-            {isCurrentWorkspaceOwner && (
+            {isCurrentWorkspaceManager && (
               <CheckboxWithLabel
                 isChecked={includeAll}
                 onChange={toggleIncludeAll}
@@ -74,6 +71,11 @@ const List = () => {
                 tooltip={t('allKnowledgeDescription', { ns: 'dataset' }) as string}
               />
             )}
+            <DepartmentFilterTabs
+              resourceType="dataset"
+              selectedDepartmentId={departmentId}
+              onDepartmentChange={setDepartmentId}
+            />
             <TagFilter type="knowledge" value={tagFilterValue} onChange={handleTagsChange} />
             <Input
               showLeftIcon
