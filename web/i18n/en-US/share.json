@@ -28,6 +28,7 @@
   "common.appNotFound": "App not found.",
   "common.appUnavailable": "App is unavailable",
   "common.appUnknownError": "App is unavailable",
+  "common.embedLinkInvalid": "This embed link is invalid.",
   "common.returnToConsole": "Return to Console",
   "common.welcome": "",
   "generation.batchFailed.info": "{{num}} failed executions",

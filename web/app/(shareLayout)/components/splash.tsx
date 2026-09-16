@@ -3,11 +3,12 @@ import type { FC, PropsWithChildren } from 'react'
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import ChatAccessGuard from '@/app/(shareLayout)/components/chat-access-guard'
+import { isChatbotPath } from '@/app/(shareLayout)/components/embed-access'
 import AppUnavailable from '@/app/components/base/app-unavailable'
 import Loading from '@/app/components/base/loading'
 import { useGlobalPublicStore } from '@/context/global-public-context'
 import { useWebAppStore } from '@/context/web-app-context'
-import { useRouter, useSearchParams } from '@/next/navigation'
+import { usePathname, useRouter, useSearchParams } from '@/next/navigation'
 import { fetchAccessToken } from '@/service/share'
 import { setWebAppAccessToken, setWebAppPassport, webAppLoginStatus, webAppLogout } from '@/service/webapp-auth'
 
@@ -18,11 +19,14 @@ const Splash: FC<PropsWithChildren> = ({ children }) => {
   const webAppAccessMode = useWebAppStore(s => s.webAppAccessMode)
   const embeddedUserId = useWebAppStore(s => s.embeddedUserId)
   const searchParams = useSearchParams()
+  const pathname = usePathname()
   const router = useRouter()
   const redirectUrl = searchParams.get('redirect_url')
   const message = searchParams.get('message')
   const code = searchParams.get('code')
   const tokenFromUrl = searchParams.get('web_sso_token')
+  const embedToken = searchParams.get('embed_token')
+  const skipDepartmentGuard = Boolean(systemFeatures.department_access_control && isChatbotPath(pathname))
   const getSigninUrl = useCallback(() => {
     const params = new URLSearchParams(searchParams)
     params.delete('message')
@@ -38,10 +42,14 @@ const Splash: FC<PropsWithChildren> = ({ children }) => {
 
   const [isLoading, setIsLoading] = useState(true)
   useEffect(() => {
-    if (message) {
-      setIsLoading(false)
+    if (skipDepartmentGuard) {
+      if (embedToken && shareCode)
+        setWebAppPassport(shareCode, embedToken)
       return
     }
+
+    if (message)
+      return
 
     if (tokenFromUrl)
       setWebAppAccessToken(tokenFromUrl)
@@ -92,25 +100,35 @@ const Splash: FC<PropsWithChildren> = ({ children }) => {
     webAppAccessMode,
     tokenFromUrl,
     embeddedUserId,
+    skipDepartmentGuard,
+    embedToken,
   ])
 
   if (message) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-y-4">
         <AppUnavailable className="h-auto w-auto" code={code || t('common.appUnavailable', { ns: 'share' })} unknownReason={message} />
-        <span className="system-sm-regular cursor-pointer text-text-tertiary" onClick={backToHome}>{code === '403' ? t('userProfile.logout', { ns: 'common' }) : t('login.backToHome', { ns: 'share' })}</span>
+        <span className="cursor-pointer text-text-tertiary system-sm-regular" onClick={backToHome}>{code === '403' ? t('userProfile.logout', { ns: 'common' }) : t('login.backToHome', { ns: 'share' })}</span>
       </div>
     )
   }
 
-  if (isLoading) {
+  if (skipDepartmentGuard && !embedToken) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <AppUnavailable unknownReason={t('common.embedLinkInvalid', { ns: 'share' })} />
+      </div>
+    )
+  }
+
+  if (isLoading && !skipDepartmentGuard) {
     return (
       <div className="flex h-full items-center justify-center">
         <Loading />
       </div>
     )
   }
-  if (systemFeatures.department_access_control && shareCode) {
+  if (systemFeatures.department_access_control && shareCode && !skipDepartmentGuard) {
     return (
       <ChatAccessGuard appCode={shareCode}>
         {children}

@@ -26,6 +26,7 @@
   "chat.viewChatSettings": "查看对话设置",
   "common.appUnavailable": "应用不可用",
   "common.appUnknownError": "应用不可用",
+  "common.embedLinkInvalid": "嵌入链接无效",
   "common.welcome": "",
   "generation.batchFailed.info": "{{num}} 次运行失败",
   "generation.batchFailed.outputPlaceholder": "无输出内容",
