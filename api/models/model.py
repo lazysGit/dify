@@ -2071,6 +2071,7 @@ class Site(Base):
         sa.DateTime, nullable=False, server_default=func.current_timestamp(), onupdate=func.current_timestamp()
     )
     code = mapped_column(String(255))
+    embed_jti = mapped_column(String(36), nullable=True)
 
     @property
     def custom_disclaimer(self):
