@@ -91,7 +91,7 @@ class DepartmentListApi(Resource):
     @account_initialization_required
     def get(self):
         user, tenant_id = current_account_with_tenant()
-        departments = DepartmentService.get_departments_with_counts(tenant_id)
+        departments = DepartmentService.get_departments_with_counts(tenant_id, user)
         return {
             "departments": departments,
             "tree": DepartmentService.build_tree(departments),

@@ -40,7 +40,7 @@ class TestDepartmentListApi:
             patch(
                 "controllers.console.workspace.department.DepartmentService.get_departments_with_counts",
                 return_value=depts,
-            ),
+            ) as mock_get_counts,
             patch(
                 "controllers.console.workspace.department.DepartmentService.build_tree",
                 return_value=depts,
@@ -61,6 +61,7 @@ class TestDepartmentListApi:
         assert "manageable_department_ids" in result
         assert "is_department_admin" in result
         assert result["is_department_admin"] is True
+        mock_get_counts.assert_called_once_with("t1", user)
 
     def test_post_create_success(self, app):
         api = DepartmentListApi()

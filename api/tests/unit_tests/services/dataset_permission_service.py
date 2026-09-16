@@ -600,11 +600,8 @@ class TestDatasetServiceCheckDatasetPermission:
             created_by="other-user-456",  # Different creator
         )
 
-        from services.department_service import DepartmentService
-
-        with patch.object(DepartmentService, "is_department_admin", return_value=False):
-            with pytest.raises(NoPermissionError, match="You do not have permission to access this dataset"):
-                DatasetService.check_dataset_permission(dataset, user)
+        with pytest.raises(NoPermissionError, match="You do not have permission to access this dataset"):
+            DatasetService.check_dataset_permission(dataset, user)
 
     def test_check_dataset_permission_partial_members_creator_success(self, mock_db_session):
         """

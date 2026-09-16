@@ -316,7 +316,7 @@ class DepartmentService:
         )
 
     @staticmethod
-    def get_departments_with_counts(tenant_id: str) -> list[dict]:
+    def get_departments_with_counts(tenant_id: str, user: Any | None = None) -> list[dict]:
         departments = (
             db.session.query(Department)
             .filter(Department.tenant_id == tenant_id)
@@ -324,6 +324,12 @@ class DepartmentService:
             .all()
         )
         default_dept_id = DepartmentService.get_default_department(tenant_id).id
+        from services.dataset_service import DatasetService
+
+        include_all = bool(user and TenantAccountRole.is_privileged_role(user.current_role))
+        visibility = (
+            DatasetService.sharing_visibility_filter(user, tenant_id, include_all=include_all) if user else None
+        )
         result = []
         for dept in departments:
             member_count = (
@@ -332,11 +338,12 @@ class DepartmentService:
             app_count = (
                 db.session.query(App).filter(func.coalesce(App.department_id, default_dept_id) == dept.id).count()
             )
-            dataset_count = (
-                db.session.query(Dataset)
-                .filter(func.coalesce(Dataset.department_id, default_dept_id) == dept.id)
-                .count()
+            dataset_query = db.session.query(Dataset).filter(
+                func.coalesce(Dataset.department_id, default_dept_id) == dept.id
             )
+            if visibility is not None:
+                dataset_query = dataset_query.filter(visibility)
+            dataset_count = dataset_query.count()
             result.append(
                 {
                     "id": dept.id,

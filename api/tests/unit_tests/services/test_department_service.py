@@ -304,6 +304,41 @@ class TestGetDepartmentsWithCounts:
         assert result[1]["app_count"] == 4
         assert result[1]["dataset_count"] == 2
 
+    @patch("services.dataset_service.DatasetService.sharing_visibility_filter")
+    @patch("services.department_service.db")
+    def test_get_departments_with_counts_applies_viewer_visibility(self, mock_db, mock_vis):
+        from models import TenantAccountRole
+
+        mock_vis.return_value = None
+        mock_session = MagicMock()
+        mock_db.session = mock_session
+        default_dept = _make_dept(dept_id="d0", is_default=True, name="默认部门")
+        query_calls = [0]
+
+        def query_side_effect(model):
+            query_calls[0] += 1
+            mock_q = MagicMock()
+            mock_f = MagicMock()
+            if query_calls[0] == 1:
+                mock_f.order_by.return_value = mock_f
+                mock_f.all.return_value = [default_dept]
+            elif query_calls[0] == 2:
+                mock_f.first.return_value = default_dept
+            else:
+                mock_f.count.return_value = 0
+            mock_q.filter.return_value = mock_f
+            return mock_q
+
+        mock_session.query.side_effect = query_side_effect
+        user = _make_user()
+        user.current_role = TenantAccountRole.EDITOR
+
+        DepartmentService.get_departments_with_counts("t1", user)
+
+        mock_vis.assert_called_once()
+        assert mock_vis.call_args[0][0] is user
+        assert mock_vis.call_args[0][1] == "t1"
+
 
 class TestUpdateDepartment:
     @patch("services.department_service.DepartmentAuditLog")
