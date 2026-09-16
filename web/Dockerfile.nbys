@@ -1,4 +1,5 @@
 # NBYS thin image: reuse official web runtime; copy host `pnpm build` standalone output.
+# Build host frontend with web/.env.nbys (see docs/nbys/production-thin-image-build.md), then:
 # Build context must include public/, .next/standalone/, .next/static/ (see web/.dockerignore).
 FROM langgenius/dify-web:1.13.3
 

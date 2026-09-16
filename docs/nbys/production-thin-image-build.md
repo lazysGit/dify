@@ -2,7 +2,8 @@
 
 基于官方 `langgenius/dify-api:1.13.3` / `langgenius/dify-web:1.13.3`，叠本分支源码后打成 `dify-*:${IMAGE_TAG}`（默认 `1.13.3-nbys`）。
 
-**唯一环境配置**：[`docker/.env.nbys`](../../docker/.env.nbys)  
+**唯一环境配置（编排）**：[`docker/.env.nbys`](../../docker/.env.nbys)  
+**前端薄构建 env**：[`web/.env.nbys`](../../web/.env.nbys)（同域 `/console/api`、`/api`，勿用 `web/.env.local`）  
 **Compose 覆盖（可提交）**：[`docker/docker-compose.nbys.yaml`](../../docker/docker-compose.nbys.yaml)  
 **薄 Dockerfile**：[`api/Dockerfile.nbys`](../../api/Dockerfile.nbys)、[`web/Dockerfile.nbys`](../../web/Dockerfile.nbys)
 
@@ -95,10 +96,14 @@ cd docker
 cd ..
 
 # 1) 宿主机编前端（薄 web 镜像只 COPY 产物）
+# 使用 web/.env.nbys：同域相对前缀。不要直接用 .env.local（会打进 localhost:5001）。
+# .env.production.local 在 next build 时优先级高于 .env.local，建完即删。
 cd web
 pnpm config set registry https://registry.npmmirror.com
 pnpm install --frozen-lockfile
+cp .env.nbys .env.production.local
 NODE_OPTIONS="--max-old-space-size=4096" pnpm build
+rm -f .env.production.local
 cd ..
 
 # 2) 拉官方底座（有本地缓存可跳过）
@@ -130,6 +135,9 @@ sudo mkdir -p \
   /data/dify_data/plugin_daemon \
   /data/dify_data/sandbox/dependencies \
   /data/dify_data/sandbox/conf
+# sandbox 需要 conf/config.yaml；可从仓库示例复制（首次，在 docker/ 目录下）
+cp -n volumes/sandbox/conf/config.yaml* "${VOLUMES_ROOT:-/data/dify_data}/sandbox/conf/" 2>/dev/null || true
+touch "${VOLUMES_ROOT:-/data/dify_data}/sandbox/dependencies/python-requirements.txt"
 
 docker compose -p dify --env-file .env.nbys -f docker-compose.yaml -f docker-compose.nbys.yaml up -d
 docker compose -p dify --env-file .env.nbys -f docker-compose.yaml -f docker-compose.nbys.yaml ps
@@ -150,7 +158,12 @@ docker compose -p dify --env-file .env.nbys -f docker-compose.yaml -f docker-com
 
 ```bash
 git pull
-cd web && pnpm install --frozen-lockfile && NODE_OPTIONS="--max-old-space-size=4096" pnpm build && cd ..
+cd web
+pnpm install --frozen-lockfile
+cp .env.nbys .env.production.local
+NODE_OPTIONS="--max-old-space-size=4096" pnpm build
+rm -f .env.production.local
+cd ..
 cd docker
 export COMMIT_SHA=$(git -C .. rev-parse --short HEAD)
 docker compose -p dify --env-file .env.nbys -f docker-compose.yaml -f docker-compose.nbys.yaml build api web
@@ -196,5 +209,6 @@ ACL 开启时：控制台嵌入弹窗复制的 iframe 应含 `/chatbot/{code}?em
 - `docker compose down -v` 或删除 `VOLUMES_ROOT` 后指望数据还在。
 - 库已初始化后再改 `SECRET_KEY` / `DB_PASSWORD` / `WEAVIATE_API_KEY`（会登不上或对不上旧数据）。
 - 用未 `pnpm build` 的 web 目录直接 `compose build web`（薄 Dockerfile 需要 `.next/standalone`）。
+- 带着开发用 `web/.env.local`（`localhost:5001`）打生产 web 包（会把错误 API 前缀打进 standalone；请用 `web/.env.nbys` → `.env.production.local`）。
 - 漏掉 `-f docker-compose.nbys.yaml`（会仍用 Hub 官方 `langgenius/dify-*:1.13.3`，不含本分支）。
 - 漏掉 `-p dify` / 不用 `name: dify`（容器会落到别的 Compose 项目组，和现网栈对不上）。
