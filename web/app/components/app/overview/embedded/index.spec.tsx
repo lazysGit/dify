@@ -13,10 +13,13 @@ const {
   mockDepartmentAccessControl,
   mockEmbedToken,
   mockResetEmbedToken,
+  embedTokenQueryKey,
 } = vi.hoisted(() => ({
   mockDepartmentAccessControl: { value: false },
   mockEmbedToken: vi.fn(),
   mockResetEmbedToken: vi.fn(),
+  embedTokenQueryKey: (options?: { input?: unknown }) =>
+    ['console', 'apps', 'embedToken', options?.input],
 }))
 
 vi.mock('./style.module.css', () => ({
@@ -69,11 +72,12 @@ vi.mock('@/service/client', () => ({
     apps: {
       embedToken: {
         queryOptions: (options?: Record<string, unknown>) => ({
-          queryKey: ['console', 'apps', 'embedToken'],
+          queryKey: embedTokenQueryKey({ input: (options as { input?: unknown } | undefined)?.input }),
           queryFn: (...args: unknown[]) => mockEmbedToken(...args),
           ...options,
         }),
         key: () => ['console', 'apps', 'embedToken'],
+        queryKey: embedTokenQueryKey,
       },
       resetEmbedToken: {
         mutationOptions: (options?: Record<string, unknown>) => ({
@@ -200,6 +204,67 @@ describe('Embedded', () => {
     })
 
     expect(mockedCopy).toHaveBeenCalledWith(expect.stringContaining('embed_token=jwt-emb'))
+  })
+
+  it('should copy iframe without embed_token when ACL is on and GET fails', async () => {
+    mockDepartmentAccessControl.value = true
+    mockEmbedToken.mockRejectedValue(new Error('embed token unavailable'))
+
+    await act(async () => {
+      render(<Embedded {...baseProps} appId="app-1" />, { wrapper: createWrapper() })
+    })
+
+    await waitFor(() => {
+      expect(mockEmbedToken).toHaveBeenCalled()
+    })
+
+    const actionButton = getCopyButton()
+    const innerDiv = actionButton.querySelector('div')
+    act(() => {
+      fireEvent.click(innerDiv ?? actionButton)
+    })
+
+    expect(mockedCopy).toHaveBeenCalledTimes(1)
+    const copied = mockedCopy.mock.calls[0][0] as string
+    expect(copied).toContain('/chatbot/token')
+    expect(copied).not.toContain('embed_token')
+  })
+
+  it('should use the new embed token from reset POST after confirm succeeds', async () => {
+    mockDepartmentAccessControl.value = true
+    mockEmbedToken.mockResolvedValue({
+      embed_token: 'jwt-old',
+      chatbot_path: '/chatbot/token?embed_token=jwt-old',
+    })
+    mockResetEmbedToken.mockResolvedValue({
+      embed_token: 'jwt-new',
+      chatbot_path: '/chatbot/token?embed_token=jwt-new',
+    })
+
+    await act(async () => {
+      render(<Embedded {...baseProps} appId="app-1" />, { wrapper: createWrapper() })
+    })
+
+    await waitFor(() => {
+      expect(document.body.textContent).toContain('embed_token=jwt-old')
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'appOverview.overview.appInfo.embedded.reset' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'common.operation.confirm' }))
+
+    await waitFor(() => {
+      expect(document.body.textContent).toContain('embed_token=jwt-new')
+    })
+    expect(document.body.textContent).not.toContain('embed_token=jwt-old')
+
+    const actionButton = getCopyButton()
+    const innerDiv = actionButton.querySelector('div')
+    act(() => {
+      fireEvent.click(innerDiv ?? actionButton)
+    })
+
+    expect(mockedCopy).toHaveBeenCalledWith(expect.stringContaining('embed_token=jwt-new'))
+    expect(mockedCopy).not.toHaveBeenCalledWith(expect.stringContaining('embed_token=jwt-old'))
   })
 
   it('opens chrome plugin store link when chrome option selected', async () => {

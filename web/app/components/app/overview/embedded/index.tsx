@@ -126,10 +126,14 @@ const Embedded = ({ siteInfo, isShow, onClose, appBaseUrl, accessToken, appId, c
     enabled: departmentAccessControl && isShow && !!appId,
   }))
   const resetEmbedToken = useMutation(consoleQuery.apps.resetEmbedToken.mutationOptions({
-    onSuccess: () => {
-      void queryClient.invalidateQueries({
-        queryKey: consoleQuery.apps.embedToken.key(),
-      })
+    onSuccess: (data) => {
+      if (appId) {
+        queryClient.setQueryData(
+          consoleQuery.apps.embedToken.queryKey({ input: { params: { appId } } }),
+          data,
+        )
+      }
+      setShowResetConfirm(false)
     },
   }))
   const embedToken = embedTokenPayload?.embed_token
@@ -162,9 +166,9 @@ const Embedded = ({ siteInfo, isShow, onClose, appBaseUrl, accessToken, appId, c
     setShowResetConfirm(true)
   }
   const onConfirmResetEmbedToken = () => {
-    if (appId)
-      resetEmbedToken.mutate({ params: { appId } })
-    setShowResetConfirm(false)
+    if (!appId)
+      return
+    resetEmbedToken.mutate({ params: { appId } })
   }
 
   // when toggle option, reset then copy status
