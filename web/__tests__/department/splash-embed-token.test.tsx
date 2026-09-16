@@ -16,7 +16,7 @@ const mockUpdateUserCanAccessApp = vi.fn()
 let mockPathname = '/chatbot/code1'
 let mockSearchParams = new URLSearchParams()
 let mockDepartmentAccessEnabled = true
-let mockShareCode = 'code1'
+let mockShareCode: string | null = 'code1'
 let mockAppInfoError: Error | null = null
 let mockAppParamsError: Error | null = null
 
@@ -40,7 +40,7 @@ vi.mock('@/context/global-public-context', () => ({
 
 vi.mock('@/context/web-app-context', () => ({
   useWebAppStore: (selector: (state: {
-    shareCode: string
+    shareCode: string | null
     webAppAccessMode: string | null
     embeddedUserId: string | null
     updateAppInfo: typeof mockUpdateAppInfo
@@ -130,7 +130,31 @@ describe('Splash embed token', () => {
     mockWebAppLoginStatus.mockResolvedValue({ userLoggedIn: true, appLoggedIn: true })
   })
 
-  it('persists embed_token and skips ChatAccessGuard on chatbot path when ACL is on', async () => {
+  it('writes embed passport before children first render on chatbot path when ACL is on', () => {
+    mockSearchParams = new URLSearchParams('embed_token=jwt')
+    let passportCallsOnChildFirstRender: unknown[][] | undefined
+
+    const Child = () => {
+      if (passportCallsOnChildFirstRender === undefined)
+        passportCallsOnChildFirstRender = [...mockSetWebAppPassport.mock.calls]
+      return <div data-testid="child">Chat Content</div>
+    }
+
+    render(
+      <Splash>
+        <Child />
+      </Splash>,
+    )
+
+    expect(screen.getByTestId('child')).toBeTruthy()
+    expect(passportCallsOnChildFirstRender).toEqual([['code1', 'jwt']])
+    expect(screen.queryByTestId('chat-access-guard')).toBeNull()
+    expect(mockWebAppLoginStatus).not.toHaveBeenCalled()
+    expect(mockFetchAccessToken).not.toHaveBeenCalled()
+  })
+
+  it('keeps loading when embed_token is present but shareCode is not ready', () => {
+    mockShareCode = null
     mockSearchParams = new URLSearchParams('embed_token=jwt')
 
     render(
@@ -139,13 +163,9 @@ describe('Splash embed token', () => {
       </Splash>,
     )
 
-    await waitFor(() => {
-      expect(screen.getByTestId('child')).toBeTruthy()
-    })
-    expect(mockSetWebAppPassport).toHaveBeenCalledWith('code1', 'jwt')
-    expect(screen.queryByTestId('chat-access-guard')).toBeNull()
-    expect(mockWebAppLoginStatus).not.toHaveBeenCalled()
-    expect(mockFetchAccessToken).not.toHaveBeenCalled()
+    expect(screen.getByTestId('loading')).toBeTruthy()
+    expect(screen.queryByTestId('child')).toBeNull()
+    expect(mockSetWebAppPassport).not.toHaveBeenCalled()
   })
 
   it('shows embed invalid copy without guard when ACL is on and chatbot path has no token', async () => {

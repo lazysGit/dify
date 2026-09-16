@@ -152,7 +152,7 @@ function unicodeToChar(text: string) {
 }
 
 const WBB_APP_LOGIN_PATH = '/webapp-signin'
-function requiredWebSSOLogin(message?: string, code?: number) {
+export function requiredWebSSOLogin(message?: string, code?: number) {
   if (isChatbotPath(globalThis.location.pathname))
     return
 

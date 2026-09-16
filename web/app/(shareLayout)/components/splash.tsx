@@ -42,11 +42,8 @@ const Splash: FC<PropsWithChildren> = ({ children }) => {
 
   const [isLoading, setIsLoading] = useState(true)
   useEffect(() => {
-    if (skipDepartmentGuard) {
-      if (embedToken && shareCode)
-        setWebAppPassport(shareCode, embedToken)
+    if (skipDepartmentGuard)
       return
-    }
 
     if (message)
       return
@@ -101,7 +98,6 @@ const Splash: FC<PropsWithChildren> = ({ children }) => {
     tokenFromUrl,
     embeddedUserId,
     skipDepartmentGuard,
-    embedToken,
   ])
 
   if (message) {
@@ -121,7 +117,20 @@ const Splash: FC<PropsWithChildren> = ({ children }) => {
     )
   }
 
-  if (isLoading && !skipDepartmentGuard) {
+  if (skipDepartmentGuard && embedToken && !shareCode) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <Loading />
+      </div>
+    )
+  }
+
+  if (skipDepartmentGuard && embedToken && shareCode) {
+    setWebAppPassport(shareCode, embedToken)
+    return <>{children}</>
+  }
+
+  if (isLoading) {
     return (
       <div className="flex h-full items-center justify-center">
         <Loading />
