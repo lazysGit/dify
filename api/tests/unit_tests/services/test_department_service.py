@@ -3,8 +3,11 @@ from datetime import datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
+import sqlalchemy as sa
 from sqlalchemy.exc import IntegrityError
 
+from models import TenantAccountRole
+from models.dataset import Dataset
 from models.department import Department
 from models.model import OperationLog
 from services.department_service import DepartmentAuditLog, DepartmentService
@@ -304,40 +307,73 @@ class TestGetDepartmentsWithCounts:
         assert result[1]["app_count"] == 4
         assert result[1]["dataset_count"] == 2
 
-    @patch("services.dataset_service.DatasetService.sharing_visibility_filter")
-    @patch("services.department_service.db")
-    def test_get_departments_with_counts_applies_viewer_visibility(self, mock_db, mock_vis):
-        from models import TenantAccountRole
-
-        mock_vis.return_value = None
-        mock_session = MagicMock()
-        mock_db.session = mock_session
-        default_dept = _make_dept(dept_id="d0", is_default=True, name="默认部门")
-        query_calls = [0]
+    @staticmethod
+    def _mock_departments_with_counts_queries(default_dept):
+        dept_list_called = [False]
+        dataset_queries: list[MagicMock] = []
 
         def query_side_effect(model):
-            query_calls[0] += 1
             mock_q = MagicMock()
             mock_f = MagicMock()
-            if query_calls[0] == 1:
-                mock_f.order_by.return_value = mock_f
-                mock_f.all.return_value = [default_dept]
-            elif query_calls[0] == 2:
-                mock_f.first.return_value = default_dept
+            if model is Department:
+                if not dept_list_called[0]:
+                    dept_list_called[0] = True
+                    mock_f.order_by.return_value = mock_f
+                    mock_f.all.return_value = [default_dept]
+                else:
+                    mock_f.first.return_value = default_dept
+            elif model is Dataset:
+                dataset_queries.append(mock_q)
+                mock_f.count.return_value = 0
+                mock_f.filter.return_value = mock_f
             else:
                 mock_f.count.return_value = 0
             mock_q.filter.return_value = mock_f
             return mock_q
 
+        return query_side_effect, dataset_queries
+
+    @patch("services.dataset_service.DatasetService.sharing_visibility_filter")
+    @patch("services.department_service.db")
+    def test_get_departments_with_counts_editor_applies_sharing_filter(self, mock_db, mock_vis):
+        visibility_clause = sa.true()
+        mock_vis.return_value = visibility_clause
+        mock_session = MagicMock()
+        mock_db.session = mock_session
+        default_dept = _make_dept(dept_id="d0", is_default=True, name="默认部门")
+        query_side_effect, dataset_queries = self._mock_departments_with_counts_queries(default_dept)
         mock_session.query.side_effect = query_side_effect
+
         user = _make_user()
         user.current_role = TenantAccountRole.EDITOR
 
         DepartmentService.get_departments_with_counts("t1", user)
 
-        mock_vis.assert_called_once()
-        assert mock_vis.call_args[0][0] is user
-        assert mock_vis.call_args[0][1] == "t1"
+        mock_vis.assert_called_once_with(user, "t1", include_all=False)
+        assert len(dataset_queries) == 1
+        dataset_query = dataset_queries[0]
+        chained_query = dataset_query.filter.return_value
+        assert dataset_query.filter.call_count == 1
+        chained_query.filter.assert_called_once_with(visibility_clause)
+
+    @patch("services.dataset_service.DatasetService.sharing_visibility_filter")
+    @patch("services.department_service.db")
+    def test_get_departments_with_counts_privileged_skips_sharing_filter(self, mock_db, mock_vis):
+        mock_vis.return_value = None
+        mock_session = MagicMock()
+        mock_db.session = mock_session
+        default_dept = _make_dept(dept_id="d0", is_default=True, name="默认部门")
+        query_side_effect, dataset_queries = self._mock_departments_with_counts_queries(default_dept)
+        mock_session.query.side_effect = query_side_effect
+
+        user = _make_user(is_admin_or_owner=True)
+        user.current_role = TenantAccountRole.ADMIN
+
+        DepartmentService.get_departments_with_counts("t1", user)
+
+        mock_vis.assert_called_once_with(user, "t1", include_all=True)
+        assert len(dataset_queries) == 1
+        assert dataset_queries[0].filter.call_count == 1
 
 
 class TestUpdateDepartment:
