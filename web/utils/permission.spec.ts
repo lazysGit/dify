@@ -47,6 +47,17 @@ describe('permission', () => {
       expect(hasEditPermissionForDataset(creatorId, config)).toBe(true)
     })
 
+    it('returns true when permission is allDepartmentMembers for any user', () => {
+      const config = {
+        createdBy: creatorId,
+        partialMemberList: [],
+        permission: DatasetPermission.allDepartmentMembers,
+      }
+      expect(hasEditPermissionForDataset(userId, config)).toBe(true)
+      expect(hasEditPermissionForDataset(otherUserId, config)).toBe(true)
+      expect(hasEditPermissionForDataset(creatorId, config)).toBe(true)
+    })
+
     it('returns true when permission is partialMembers and user is in list', () => {
       const config = {
         createdBy: creatorId,

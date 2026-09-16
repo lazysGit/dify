@@ -19,6 +19,7 @@ export enum DatasetPermission {
   onlyMe = 'only_me',
   allTeamMembers = 'all_team_members',
   partialMembers = 'partial_members',
+  allDepartmentMembers = 'all_department_members',
 }
 
 export enum ChunkingMode {
