@@ -96,6 +96,7 @@ class TestGetDatasetsDepartmentFiltering:
     @patch("services.dataset_service.db")
     def test_department_id_exact_filter(self, mock_db, mock_dept_service):
         mock_dept_service.get_accessible_department_ids.return_value = None
+        mock_dept_service.get_user_department_id.return_value = None
 
         mock_pagination = MagicMock()
         mock_pagination.items = []
@@ -209,6 +210,7 @@ def _compiled_get_datasets_sql(mock_db) -> str:
 def _stub_get_datasets_db(mock_db, mock_dept_service) -> None:
     mock_dept_service.get_accessible_department_ids.return_value = None
     mock_dept_service.is_department_admin.return_value = False
+    mock_dept_service.get_user_department_id.return_value = None
     mock_pagination = MagicMock()
     mock_pagination.items = []
     mock_pagination.total = 0
@@ -252,7 +254,7 @@ class TestGetDatasetsAdminIncludeAll:
 
     @patch("services.department_service.DepartmentService")
     @patch("services.dataset_service.db")
-    def test_department_admin_skips_sharing_filter(self, mock_db, mock_dept_service):
+    def test_department_admin_still_applies_sharing_filter(self, mock_db, mock_dept_service):
         _stub_get_datasets_db(mock_db, mock_dept_service)
         mock_dept_service.is_department_admin.return_value = True
         user = _make_user(role=TenantAccountRole.EDITOR, is_admin_or_owner=False)
@@ -260,8 +262,102 @@ class TestGetDatasetsAdminIncludeAll:
         DatasetService.get_datasets(1, 20, "t1", user)
 
         compiled = _compiled_get_datasets_sql(mock_db).lower()
-        assert "only_me" not in compiled
-        mock_dept_service.is_department_admin.assert_called_once_with(user.id, "t1")
+        assert "only_me" in compiled
+
+
+class TestSharingVisibilityFilter:
+    @patch("services.department_service.DepartmentService")
+    @patch("services.dataset_service.db")
+    def test_editor_filter_includes_only_me_self_and_all_team(self, mock_db, mock_dept_service):
+        mock_db.session.query.return_value.filter_by.return_value.all.return_value = []
+        mock_dept_service.get_user_department_id.return_value = None
+        user = _make_user(role=TenantAccountRole.EDITOR, is_admin_or_owner=False)
+
+        clause = DatasetService.sharing_visibility_filter(user, "t1")
+        assert clause is not None
+        compiled = str(clause.compile(compile_kwargs={"literal_binds": True})).lower()
+        assert "only_me" in compiled
+        assert "all_team_members" in compiled
+        assert "u1" in compiled
+
+    @patch("services.dataset_service.db")
+    def test_privileged_with_include_all_has_no_sharing_filter(self, mock_db):
+        user = _make_user(role=TenantAccountRole.ADMIN, is_admin_or_owner=True)
+
+        clause = DatasetService.sharing_visibility_filter(user, "t1", include_all=True)
+        assert clause is None
+        mock_db.session.query.assert_not_called()
+
+    @patch("services.department_service.DepartmentService")
+    @patch("services.dataset_service.db")
+    def test_editor_filter_includes_all_department_members(self, mock_db, mock_dept_service):
+        mock_db.session.query.return_value.filter_by.return_value.all.return_value = []
+        mock_dept_service.get_user_department_id.return_value = "d-rd"
+        default_dept = MagicMock()
+        default_dept.id = "d-default"
+        mock_dept_service.get_default_department.return_value = default_dept
+        user = _make_user(role=TenantAccountRole.EDITOR, is_admin_or_owner=False)
+
+        clause = DatasetService.sharing_visibility_filter(user, "t1")
+        compiled = str(clause.compile(compile_kwargs={"literal_binds": True})).lower()
+        assert "all_department_members" in compiled
+        assert "d-rd" in compiled
+        assert "only_me" in compiled
+        assert "all_team_members" in compiled
+
+    @patch("services.department_service.DepartmentService")
+    @patch("services.dataset_service.db")
+    def test_operator_filter_includes_same_department_without_partial_list(self, mock_db, mock_dept_service):
+        mock_db.session.query.return_value.filter_by.return_value.all.return_value = []
+        mock_dept_service.get_user_department_id.return_value = "d-rd"
+        default_dept = MagicMock()
+        default_dept.id = "d-default"
+        mock_dept_service.get_default_department.return_value = default_dept
+        user = _make_user(role=TenantAccountRole.DATASET_OPERATOR, is_admin_or_owner=False)
+
+        clause = DatasetService.sharing_visibility_filter(user, "t1")
+        compiled = str(clause.compile(compile_kwargs={"literal_binds": True})).lower()
+        assert "all_department_members" in compiled
+        assert "d-rd" in compiled
+        assert "all_team_members" not in compiled
+
+    @patch("services.department_service.DepartmentService")
+    @patch("services.dataset_service.db")
+    def test_no_user_department_omits_department_match_id(self, mock_db, mock_dept_service):
+        mock_db.session.query.return_value.filter_by.return_value.all.return_value = []
+        mock_dept_service.get_user_department_id.return_value = None
+        user = _make_user(role=TenantAccountRole.EDITOR, is_admin_or_owner=False)
+
+        clause = DatasetService.sharing_visibility_filter(user, "t1")
+        compiled = str(clause.compile(compile_kwargs={"literal_binds": True})).lower()
+        assert "all_team_members" in compiled
+        mock_dept_service.get_default_department.assert_not_called()
+
+    @patch("services.department_service.DepartmentService")
+    def test_user_in_dataset_department_exact_match_and_default(self, mock_dept_service):
+        mock_dept_service.get_user_department_id.return_value = "d-rd"
+        default_dept = MagicMock()
+        default_dept.id = "d-default"
+        mock_dept_service.get_default_department.return_value = default_dept
+        user = _make_user()
+        same = _make_dataset(department_id="d-rd")
+        other = _make_dataset(department_id="d-fe")
+        unset = _make_dataset(department_id=None)
+
+        assert DatasetService.user_in_dataset_department(user, same, "t1") is True
+        assert DatasetService.user_in_dataset_department(user, other, "t1") is False
+        assert DatasetService.user_in_dataset_department(user, unset, "t1") is False
+
+        mock_dept_service.get_user_department_id.return_value = "d-default"
+        assert DatasetService.user_in_dataset_department(user, unset, "t1") is True
+
+    @patch("services.department_service.DepartmentService")
+    def test_user_in_dataset_department_false_without_membership(self, mock_dept_service):
+        mock_dept_service.get_user_department_id.return_value = None
+        user = _make_user()
+        dataset = _make_dataset(department_id="d-rd")
+        assert DatasetService.user_in_dataset_department(user, dataset, "t1") is False
+        mock_dept_service.get_default_department.assert_not_called()
 
 
 class TestCreateDatasetDepartmentOwnership:

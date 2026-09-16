@@ -109,6 +109,65 @@ logger = logging.getLogger(__name__)
 
 class DatasetService:
     @staticmethod
+    def user_in_dataset_department(user: Any, dataset: Any, tenant_id: str) -> bool:
+        from services.department_service import DepartmentService
+
+        user_dept_id = DepartmentService.get_user_department_id(user.id, tenant_id)
+        if not user_dept_id:
+            return False
+        default_dept_id = DepartmentService.get_default_department(tenant_id).id
+        return user_dept_id == (dataset.department_id or default_dept_id)
+
+    @staticmethod
+    def _department_members_clause(user: Any, tenant_id: str | None):
+        from services.department_service import DepartmentService
+
+        if not tenant_id:
+            return sa.false()
+        user_dept_id = DepartmentService.get_user_department_id(user.id, tenant_id)
+        if not user_dept_id:
+            return sa.false()
+        default_dept_id = DepartmentService.get_default_department(tenant_id).id
+        return sa.and_(
+            Dataset.permission == DatasetPermissionEnum.ALL_DEPARTMENT,
+            func.coalesce(Dataset.department_id, default_dept_id) == user_dept_id,
+        )
+
+    @staticmethod
+    def sharing_visibility_filter(user: Any, tenant_id: str | None, include_all: bool = False):
+        if user is None:
+            return None
+        if TenantAccountRole.is_privileged_role(user.current_role) and include_all:
+            return None
+
+        dataset_permission = (
+            db.session.query(DatasetPermission).filter_by(account_id=user.id, tenant_id=tenant_id).all()
+        )
+        permitted_dataset_ids = {dp.dataset_id for dp in dataset_permission} if dataset_permission else None
+        department_clause = DatasetService._department_members_clause(user, tenant_id)
+
+        if user.current_role == TenantAccountRole.DATASET_OPERATOR:
+            if permitted_dataset_ids:
+                return sa.or_(department_clause, Dataset.id.in_(permitted_dataset_ids))
+            return department_clause
+
+        if permitted_dataset_ids:
+            return sa.or_(
+                Dataset.permission == DatasetPermissionEnum.ALL_TEAM,
+                sa.and_(Dataset.permission == DatasetPermissionEnum.ONLY_ME, Dataset.created_by == user.id),
+                sa.and_(
+                    Dataset.permission == DatasetPermissionEnum.PARTIAL_TEAM,
+                    Dataset.id.in_(permitted_dataset_ids),
+                ),
+                department_clause,
+            )
+        return sa.or_(
+            Dataset.permission == DatasetPermissionEnum.ALL_TEAM,
+            sa.and_(Dataset.permission == DatasetPermissionEnum.ONLY_ME, Dataset.created_by == user.id),
+            department_clause,
+        )
+
+    @staticmethod
     def get_datasets(
         page, per_page, tenant_id=None, user=None, search=None, tag_ids=None, include_all=False, department_id=None
     ):
@@ -117,43 +176,9 @@ class DatasetService:
         if user:
             from services.department_service import DepartmentService
 
-            dataset_permission = (
-                db.session.query(DatasetPermission).filter_by(account_id=user.id, tenant_id=tenant_id).all()
-            )
-            permitted_dataset_ids = {dp.dataset_id for dp in dataset_permission} if dataset_permission else None
-
-            if user.current_role == TenantAccountRole.DATASET_OPERATOR:
-                if permitted_dataset_ids and len(permitted_dataset_ids) > 0:
-                    query = query.where(Dataset.id.in_(permitted_dataset_ids))
-                else:
-                    return [], 0
-            else:
-                skip_sharing_filter = TenantAccountRole.is_privileged_role(user.current_role) and include_all
-                if not skip_sharing_filter and tenant_id:
-                    skip_sharing_filter = DepartmentService.is_department_admin(user.id, tenant_id)
-                if not skip_sharing_filter:
-                    if permitted_dataset_ids and len(permitted_dataset_ids) > 0:
-                        query = query.where(
-                            sa.or_(
-                                Dataset.permission == DatasetPermissionEnum.ALL_TEAM,
-                                sa.and_(
-                                    Dataset.permission == DatasetPermissionEnum.ONLY_ME, Dataset.created_by == user.id
-                                ),
-                                sa.and_(
-                                    Dataset.permission == DatasetPermissionEnum.PARTIAL_TEAM,
-                                    Dataset.id.in_(permitted_dataset_ids),
-                                ),
-                            )
-                        )
-                    else:
-                        query = query.where(
-                            sa.or_(
-                                Dataset.permission == DatasetPermissionEnum.ALL_TEAM,
-                                sa.and_(
-                                    Dataset.permission == DatasetPermissionEnum.ONLY_ME, Dataset.created_by == user.id
-                                ),
-                            )
-                        )
+            clause = DatasetService.sharing_visibility_filter(user, tenant_id, include_all=include_all)
+            if clause is not None:
+                query = query.where(clause)
 
             if tenant_id:
                 accessible = DepartmentService.get_accessible_department_ids(user, tenant_id)
@@ -1142,22 +1167,22 @@ class DatasetService:
         if dataset.tenant_id != user.current_tenant_id:
             logger.debug("User %s does not have permission to access dataset %s", user.id, dataset.id)
             raise NoPermissionError("You do not have permission to access this dataset.")
-        from services.department_service import DepartmentService
-        from services.errors.department import DepartmentPermissionDeniedError
-
         if not TenantAccountRole.is_privileged_role(user.current_role):
-            sharing_denied = False
             if dataset.permission == DatasetPermissionEnum.ONLY_ME and dataset.created_by != user.id:
-                sharing_denied = True
-            elif dataset.permission == DatasetPermissionEnum.PARTIAL_TEAM and dataset.created_by != user.id:
-                user_permission = (
-                    db.session.query(DatasetPermission).filter_by(dataset_id=dataset.id, account_id=user.id).first()
-                )
-                if not user_permission:
-                    sharing_denied = True
-            if sharing_denied and not DepartmentService.is_department_admin(user.id, user.current_tenant_id):
                 logger.debug("User %s does not have permission to access dataset %s", user.id, dataset.id)
                 raise NoPermissionError("You do not have permission to access this dataset.")
+            if dataset.permission == DatasetPermissionEnum.PARTIAL_TEAM:
+                # For partial team permission, user needs explicit permission or be the creator
+                if dataset.created_by != user.id:
+                    user_permission = (
+                        db.session.query(DatasetPermission).filter_by(dataset_id=dataset.id, account_id=user.id).first()
+                    )
+                    if not user_permission:
+                        logger.debug("User %s does not have permission to access dataset %s", user.id, dataset.id)
+                        raise NoPermissionError("You do not have permission to access this dataset.")
+
+        from services.department_service import DepartmentService
+        from services.errors.department import DepartmentPermissionDeniedError
 
         try:
             DepartmentService.assert_department_access(

@@ -112,6 +112,7 @@ class DatasetPermissionEnum(enum.StrEnum):
     ONLY_ME = "only_me"
     ALL_TEAM = "all_team_members"
     PARTIAL_TEAM = "partial_members"
+    ALL_DEPARTMENT = "all_department_members"
 
 
 class Dataset(Base):

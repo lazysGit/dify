@@ -687,19 +687,10 @@ class TestDocumentStatusApi:
             with pytest.raises(InvalidActionError):
                 api.patch("tenant_123", "dataset_123", "invalid_action")
 
-    """Test DatasetPermissionEnum values."""
 
-    def test_only_me_permission(self):
-        """Test ONLY_ME permission value."""
-        assert DatasetPermissionEnum.ONLY_ME is not None
-
-    def test_all_team_permission(self):
-        """Test ALL_TEAM permission value."""
-        assert DatasetPermissionEnum.ALL_TEAM is not None
-
-    def test_partial_team_permission(self):
-        """Test PARTIAL_TEAM permission value."""
-        assert DatasetPermissionEnum.PARTIAL_TEAM is not None
+class TestDatasetPermissionEnumValues:
+    def test_all_department_permission(self):
+        assert DatasetPermissionEnum.ALL_DEPARTMENT == "all_department_members"
 
 
 class TestDatasetErrors:
