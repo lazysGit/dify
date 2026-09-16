@@ -1,4 +1,4 @@
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
 from functools import wraps
 from typing import Concatenate, ParamSpec, TypeVar
@@ -82,7 +82,17 @@ def decode_jwt_token(app_code: str | None = None, user_id: str | None = None):
             decoded, app_code, app_web_auth_enabled, system_features.webapp_auth.enabled, webapp_settings
         )
 
-        if system_features.department_access_control and end_user.is_anonymous:
+        # Flask-Login's EndUser.is_anonymous is always False; the DB flag is _is_anonymous.
+        is_anonymous = (
+            bool(end_user._is_anonymous)
+            if hasattr(end_user, "_is_anonymous")
+            else bool(getattr(end_user, "is_anonymous", False))
+        )
+        if (
+            system_features.department_access_control
+            and is_anonymous
+            and not _is_valid_embed_passport(decoded, site, app_model)
+        ):
             raise Unauthorized("Anonymous access is not allowed under department access control.")
 
         return app_model, end_user
@@ -98,6 +108,20 @@ def decode_jwt_token(app_code: str | None = None, user_id: str | None = None):
                 raise WebAppAuthRequiredError()
 
         raise Unauthorized(e.description)
+
+
+def _is_valid_embed_passport(decoded: Mapping[str, object], site: Site, app_model: App) -> bool:
+    """True only for a resettable embed passport that still matches the live site."""
+    token_jti = decoded.get("jti")
+    site_jti = getattr(site, "embed_jti", None)
+    return (
+        decoded.get("channel") == "embed"
+        and bool(token_jti)
+        and bool(site_jti)
+        and token_jti == site_jti
+        and app_model.enable_site is True
+        and getattr(site, "status", "normal") == "normal"
+    )
 
 
 def _validate_webapp_token(decoded, app_web_auth_enabled: bool, system_webapp_auth_enabled: bool):
