@@ -1,5 +1,5 @@
 import type { InferContractRouterInputs } from '@orpc/contract'
-import { appDeleteContract } from './console/apps'
+import { appDeleteContract, appSiteEmbedTokenContract, appSiteEmbedTokenResetContract } from './console/apps'
 import { bindPartnerStackContract, invoicesContract } from './console/billing'
 import { departmentRouterContract } from './console/departments'
 import {
@@ -53,6 +53,8 @@ export const consoleRouterContract = {
   systemFeatures: systemFeaturesContract,
   apps: {
     deleteApp: appDeleteContract,
+    embedToken: appSiteEmbedTokenContract,
+    resetEmbedToken: appSiteEmbedTokenResetContract,
   },
   explore: {
     apps: exploreAppsContract,

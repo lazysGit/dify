@@ -57,6 +57,8 @@
   "overview.appInfo.embedded.entry": "嵌入",
   "overview.appInfo.embedded.explanation": "选择一种方式将聊天应用嵌入到你的网站中",
   "overview.appInfo.embedded.iframe": "将以下 iframe 嵌入到你的网站中的目标位置",
+  "overview.appInfo.embedded.reset": "重置嵌入凭证",
+  "overview.appInfo.embedded.resetConfirm": "重置后已嵌入外站的代码将失效，需要重新复制。确定重置吗？",
   "overview.appInfo.embedded.scripts": "将以下代码嵌入到你的网站中",
   "overview.appInfo.embedded.title": "嵌入到网站中",
   "overview.appInfo.enableTooltip.description": "要启用此功能，请在画布中添加用户输入节点。（草稿中可能已存在，发布后生效）",

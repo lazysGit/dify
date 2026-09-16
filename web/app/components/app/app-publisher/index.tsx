@@ -478,6 +478,7 @@ const AppPublisher = ({
           onClose={() => setEmbeddingModalOpen(false)}
           appBaseUrl={appBaseURL}
           accessToken={accessToken}
+          appId={appDetail?.id}
         />
         {showAppAccessControl && <AccessControl app={appDetail!} onConfirm={handleAccessControlUpdate} onClose={() => { setShowAppAccessControl(false) }} />}
       </PortalToFollowElem>

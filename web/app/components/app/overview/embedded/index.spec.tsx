@@ -1,11 +1,23 @@
+import type { ReactNode } from 'react'
 import type { SiteInfo } from '@/models/share'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import copy from 'copy-to-clipboard'
 import * as React from 'react'
 
 import { act } from 'react'
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import Embedded from './index'
+
+const {
+  mockDepartmentAccessControl,
+  mockEmbedToken,
+  mockResetEmbedToken,
+} = vi.hoisted(() => ({
+  mockDepartmentAccessControl: { value: false },
+  mockEmbedToken: vi.fn(),
+  mockResetEmbedToken: vi.fn(),
+}))
 
 vi.mock('./style.module.css', () => ({
   default: {
@@ -44,8 +56,58 @@ vi.mock('@/app/components/base/chat/embedded-chatbot/theme/theme-context', () =>
 vi.mock('@/context/app-context', () => ({
   useAppContext: () => mockUseAppContext(),
 }))
+vi.mock('@/context/global-public-context', () => ({
+  useGlobalPublicStore: (selector: (s: { systemFeatures: { department_access_control: boolean } }) => unknown) =>
+    selector({
+      systemFeatures: {
+        department_access_control: mockDepartmentAccessControl.value,
+      },
+    }),
+}))
+vi.mock('@/service/client', () => ({
+  consoleQuery: {
+    apps: {
+      embedToken: {
+        queryOptions: (options?: Record<string, unknown>) => ({
+          queryKey: ['console', 'apps', 'embedToken'],
+          queryFn: (...args: unknown[]) => mockEmbedToken(...args),
+          ...options,
+        }),
+        key: () => ['console', 'apps', 'embedToken'],
+      },
+      resetEmbedToken: {
+        mutationOptions: (options?: Record<string, unknown>) => ({
+          mutationKey: ['console', 'apps', 'resetEmbedToken'],
+          mutationFn: (...args: unknown[]) => mockResetEmbedToken(...args),
+          ...options,
+        }),
+      },
+    },
+  },
+}))
 const mockWindowOpen = vi.spyOn(window, 'open').mockImplementation(() => null)
 const mockedCopy = vi.mocked(copy)
+
+const createWrapper = () => {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+      },
+      mutations: {
+        retry: false,
+      },
+    },
+  })
+
+  const Wrapper = ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={queryClient}>
+      {children}
+    </QueryClientProvider>
+  )
+
+  return Wrapper
+}
 
 const siteInfo: SiteInfo = {
   title: 'test site',
@@ -73,6 +135,9 @@ describe('Embedded', () => {
   afterEach(() => {
     vi.clearAllMocks()
     mockWindowOpen.mockClear()
+    mockDepartmentAccessControl.value = false
+    mockEmbedToken.mockReset()
+    mockResetEmbedToken.mockReset()
   })
 
   afterAll(() => {
@@ -81,7 +146,7 @@ describe('Embedded', () => {
 
   it('builds theme and copies iframe snippet', async () => {
     await act(async () => {
-      render(<Embedded {...baseProps} />)
+      render(<Embedded {...baseProps} />, { wrapper: createWrapper() })
     })
 
     const actionButton = getCopyButton()
@@ -94,9 +159,52 @@ describe('Embedded', () => {
     expect(mockedCopy).toHaveBeenCalledWith(expect.stringContaining('/chatbot/token'))
   })
 
+  it('should copy iframe without embed_token when department ACL is off', async () => {
+    mockDepartmentAccessControl.value = false
+
+    await act(async () => {
+      render(<Embedded {...baseProps} appId="app-1" />, { wrapper: createWrapper() })
+    })
+
+    const actionButton = getCopyButton()
+    const innerDiv = actionButton.querySelector('div')
+    act(() => {
+      fireEvent.click(innerDiv ?? actionButton)
+    })
+
+    expect(mockedCopy).toHaveBeenCalledTimes(1)
+    const copied = mockedCopy.mock.calls[0][0] as string
+    expect(copied).toContain('/chatbot/token')
+    expect(copied).not.toContain('embed_token')
+  })
+
+  it('should copy iframe with embed_token when department ACL is on', async () => {
+    mockDepartmentAccessControl.value = true
+    mockEmbedToken.mockResolvedValue({
+      embed_token: 'jwt-emb',
+      chatbot_path: '/chatbot/token?embed_token=jwt-emb',
+    })
+
+    await act(async () => {
+      render(<Embedded {...baseProps} appId="app-1" />, { wrapper: createWrapper() })
+    })
+
+    await waitFor(() => {
+      expect(document.body.textContent).toContain('embed_token=jwt-emb')
+    })
+
+    const actionButton = getCopyButton()
+    const innerDiv = actionButton.querySelector('div')
+    act(() => {
+      fireEvent.click(innerDiv ?? actionButton)
+    })
+
+    expect(mockedCopy).toHaveBeenCalledWith(expect.stringContaining('embed_token=jwt-emb'))
+  })
+
   it('opens chrome plugin store link when chrome option selected', async () => {
     await act(async () => {
-      render(<Embedded {...baseProps} />)
+      render(<Embedded {...baseProps} />, { wrapper: createWrapper() })
     })
 
     const optionButtons = document.body.querySelectorAll('[class*="option"]')

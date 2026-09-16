@@ -57,6 +57,8 @@
   "overview.appInfo.embedded.entry": "Embedded",
   "overview.appInfo.embedded.explanation": "Choose the way to embed chat app to your website",
   "overview.appInfo.embedded.iframe": "To add the chat app any where on your website, add this iframe to your html code.",
+  "overview.appInfo.embedded.reset": "Reset embed credential",
+  "overview.appInfo.embedded.resetConfirm": "Existing embed snippets will stop working. Reset?",
   "overview.appInfo.embedded.scripts": "To add a chat app to the bottom right of your website add this code to your html.",
   "overview.appInfo.embedded.title": "Embed on website",
   "overview.appInfo.enableTooltip.description": "To enable this feature, please add a User Input node to the canvas. (May already exist in draft, takes effect after publishing)",
