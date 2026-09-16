@@ -114,3 +114,86 @@ class TestCheckDatasetPermissionDepartmentGuard:
             with pytest.raises(NoPermissionError, match="You do not have permission"):
                 DatasetService.check_dataset_permission(dataset, user)
             mock_check.assert_not_called()
+
+
+class TestCheckDatasetPermissionAllDepartment:
+    def test_same_department_member_allowed(self) -> None:
+        user = _make_user(role=TenantAccountRole.EDITOR)
+        dataset = _make_dataset(
+            permission=DatasetPermissionEnum.ALL_DEPARTMENT,
+            department_id="d-rd",
+            created_by="other-user",
+        )
+        from services.department_service import DepartmentService
+
+        with (
+            patch.object(DatasetService, "user_in_dataset_department", return_value=True),
+            patch.object(DepartmentService, "assert_department_access", return_value=None),
+        ):
+            DatasetService.check_dataset_permission(dataset, user)
+
+    def test_other_department_denied_before_acl(self) -> None:
+        user = _make_user(role=TenantAccountRole.EDITOR)
+        dataset = _make_dataset(
+            permission=DatasetPermissionEnum.ALL_DEPARTMENT,
+            department_id="d-fe",
+            created_by="u1",
+        )
+        from services.department_service import DepartmentService
+
+        with (
+            patch.object(DatasetService, "user_in_dataset_department", return_value=False),
+            patch.object(DepartmentService, "assert_department_access", return_value=None) as mock_acl,
+        ):
+            with pytest.raises(NoPermissionError, match="You do not have permission"):
+                DatasetService.check_dataset_permission(dataset, user)
+            mock_acl.assert_not_called()
+
+    def test_parent_department_admin_denied(self) -> None:
+        user = _make_user(role=TenantAccountRole.EDITOR)
+        dataset = _make_dataset(
+            permission=DatasetPermissionEnum.ALL_DEPARTMENT,
+            department_id="d-fe",
+            created_by="other-user",
+        )
+        from services.department_service import DepartmentService
+
+        with (
+            patch.object(DepartmentService, "is_department_admin", return_value=True),
+            patch.object(DatasetService, "user_in_dataset_department", return_value=False),
+            patch.object(DepartmentService, "assert_department_access", return_value=None) as mock_acl,
+        ):
+            with pytest.raises(NoPermissionError):
+                DatasetService.check_dataset_permission(dataset, user)
+            mock_acl.assert_not_called()
+
+    def test_privileged_skips_department_sharing(self) -> None:
+        user = _make_user(role=TenantAccountRole.ADMIN)
+        dataset = _make_dataset(
+            permission=DatasetPermissionEnum.ALL_DEPARTMENT,
+            department_id="d-fe",
+            created_by="other-user",
+        )
+        from services.department_service import DepartmentService
+
+        with (
+            patch.object(DatasetService, "user_in_dataset_department") as mock_same,
+            patch.object(DepartmentService, "assert_department_access", return_value=None),
+        ):
+            DatasetService.check_dataset_permission(dataset, user)
+            mock_same.assert_not_called()
+
+
+class TestCheckDatasetOperatorPermissionAllDepartment:
+    def test_operator_same_department_allowed(self) -> None:
+        user = _make_user(role=TenantAccountRole.DATASET_OPERATOR)
+        dataset = _make_dataset(permission=DatasetPermissionEnum.ALL_DEPARTMENT, department_id="d-rd")
+        with patch.object(DatasetService, "user_in_dataset_department", return_value=True):
+            DatasetService.check_dataset_operator_permission(user=user, dataset=dataset)
+
+    def test_operator_other_department_denied(self) -> None:
+        user = _make_user(role=TenantAccountRole.DATASET_OPERATOR)
+        dataset = _make_dataset(permission=DatasetPermissionEnum.ALL_DEPARTMENT, department_id="d-fe")
+        with patch.object(DatasetService, "user_in_dataset_department", return_value=False):
+            with pytest.raises(NoPermissionError):
+                DatasetService.check_dataset_operator_permission(user=user, dataset=dataset)

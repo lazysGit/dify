@@ -1180,6 +1180,10 @@ class DatasetService:
                     if not user_permission:
                         logger.debug("User %s does not have permission to access dataset %s", user.id, dataset.id)
                         raise NoPermissionError("You do not have permission to access this dataset.")
+            if dataset.permission == DatasetPermissionEnum.ALL_DEPARTMENT:
+                if not DatasetService.user_in_dataset_department(user, dataset, user.current_tenant_id):
+                    logger.debug("User %s does not have permission to access dataset %s", user.id, dataset.id)
+                    raise NoPermissionError("You do not have permission to access this dataset.")
 
         from services.department_service import DepartmentService
         from services.errors.department import DepartmentPermissionDeniedError
@@ -1230,6 +1234,10 @@ class DatasetService:
                     dp.dataset_id == dataset.id
                     for dp in db.session.query(DatasetPermission).filter_by(account_id=user.id).all()
                 ):
+                    raise NoPermissionError("You do not have permission to access this dataset.")
+
+            elif dataset.permission == DatasetPermissionEnum.ALL_DEPARTMENT:
+                if not DatasetService.user_in_dataset_department(user, dataset, user.current_tenant_id):
                     raise NoPermissionError("You do not have permission to access this dataset.")
 
     @staticmethod
