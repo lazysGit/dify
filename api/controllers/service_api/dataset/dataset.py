@@ -359,8 +359,12 @@ class DatasetApi(DatasetApiResource):
 
         if payload.partial_member_list and payload.permission == DatasetPermissionEnum.PARTIAL_TEAM:
             DatasetPermissionService.update_partial_member_list(tenant_id, dataset_id_str, payload.partial_member_list)
-        # clear partial member list when permission is only_me or all_team_members
-        elif payload.permission in {DatasetPermissionEnum.ONLY_ME, DatasetPermissionEnum.ALL_TEAM}:
+        # clear partial member list when permission is only_me, all_team_members, or all_department_members
+        elif payload.permission in {
+            DatasetPermissionEnum.ONLY_ME,
+            DatasetPermissionEnum.ALL_TEAM,
+            DatasetPermissionEnum.ALL_DEPARTMENT,
+        }:
             DatasetPermissionService.clear_partial_member_list(dataset_id_str)
 
         partial_member_list = DatasetPermissionService.get_dataset_partial_member_list(dataset_id_str)

@@ -850,6 +850,51 @@ class TestDatasetApiPatch:
 
         assert result["partial_member_list"] == []
 
+    def test_patch_all_department_members_clears_partial_list(self, app):
+        api = DatasetApi()
+        method = unwrap(api.patch)
+
+        dataset_id = "dataset-id"
+        payload = {"permission": "all_department_members"}
+
+        dataset = MagicMock()
+        dataset.id = dataset_id
+        dataset.permission = "all_department_members"
+        dataset.indexing_technique = "economy"
+        dataset.embedding_model_provider = None
+        dataset.embedding_available = True
+        dataset.built_in_field_enabled = False
+        dataset.is_published = False
+        dataset.enable_api = False
+        dataset.is_multimodal = False
+        dataset.documents = []
+        dataset.retrieval_model_dict = {}
+        dataset.tags = []
+        dataset.external_knowledge_info = None
+        dataset.external_retrieval_model = None
+        dataset.doc_metadata = []
+        dataset.icon_info = None
+        dataset.summary_index_setting = MagicMock()
+        dataset.summary_index_setting.enable = False
+
+        with (
+            app.test_request_context(f"/datasets/{dataset_id}"),
+            patch.object(type(console_ns), "payload", payload),
+            patch(
+                "controllers.console.datasets.datasets.current_account_with_tenant",
+                return_value=(MagicMock(), "tenant"),
+            ),
+            patch.object(DatasetService, "get_dataset", return_value=dataset),
+            patch.object(DatasetPermissionService, "check_permission", return_value=None),
+            patch.object(DatasetService, "update_dataset", return_value=dataset),
+            patch.object(DatasetPermissionService, "clear_partial_member_list", return_value=None) as mock_clear,
+            patch.object(DatasetPermissionService, "get_dataset_partial_member_list", return_value=[]),
+        ):
+            result, _ = method(api, dataset_id)
+
+        mock_clear.assert_called_once_with(dataset_id)
+        assert result["partial_member_list"] == []
+
 
 class TestDatasetApiDelete:
     def test_delete_success(self, app):
