@@ -1,0 +1,26 @@
+# NBYS thin image: reuse official runtime (.venv / nltk / tiktoken), overlay branch source + uv sync.
+FROM langgenius/dify-api:1.13.3
+
+WORKDIR /app/api
+
+USER root
+
+ARG UV_DEFAULT_INDEX=
+ENV UV_DEFAULT_INDEX=${UV_DEFAULT_INDEX}
+
+# Ensure uv is available (official image usually has it; reinstall is cached if unchanged)
+RUN if ! command -v uv >/dev/null 2>&1; then \
+      pip install --no-cache-dir -i "${UV_DEFAULT_INDEX:-https://mirrors.aliyun.com/pypi/simple/}" uv; \
+    fi
+
+# Lock files first so unchanged deps hit Docker layer cache on uv sync
+COPY --chown=dify:dify pyproject.toml uv.lock ./
+RUN uv sync --locked --no-dev
+
+# Overlay full branch tree (api/.dockerignore excludes .venv — keep synced env)
+COPY --chown=dify:dify . .
+
+ARG COMMIT_SHA=dev
+ENV COMMIT_SHA=${COMMIT_SHA}
+
+USER dify

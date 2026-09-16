@@ -11,8 +11,13 @@ dist
 build
 coverage
 .husky
-.next
 .pnpm-store
+# Keep host pnpm build artifacts for Dockerfile.nbys thin image
+.next/*
+!.next/standalone
+!.next/standalone/**
+!.next/static
+!.next/static/**
 
 # vscode
 .vscode

@@ -1,0 +1,16 @@
+# NBYS thin image: reuse official web runtime; copy host `pnpm build` standalone output.
+# Build context must include public/, .next/standalone/, .next/static/ (see web/.dockerignore).
+FROM langgenius/dify-web:1.13.3
+
+WORKDIR /app/web
+
+USER root
+
+COPY --chown=dify:dify public ./public
+COPY --chown=dify:dify .next/standalone ./
+COPY --chown=dify:dify .next/static ./.next/static
+
+ARG COMMIT_SHA=dev
+ENV COMMIT_SHA=${COMMIT_SHA}
+
+USER dify
