@@ -115,6 +115,7 @@ describe('Departments Tab Gating', () => {
     vi.doMock('@/context/app-context', () => ({
       useAppContext: () => ({
         isCurrentWorkspaceManager: false,
+        isCurrentWorkspaceEditor: true,
         isCurrentWorkspaceDatasetOperator: false,
       }),
     }))

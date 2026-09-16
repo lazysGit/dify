@@ -83,6 +83,14 @@ SYSTEM_MODELS = [
 ]
 
 
+def _make_default_model(provider="openai", model="gpt-4", model_type="llm"):
+    default = MagicMock()
+    default.model = model
+    default.model_type = model_type
+    default.provider.provider = provider
+    return default
+
+
 def _patch_system_models(mock_svc_cls):
     svc_instance = mock_svc_cls.return_value
 
@@ -91,12 +99,10 @@ def _patch_system_models(mock_svc_cls):
         for provider, model in SYSTEM_MODELS:
             if str(model.model_type) == model_type:
                 by_provider.setdefault(provider, []).append(model)
-        return [
-            _make_provider_response(provider=p, models=ms)
-            for p, ms in sorted(by_provider.items())
-        ]
+        return [_make_provider_response(provider=p, models=ms) for p, ms in sorted(by_provider.items())]
 
     svc_instance.get_models_by_model_type.side_effect = get_models_by_model_type
+    svc_instance.get_default_model_of_model_type.return_value = None
     return svc_instance
 
 
@@ -254,6 +260,36 @@ class TestGetFilteredModels:
 
         assert len(result) == 1
         assert len(result[0].models) == 2
+
+    @patch("services.model_permission_service.ModelProviderService")
+    @patch("services.model_permission_service.db")
+    def test_get_filtered_models_unrestricted_returns_workspace_default(self, mock_db, mock_svc_cls):
+        mock_session = MagicMock()
+        mock_db.session = mock_session
+        _mock_query_chain(mock_session, first_return=None)
+        svc_instance = _patch_system_models(mock_svc_cls)
+        svc_instance.get_default_model_of_model_type.return_value = _make_default_model(model="gpt-4")
+
+        user = _make_user(user_id="u2", is_admin_or_owner=False)
+        result = ModelPermissionService.get_filtered_models("u2", "t1", "llm", user)
+
+        assert len(result) == 1
+        assert [m.model for m in result[0].models] == ["gpt-4"]
+
+    @patch("services.model_permission_service.ModelProviderService")
+    @patch("services.model_permission_service.db")
+    def test_get_filtered_models_restricted_unions_workspace_default(self, mock_db, mock_svc_cls):
+        mock_session = MagicMock()
+        mock_db.session = mock_session
+        rows = [_make_whitelist_row(provider_name="openai", model_name="gpt-4o", model_type="llm")]
+        _mock_query_chain(mock_session, first_return=MagicMock(), all_return=rows)
+        svc_instance = _patch_system_models(mock_svc_cls)
+        svc_instance.get_default_model_of_model_type.return_value = _make_default_model(model="gpt-4")
+
+        user = _make_user(user_id="u2", is_admin_or_owner=False)
+        result = ModelPermissionService.get_filtered_models("u2", "t1", "llm", user)
+
+        assert [m.model for m in result[0].models] == ["gpt-4", "gpt-4o"]
 
     @patch("services.model_permission_service.ModelProviderService")
     @patch("services.model_permission_service.db")

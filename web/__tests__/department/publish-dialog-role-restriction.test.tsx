@@ -98,6 +98,7 @@ describe('PublishDepartmentModal role restriction', () => {
     expect(screen.getByRole('checkbox', { name: 'Tech' })).toBeEnabled()
     expect(screen.getByRole('checkbox', { name: 'Marketing' })).toBeDisabled()
     expect(screen.getByText('publish.own_department_only_hint')).toBeInTheDocument()
+    expect(screen.getByText('department.publishPersonalOnlyHint')).toBeInTheDocument()
   })
 
   it('should allow all departments for tenant admin', async () => {

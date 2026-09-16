@@ -58,6 +58,19 @@ class TestResolveConsoleAccount:
         result = _resolve_console_account(MagicMock())
         assert result.id == "acc-1"
 
+    @patch("controllers.web.passport.extract_access_token", return_value="valid-token")
+    @patch("controllers.web.passport.PassportService")
+    @patch("controllers.web.passport.db")
+    def test_console_jwt_user_id_returns_account(
+        self, mock_db: MagicMock, mock_passport_cls: MagicMock, mock_extract: MagicMock
+    ) -> None:
+        # AccountService.get_account_jwt_token issues {"user_id": account.id}, not account_id.
+        mock_passport_cls.return_value.verify.return_value = {"user_id": "acc-1", "sub": "Console API Passport"}
+        account = SimpleNamespace(id="acc-1")
+        mock_db.session.scalar.return_value = account
+        result = _resolve_console_account(MagicMock())
+        assert result.id == "acc-1"
+
 
 class TestPassportDepartmentGate:
     @patch("controllers.web.passport.extract_access_token", return_value=None)

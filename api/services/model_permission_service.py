@@ -1,10 +1,14 @@
 """Model permission service: per-member model whitelist management and filtering.
 
 Semantics (see docs plan 2026-09-03 model-permissions-and-publish-gate):
-- No ``account_model_whitelist`` rows for an account means "unrestricted":
-  every system model of the tenant is usable (backward compatible default).
-- Rows present mean "restricted": only whitelisted (provider, model, model_type)
-  triples pass. Owners/admins are never restricted, regardless of rows.
+- No ``account_model_whitelist`` rows for an account means the member has not
+  been given extra models: they may use the workspace default model of each
+  type (matching the members-page copy that unchecked models are forbidden).
+  If the workspace has no default for that type, the full catalogue is kept so
+  a first-run workspace is not locked out.
+- Rows present mean "restricted": whitelist triples pass, always unioned with
+  the workspace default of the requested type (defaults cannot be unchecked).
+- Owners/admins are never restricted, regardless of rows.
 - The catalogue of system models comes from ``ModelProviderService.get_models_by_model_type``
   per model type; there is deliberately no repository layer for the small config
   table (``DepartmentService`` precedent).
@@ -146,18 +150,29 @@ class ModelPermissionService:
 
         Response shape is identical to the underlying service so the frontend
         model-type endpoint can swap implementations without client changes:
-        admins/owners and unrestricted accounts get the untouched result, while
-        restricted accounts get each provider's ``models`` pruned to whitelist
-        hits (providers with zero hits are dropped entirely).
+        admins/owners get the untouched catalogue. Other members keep whitelist
+        hits (if any) unioned with the workspace default of ``model_type``.
         """
-        provider_responses = ModelProviderService().get_models_by_model_type(tenant_id, model_type)
-        if user.is_admin_or_owner or not ModelPermissionService.is_restricted(account_id, tenant_id):
+        provider_service = ModelProviderService()
+        provider_responses = provider_service.get_models_by_model_type(tenant_id, model_type)
+        if user.is_admin_or_owner:
             return provider_responses
 
-        allowed = {
-            (entry["provider_name"], entry["model_name"], entry["model_type"])
-            for entry in ModelPermissionService.get_whitelist(account_id, tenant_id)
-        }
+        allowed: set[tuple[str, str, str]] = set()
+        restricted = ModelPermissionService.is_restricted(account_id, tenant_id)
+        if restricted:
+            allowed = {
+                (entry["provider_name"], entry["model_name"], entry["model_type"])
+                for entry in ModelPermissionService.get_whitelist(account_id, tenant_id)
+            }
+
+        default = provider_service.get_default_model_of_model_type(tenant_id, model_type)
+        if default is not None:
+            allowed.add((default.provider.provider, default.model, str(default.model_type)))
+
+        if not allowed:
+            return provider_responses if not restricted else []
+
         filtered: list[ProviderWithModelsResponse] = []
         for response in provider_responses:
             kept_models = [

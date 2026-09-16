@@ -375,6 +375,25 @@ class TestGetDepartmentsWithCounts:
         assert len(dataset_queries) == 1
         assert dataset_queries[0].filter.call_count == 1
 
+    @patch("services.dataset_service.DatasetService.sharing_visibility_filter")
+    @patch("services.department_service.db")
+    def test_get_departments_with_counts_dataset_query_includes_tenant_id(self, mock_db, mock_vis):
+        mock_vis.return_value = None
+        mock_session = MagicMock()
+        mock_db.session = mock_session
+        default_dept = _make_dept(dept_id="d0", is_default=True, name="默认部门")
+        query_side_effect, dataset_queries = self._mock_departments_with_counts_queries(default_dept)
+        mock_session.query.side_effect = query_side_effect
+
+        user = _make_user()
+        user.current_role = TenantAccountRole.EDITOR
+        DepartmentService.get_departments_with_counts("t1", user)
+
+        args = dataset_queries[0].filter.call_args[0]
+        compiled = " ".join(str(arg.compile(compile_kwargs={"literal_binds": True})) for arg in args).lower()
+        assert "tenant_id" in compiled
+        assert "t1" in compiled
+
 
 class TestUpdateDepartment:
     @patch("services.department_service.DepartmentAuditLog")

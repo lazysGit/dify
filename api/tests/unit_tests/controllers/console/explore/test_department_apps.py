@@ -1,8 +1,10 @@
 from datetime import datetime
+from pathlib import Path
 from unittest.mock import MagicMock, PropertyMock, patch
 
 import pytest
 
+import controllers.console as console_pkg
 import controllers.console.explore.department_app as dept_module
 import controllers.console.explore.installed_app as installed_module
 from services.feature_service import FeatureService
@@ -44,6 +46,12 @@ def member_user(tenant_id):
     user.current_tenant = MagicMock(id=tenant_id)
     user.is_admin_or_owner = False
     return user
+
+
+class TestDepartmentAppRouteRegistration:
+    def test_console_init_imports_department_app(self):
+        init_source = Path(console_pkg.__file__).read_text(encoding="utf-8")
+        assert "department_app" in init_source
 
 
 class TestDepartmentAppListApi:

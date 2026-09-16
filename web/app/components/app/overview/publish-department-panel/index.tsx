@@ -16,13 +16,13 @@ type PublishDepartmentPanelProps = {
 
 const PublishDepartmentPanel: FC<PublishDepartmentPanelProps> = ({ appId }) => {
   const { t } = useTranslation()
-  const { isCurrentWorkspaceManager } = useAppContext()
+  const { isCurrentWorkspaceEditor } = useAppContext()
   const { data: deptData, isLoading: deptLoading } = useDepartmentList()
   const { data: publishData, isLoading: publishLoading } = usePublishDepartments(appId)
   const updateMutation = useUpdatePublishDepartmentsMutation(appId)
   const [modalOpen, setModalOpen] = useState(false)
 
-  const canEdit = isCurrentWorkspaceManager
+  const canEdit = isCurrentWorkspaceEditor
 
   if (deptLoading || publishLoading)
     return <Loading />

@@ -110,6 +110,7 @@ from .datasets.rag_pipeline import (
 # Import explore controllers
 from .explore import (
     banner,
+    department_app,
     installed_app,
     parameter,
     recommended_app,
@@ -166,6 +167,7 @@ __all__ = [
     "datasource_auth",
     "datasource_content_preview",
     "department",
+    "department_app",
     "email_register",
     "endpoint",
     "extension",

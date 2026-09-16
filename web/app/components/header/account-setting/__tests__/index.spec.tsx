@@ -6,6 +6,7 @@ import { useState } from 'react'
 import { useAppContext } from '@/context/app-context'
 import { baseProviderContextValue, useProviderContext } from '@/context/provider-context'
 import useBreakpoints, { MediaType } from '@/hooks/use-breakpoints'
+import { useDepartmentList } from '@/service/use-departments'
 import { ACCOUNT_SETTING_TAB } from '../constants'
 import AccountSetting from '../index'
 
@@ -70,6 +71,14 @@ vi.mock('@/service/use-common', () => ({
   useProviderContext: vi.fn(),
 }))
 
+vi.mock('@/service/use-departments', () => ({
+  useDepartmentList: vi.fn(() => ({
+    data: { is_department_admin: false },
+    isError: false,
+    isLoading: false,
+  })),
+}))
+
 const baseAppContextValue: AppContextValue = {
   userProfile: {
     id: '1',
@@ -109,6 +118,48 @@ const baseAppContextValue: AppContextValue = {
   useSelector: vi.fn(),
   isLoadingCurrentWorkspace: false,
   isValidatingCurrentWorkspace: false,
+}
+
+const editorAppContext: AppContextValue = {
+  ...baseAppContextValue,
+  isCurrentWorkspaceManager: false,
+  isCurrentWorkspaceOwner: false,
+  isCurrentWorkspaceEditor: true,
+  isCurrentWorkspaceDatasetOperator: false,
+  currentWorkspace: { ...baseAppContextValue.currentWorkspace, role: 'editor' },
+}
+
+const normalAppContext: AppContextValue = {
+  ...baseAppContextValue,
+  isCurrentWorkspaceManager: false,
+  isCurrentWorkspaceOwner: false,
+  isCurrentWorkspaceEditor: false,
+  isCurrentWorkspaceDatasetOperator: false,
+  currentWorkspace: { ...baseAppContextValue.currentWorkspace, role: 'normal' },
+}
+
+const workplaceTabLabels = [
+  'common.settings.workplaceGroup',
+  'common.settings.provider',
+  'common.settings.members',
+  'common.settings.departments',
+  'common.settings.billing',
+  'common.settings.dataSource',
+  'common.settings.apiBasedExtension',
+  'custom.custom',
+] as const
+
+const expectWorkplaceTabsHidden = () => {
+  for (const label of workplaceTabLabels)
+    expect(screen.queryByText(label)).not.toBeInTheDocument()
+  expect(screen.getAllByText('common.settings.language').length).toBeGreaterThan(0)
+}
+
+const expectWorkplaceTabsVisible = () => {
+  expect(screen.getByText('common.settings.workplaceGroup')).toBeInTheDocument()
+  expect(screen.getByText('common.settings.provider')).toBeInTheDocument()
+  expect(screen.getAllByText('common.settings.members').length).toBeGreaterThan(0)
+  expect(screen.getByText('common.settings.language')).toBeInTheDocument()
 }
 
 describe('AccountSetting', () => {
@@ -156,6 +207,11 @@ describe('AccountSetting', () => {
     })
     vi.mocked(useAppContext).mockReturnValue(baseAppContextValue)
     vi.mocked(useBreakpoints).mockReturnValue(MediaType.pc)
+    vi.mocked(useDepartmentList).mockReturnValue({
+      data: { is_department_admin: false },
+      isError: false,
+      isLoading: false,
+    } as ReturnType<typeof useDepartmentList>)
   })
 
   describe('Rendering', () => {
@@ -202,16 +258,77 @@ describe('AccountSetting', () => {
       // Arrange
       vi.mocked(useAppContext).mockReturnValue({
         ...baseAppContextValue,
+        isCurrentWorkspaceManager: false,
+        isCurrentWorkspaceOwner: false,
+        isCurrentWorkspaceEditor: false,
         isCurrentWorkspaceDatasetOperator: true,
+        currentWorkspace: { ...baseAppContextValue.currentWorkspace, role: 'dataset_operator' },
       })
 
       // Act
       renderAccountSetting()
 
       // Assert
-      expect(screen.queryByText('common.settings.provider')).not.toBeInTheDocument()
-      expect(screen.queryByText('common.settings.members')).not.toBeInTheDocument()
-      expect(screen.getByText('common.settings.language')).toBeInTheDocument()
+      expectWorkplaceTabsHidden()
+    })
+
+    it('should show workplace tabs for workspace admin', () => {
+      vi.mocked(useAppContext).mockReturnValue({
+        ...baseAppContextValue,
+        isCurrentWorkspaceManager: true,
+        isCurrentWorkspaceOwner: false,
+        isCurrentWorkspaceEditor: true,
+        isCurrentWorkspaceDatasetOperator: false,
+        currentWorkspace: { ...baseAppContextValue.currentWorkspace, role: 'admin' },
+      })
+
+      renderAccountSetting()
+
+      expectWorkplaceTabsVisible()
+    })
+
+    it('should show workplace tabs for editor who is department admin', () => {
+      vi.mocked(useAppContext).mockReturnValue(editorAppContext)
+      vi.mocked(useDepartmentList).mockReturnValue({
+        data: { is_department_admin: true },
+        isError: false,
+        isLoading: false,
+      } as ReturnType<typeof useDepartmentList>)
+
+      renderAccountSetting()
+
+      expectWorkplaceTabsVisible()
+      expect(screen.getByText('common.settings.departments')).toBeInTheDocument()
+    })
+
+    it('should hide workplace tabs for editor who is not department admin', () => {
+      vi.mocked(useAppContext).mockReturnValue(editorAppContext)
+
+      renderAccountSetting()
+
+      expectWorkplaceTabsHidden()
+    })
+
+    it('should hide workplace tabs for normal members even if they are department admin', () => {
+      vi.mocked(useAppContext).mockReturnValue(normalAppContext)
+      vi.mocked(useDepartmentList).mockReturnValue({
+        data: { is_department_admin: true },
+        isError: false,
+        isLoading: false,
+      } as ReturnType<typeof useDepartmentList>)
+
+      renderAccountSetting()
+
+      expectWorkplaceTabsHidden()
+    })
+
+    it('should fall back to language when a hidden workplace tab is requested', () => {
+      vi.mocked(useAppContext).mockReturnValue(editorAppContext)
+
+      renderAccountSetting({ initialTab: ACCOUNT_SETTING_TAB.MEMBERS })
+
+      expectWorkplaceTabsHidden()
+      expect(screen.getByText('common.language.displayLanguage')).toBeInTheDocument()
     })
 
     it('should hide billing and custom tabs when disabled', () => {

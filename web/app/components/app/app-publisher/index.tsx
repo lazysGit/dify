@@ -40,6 +40,7 @@ import Tooltip from '../../base/tooltip'
 import ShortcutsName from '../../workflow/shortcuts-name'
 import { getKeyboardKeyCodeBySystem } from '../../workflow/utils'
 import AccessControl from '../app-access-control'
+import { usePublishDepartmentGate } from '../overview/use-publish-department-gate'
 import PublishWithMultipleModel from './publish-with-multiple-model'
 import SuggestedAction from './suggested-action'
 
@@ -140,6 +141,7 @@ const AppPublisher = ({
   const appDetail = useAppStore(state => state.appDetail)
   const setAppDetail = useAppStore(s => s.setAppDetail)
   const systemFeatures = useGlobalPublicStore(s => s.systemFeatures)
+  const { publishWithScope, modal: departmentScopeModal } = usePublishDepartmentGate(appDetail?.id)
   const { formatTimeFromNow } = useFormatTimeFromNow()
   const { app_base_url: appBaseURL = '', access_token: accessToken = '' } = appDetail?.site ?? {}
 
@@ -177,14 +179,18 @@ const AppPublisher = ({
 
   const handlePublish = useCallback(async (params?: ModelAndParameter | PublishWorkflowParams) => {
     try {
-      await onPublish?.(params)
+      const publishedOk = await publishWithScope(async () => {
+        await onPublish?.(params)
+      })
+      if (!publishedOk)
+        return
       setPublished(true)
       trackEvent('app_published_time', { action_mode: 'app', app_id: appDetail?.id, app_name: appDetail?.name })
     }
     catch {
       setPublished(false)
     }
-  }, [appDetail, onPublish])
+  }, [appDetail, onPublish, publishWithScope])
 
   const handleRestore = useCallback(async () => {
     try {
@@ -482,6 +488,7 @@ const AppPublisher = ({
         />
         {showAppAccessControl && <AccessControl app={appDetail!} onConfirm={handleAccessControlUpdate} onClose={() => { setShowAppAccessControl(false) }} />}
       </PortalToFollowElem>
+      {departmentScopeModal}
     </>
   )
 }

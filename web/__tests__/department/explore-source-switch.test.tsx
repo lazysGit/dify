@@ -125,7 +125,15 @@ describe('Explore source switch', () => {
     expect(mockUseExploreAppList).toBeDefined()
   })
 
-  it('should use departmentExploreApps when department flag is on', () => {
+  it('should keep recommended templates when department flag is on', () => {
+    mockUseExploreAppList.mockReturnValue({
+      data: {
+        categories: [],
+        allList: [{ app_id: '1', app: { name: 'TemplateApp' }, category: 'test', position: 0 }],
+      },
+      isLoading: false,
+      isError: false,
+    })
     mockUseDepartmentExploreApps.mockReturnValue({
       data: {
         categories: [],
@@ -135,6 +143,6 @@ describe('Explore source switch', () => {
       isError: false,
     })
 
-    expect(mockUseDepartmentExploreApps).toBeDefined()
+    expect(mockUseExploreAppList).toBeDefined()
   })
 })

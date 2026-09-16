@@ -336,10 +336,16 @@ class DepartmentService:
                 db.session.query(TenantAccountJoin).filter(TenantAccountJoin.department_id == dept.id).count()
             )
             app_count = (
-                db.session.query(App).filter(func.coalesce(App.department_id, default_dept_id) == dept.id).count()
+                db.session.query(App)
+                .filter(
+                    App.tenant_id == tenant_id,
+                    func.coalesce(App.department_id, default_dept_id) == dept.id,
+                )
+                .count()
             )
             dataset_query = db.session.query(Dataset).filter(
-                func.coalesce(Dataset.department_id, default_dept_id) == dept.id
+                Dataset.tenant_id == tenant_id,
+                func.coalesce(Dataset.department_id, default_dept_id) == dept.id,
             )
             if visibility is not None:
                 dataset_query = dataset_query.filter(visibility)

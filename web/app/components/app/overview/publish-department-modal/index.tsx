@@ -196,6 +196,9 @@ export default function PublishDepartmentModal({
             {t('publish.own_department_only_hint', { ns: 'common' })}
           </div>
         )}
+        <div className="mt-3 text-text-tertiary system-xs-regular">
+          {t('department.publishPersonalOnlyHint', { ns: 'common' })}
+        </div>
 
         <div className="mt-4 flex justify-end gap-2">
           <Button onClick={() => onOpenChange(false)}>{t('operation.cancel', { ns: 'common' })}</Button>

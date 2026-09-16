@@ -2,6 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import ChatAccessGuard from '@/app/(shareLayout)/components/chat-access-guard'
+import { PUBLIC_API_PREFIX } from '@/config'
 
 const mockReplace = vi.fn()
 let mockDepartmentAccessEnabled = false
@@ -178,7 +179,7 @@ describe('ChatAccessGuard', () => {
 
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/chat-access/verify?app_code=code1'),
+        `${PUBLIC_API_PREFIX}/chat-access/verify?app_code=code1`,
         expect.objectContaining({ credentials: 'include' }),
       )
     })

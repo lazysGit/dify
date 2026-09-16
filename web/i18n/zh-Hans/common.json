@@ -210,6 +210,7 @@
   "department.publishModalTitle": "发布到部门",
   "department.publishPanelEmpty": "未发布到任何部门",
   "department.publishPanelTitle": "部门发布",
+  "department.publishPersonalOnlyHint": "不选择任何部门则仅本人使用，不会出现在部门探索中。",
   "department.publishSaveFailed": "保存发布部门失败",
   "department.publishSaveSuccess": "发布部门保存成功",
   "department.regularMember": "普通成员",

@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import Loading from '@/app/components/base/loading'
+import { PUBLIC_API_PREFIX } from '@/config'
 import { useGlobalPublicStore } from '@/context/global-public-context'
 import { useRouter } from '@/next/navigation'
 
@@ -35,7 +36,7 @@ const ChatAccessGuard = ({
 
     const verify = async () => {
       try {
-        const res = await fetch(`/api/chat-access/verify?app_code=${encodeURIComponent(appCode)}`, {
+        const res = await fetch(`${PUBLIC_API_PREFIX}/chat-access/verify?app_code=${encodeURIComponent(appCode)}`, {
           credentials: 'include',
           signal: controller.signal,
         })

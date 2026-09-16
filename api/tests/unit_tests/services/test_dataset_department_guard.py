@@ -167,6 +167,26 @@ class TestCheckDatasetPermissionAllDepartment:
                 DatasetService.check_dataset_permission(dataset, user)
             mock_acl.assert_not_called()
 
+    def test_creator_transferred_out_denied_via_live_membership(self) -> None:
+        user = _make_user(role=TenantAccountRole.EDITOR)
+        dataset = _make_dataset(
+            permission=DatasetPermissionEnum.ALL_DEPARTMENT,
+            department_id="d-rd",
+            created_by="u1",
+        )
+        from services.department_service import DepartmentService
+
+        default_dept = Mock()
+        default_dept.id = "d-default"
+        with (
+            patch.object(DepartmentService, "get_user_department_id", return_value="d-fe"),
+            patch.object(DepartmentService, "get_default_department", return_value=default_dept),
+            patch.object(DepartmentService, "assert_department_access", return_value=None) as mock_acl,
+        ):
+            with pytest.raises(NoPermissionError, match="You do not have permission"):
+                DatasetService.check_dataset_permission(dataset, user)
+            mock_acl.assert_not_called()
+
     def test_privileged_skips_department_sharing(self) -> None:
         user = _make_user(role=TenantAccountRole.ADMIN)
         dataset = _make_dataset(

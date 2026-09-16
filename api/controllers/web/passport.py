@@ -286,7 +286,8 @@ def _resolve_console_account(req) -> Account | None:
         payload = PassportService().verify(token)
     except Unauthorized:
         return None
-    account_id = payload.get("account_id")
+    # Console JWT from AccountService.get_account_jwt_token carries "user_id".
+    account_id = payload.get("user_id") or payload.get("account_id")
     if not account_id:
         return None
     return db.session.scalar(select(Account).where(Account.id == account_id))

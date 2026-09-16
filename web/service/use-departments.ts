@@ -171,6 +171,54 @@ type DepartmentExploreAppsData = {
   allList: App[]
 }
 
+type DepartmentExploreAppItem = {
+  id: string
+  name: string
+  mode: string
+  icon: string | null
+  icon_type: string | null
+  icon_url?: string | null
+  icon_background: string | null
+  description: string
+  is_installed: boolean
+  is_pinned: boolean
+}
+
+export const mapDepartmentAppsToExploreList = (
+  payload: { department_apps?: DepartmentExploreAppItem[] },
+): DepartmentExploreAppsData => {
+  const departmentApps = payload.department_apps ?? []
+  return {
+    categories: [],
+    allList: departmentApps.map((item, position) => ({
+      app: {
+        id: item.id,
+        mode: item.mode as App['app']['mode'],
+        icon_type: item.icon_type as App['app']['icon_type'],
+        icon: item.icon ?? '',
+        icon_background: item.icon_background ?? '',
+        icon_url: item.icon_url ?? '',
+        name: item.name,
+        description: item.description,
+        use_icon_as_answer_icon: false,
+      },
+      app_id: item.id,
+      description: item.description,
+      copyright: '',
+      privacy_policy: null,
+      custom_disclaimer: null,
+      category: 'Recommended',
+      position,
+      is_listed: true,
+      install_count: 0,
+      installed: item.is_installed,
+      editable: false,
+      is_agent: item.mode === 'agent-chat',
+      can_trial: false,
+    })),
+  }
+}
+
 export const useDepartmentExploreApps = () => {
   const locale = useLocale()
   const input = locale
@@ -182,10 +230,7 @@ export const useDepartmentExploreApps = () => {
     queryKey: [...consoleQuery.explore.departmentApps.queryKey({ input }), language],
     queryFn: async () => {
       const result = await consoleClient.explore.departmentApps(input)
-      return {
-        categories: result.categories,
-        allList: [...result.recommended_apps].sort((a, b) => a.position - b.position),
-      }
+      return mapDepartmentAppsToExploreList(result)
     },
   })
 }

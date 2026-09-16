@@ -112,13 +112,30 @@ export const exploreInstalledAppMetaContract = base
   }>())
   .output(type<AppMeta>())
 
+export type DepartmentExploreApp = {
+  id: string
+  name: string
+  mode: string
+  icon: string | null
+  icon_type: string | null
+  icon_url: string | null
+  icon_background: string | null
+  description: string
+  is_installed: boolean
+  is_pinned: boolean
+}
+
+export type DepartmentExploreAppsResponse = {
+  department_apps: DepartmentExploreApp[]
+}
+
 export const exploreDepartmentAppsContract = base
   .route({
     path: '/explore/department-apps',
     method: 'GET',
   })
   .input(type<{ query?: { language?: string } }>())
-  .output(type<ExploreAppsResponse>())
+  .output(type<DepartmentExploreAppsResponse>())
 
 export const exploreBannersContract = base
   .route({

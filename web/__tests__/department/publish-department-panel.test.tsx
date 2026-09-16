@@ -1,8 +1,12 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import PublishDepartmentPanel from '@/app/components/app/overview/publish-department-panel'
 
 const mockMutateAsync = vi.fn()
+const mockUseAppContext = vi.hoisted(() => vi.fn(() => ({
+  isCurrentWorkspaceManager: true,
+  isCurrentWorkspaceEditor: true,
+})))
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -58,9 +62,7 @@ vi.mock('@/service/use-departments', () => ({
 }))
 
 vi.mock('@/context/app-context', () => ({
-  useAppContext: () => ({
-    isCurrentWorkspaceManager: true,
-  }),
+  useAppContext: () => mockUseAppContext(),
 }))
 
 vi.mock('@/app/components/base/loading', () => ({
@@ -68,6 +70,13 @@ vi.mock('@/app/components/base/loading', () => ({
 }))
 
 describe('PublishDepartmentPanel', () => {
+  beforeEach(() => {
+    mockUseAppContext.mockReturnValue({
+      isCurrentWorkspaceManager: true,
+      isCurrentWorkspaceEditor: true,
+    })
+  })
+
   it('should show published department names', () => {
     render(<PublishDepartmentPanel appId="app-1" />)
     expect(screen.getByText('Engineering')).toBeInTheDocument()
@@ -78,6 +87,24 @@ describe('PublishDepartmentPanel', () => {
     const editButton = screen.getByRole('button', { name: 'department.publishEditButton' })
     expect(editButton).toBeInTheDocument()
     expect(editButton.className).toContain('btn-secondary')
+  })
+
+  it('should show edit button for workspace editor who is not manager', () => {
+    mockUseAppContext.mockReturnValue({
+      isCurrentWorkspaceManager: false,
+      isCurrentWorkspaceEditor: true,
+    })
+    render(<PublishDepartmentPanel appId="app-1" />)
+    expect(screen.getByRole('button', { name: 'department.publishEditButton' })).toBeInTheDocument()
+  })
+
+  it('should hide edit button for non-editor', () => {
+    mockUseAppContext.mockReturnValue({
+      isCurrentWorkspaceManager: false,
+      isCurrentWorkspaceEditor: false,
+    })
+    render(<PublishDepartmentPanel appId="app-1" />)
+    expect(screen.queryByRole('button', { name: 'department.publishEditButton' })).not.toBeInTheDocument()
   })
 
   it('should show empty message when no departments published', () => {

@@ -11,6 +11,7 @@ import { AppModeEnum } from '@/types/app'
 import AppList from '../index'
 
 let mockExploreData: { categories: string[], allList: App[] } | undefined = { categories: [], allList: [] }
+let mockDepartmentData: { categories: string[], allList: App[] } | undefined = { categories: [], allList: [] }
 let mockIsLoading = false
 let mockIsError = false
 const mockHandleImportDSL = vi.fn()
@@ -35,6 +36,14 @@ vi.mock('@/context/app-context', () => ({
 
 vi.mock('@/service/use-common', () => ({
   useMembers: vi.fn(),
+}))
+
+vi.mock('@/service/use-departments', () => ({
+  useDepartmentExploreApps: () => ({
+    data: mockDepartmentData,
+    isLoading: false,
+    isError: false,
+  }),
 }))
 
 vi.mock('@/hooks/use-import-dsl', () => ({
@@ -122,11 +131,10 @@ const createApp = (overrides: Partial<App> = {}): App => ({
 const mockMemberRole = (hasEditPermission: boolean) => {
   ;(useAppContext as Mock).mockReturnValue({
     userProfile: { id: 'user-1' },
+    isCurrentWorkspaceEditor: hasEditPermission,
   })
   ;(useMembers as Mock).mockReturnValue({
-    data: {
-      accounts: [{ id: 'user-1', role: hasEditPermission ? 'admin' : 'normal' }],
-    },
+    data: undefined,
   })
 }
 
@@ -143,8 +151,15 @@ describe('AppList', () => {
     vi.useFakeTimers()
     vi.clearAllMocks()
     mockExploreData = { categories: [], allList: [] }
+    mockDepartmentData = { categories: [], allList: [] }
     mockIsLoading = false
     mockIsError = false
+    useGlobalPublicStore.setState({
+      systemFeatures: {
+        ...useGlobalPublicStore.getState().systemFeatures,
+        department_access_control: false,
+      },
+    })
   })
 
   afterEach(() => {
@@ -171,6 +186,44 @@ describe('AppList', () => {
 
       expect(screen.getByText('Alpha')).toBeInTheDocument()
       expect(screen.getByText('Beta')).toBeInTheDocument()
+    })
+
+    it('should keep recommended templates when department access control is on', () => {
+      useGlobalPublicStore.setState({
+        systemFeatures: {
+          ...useGlobalPublicStore.getState().systemFeatures,
+          department_access_control: true,
+        },
+      })
+      mockExploreData = {
+        categories: ['Writing'],
+        allList: [createApp({ app_id: 'tmpl-1', app: { ...createApp().app, name: 'Template App' } })],
+      }
+      mockDepartmentData = {
+        categories: [],
+        allList: [createApp({ app_id: 'dept-1', app: { ...createApp().app, name: 'Dept Internal App' } })],
+      }
+
+      renderAppList()
+
+      expect(screen.getByText('Template App')).toBeInTheDocument()
+      expect(screen.queryByText('Dept Internal App')).not.toBeInTheDocument()
+    })
+
+    it('should allow workspace editor to add apps without fetching members', () => {
+      mockExploreData = {
+        categories: ['Writing'],
+        allList: [createApp()],
+      }
+      ;(useAppContext as Mock).mockReturnValue({
+        userProfile: { id: 'user-1' },
+        isCurrentWorkspaceEditor: true,
+      })
+      ;(useMembers as Mock).mockReturnValue({ data: undefined })
+
+      renderWithNuqs(<AppList />)
+
+      expect(screen.getByText('explore.appCard.addToWorkspace')).toBeInTheDocument()
     })
   })
 

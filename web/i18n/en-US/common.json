@@ -210,6 +210,7 @@
   "department.publishModalTitle": "Publish to Departments",
   "department.publishPanelEmpty": "Not published to any department",
   "department.publishPanelTitle": "Department Publishing",
+  "department.publishPersonalOnlyHint": "If no department is selected, the app is published for your own use only and will not appear in Explore.",
   "department.publishSaveFailed": "Failed to save publish departments",
   "department.publishSaveSuccess": "Publish departments saved successfully",
   "department.regularMember": "Regular Member",
