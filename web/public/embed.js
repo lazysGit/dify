@@ -140,6 +140,10 @@
       params.set('sendOnEnter', 'false');
     }
 
+    if (config.embedToken) {
+      params.set('embed_token', config.embedToken);
+    }
+
     // pre-check the length of the URL
     const iframeUrl = `${baseUrl}/chatbot/${config.token}?${params}`;
     // 1) CREATE the iframe immediately, so it can load in the background:
