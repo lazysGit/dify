@@ -56,10 +56,28 @@ def decode_jwt_token(app_code: str | None = None, user_id: str | None = None):
                 raise NotFound()
             if not app_code or not site:
                 raise BadRequest("Site URL is no longer valid.")
-            if app_model.enable_site is False:
-                raise BadRequest("Site is disabled.")
             end_user_id = decoded.get("end_user_id")
             end_user = session.scalar(select(EndUser).where(EndUser.id == end_user_id))
+
+            # Flask-Login's EndUser.is_anonymous is always False; the DB flag is _is_anonymous.
+            is_anonymous = False
+            if end_user is not None:
+                is_anonymous = (
+                    bool(end_user._is_anonymous)
+                    if hasattr(end_user, "_is_anonymous")
+                    else bool(getattr(end_user, "is_anonymous", False))
+                )
+            # Anonymous ACL 401 must precede disabled-site 400 so embed tickets that fail
+            # _is_valid_embed_passport (including enable_site=False) match "Anonymous access".
+            if (
+                system_features.department_access_control
+                and is_anonymous
+                and not _is_valid_embed_passport(decoded, site, app_model)
+            ):
+                raise Unauthorized("Anonymous access is not allowed under department access control.")
+
+            if app_model.enable_site is False:
+                raise BadRequest("Site is disabled.")
             if not end_user:
                 raise NotFound()
 
@@ -81,19 +99,6 @@ def decode_jwt_token(app_code: str | None = None, user_id: str | None = None):
         _validate_user_accessibility(
             decoded, app_code, app_web_auth_enabled, system_features.webapp_auth.enabled, webapp_settings
         )
-
-        # Flask-Login's EndUser.is_anonymous is always False; the DB flag is _is_anonymous.
-        is_anonymous = (
-            bool(end_user._is_anonymous)
-            if hasattr(end_user, "_is_anonymous")
-            else bool(getattr(end_user, "is_anonymous", False))
-        )
-        if (
-            system_features.department_access_control
-            and is_anonymous
-            and not _is_valid_embed_passport(decoded, site, app_model)
-        ):
-            raise Unauthorized("Anonymous access is not allowed under department access control.")
 
         return app_model, end_user
     except Unauthorized as e:

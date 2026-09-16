@@ -653,6 +653,54 @@ class TestDecodeJwtToken:
     @patch("controllers.web.wraps.PassportService")
     @patch("controllers.web.wraps.extract_webapp_passport")
     @patch("controllers.web.wraps.db")
+    def test_flag_on_anonymous_embed_disabled_site_raises_unauthorized(
+        self,
+        mock_db: MagicMock,
+        mock_extract: MagicMock,
+        mock_passport_cls: MagicMock,
+        mock_features: MagicMock,
+        mock_app_id: MagicMock,
+        mock_access_mode: MagicMock,
+        mock_validate_token: MagicMock,
+        mock_validate_user: MagicMock,
+        app: Flask,
+    ) -> None:
+        mock_extract.return_value = "jwt-token"
+        mock_passport_cls.return_value.verify.return_value = {
+            "app_code": "code1",
+            "app_id": "app-1",
+            "end_user_id": "eu-1",
+            "channel": "embed",
+            "jti": "jti-1",
+        }
+        mock_features.return_value = SimpleNamespace(
+            webapp_auth=SimpleNamespace(enabled=False), department_access_control=True
+        )
+
+        app_model = SimpleNamespace(id="app-1", enable_site=False)
+        site = SimpleNamespace(code="code1", embed_jti="jti-1", status="normal")
+        end_user = SimpleNamespace(id="eu-1", session_id="sess-1", is_anonymous=True)
+
+        session_mock = MagicMock()
+        session_mock.scalar.side_effect = [app_model, site, end_user]
+        session_ctx = MagicMock()
+        session_ctx.__enter__ = MagicMock(return_value=session_mock)
+        session_ctx.__exit__ = MagicMock(return_value=False)
+        mock_db.engine = "engine"
+
+        with patch("controllers.web.wraps.Session", return_value=session_ctx):
+            with app.test_request_context("/", headers={"X-App-Code": "code1"}):
+                with pytest.raises(Unauthorized, match="Anonymous access"):
+                    decode_jwt_token()
+
+    @patch("controllers.web.wraps._validate_user_accessibility")
+    @patch("controllers.web.wraps._validate_webapp_token")
+    @patch("controllers.web.wraps.EnterpriseService.WebAppAuth.get_app_access_mode_by_id")
+    @patch("controllers.web.wraps.AppService.get_app_id_by_code")
+    @patch("controllers.web.wraps.FeatureService.get_system_features")
+    @patch("controllers.web.wraps.PassportService")
+    @patch("controllers.web.wraps.extract_webapp_passport")
+    @patch("controllers.web.wraps.db")
     def test_flag_on_column_anonymous_user_raises_unauthorized(
         self,
         mock_db: MagicMock,
