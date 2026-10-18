@@ -1299,9 +1299,8 @@ class TenantService:
     def remove_member_from_tenant(tenant: Tenant, account: Account, operator: Account):
         """Remove member from tenant.
 
-        If the removed member has ``AccountStatus.PENDING`` (invited but never
-        activated) and no remaining workspace memberships, the orphaned account
-        record is deleted as well.
+        If the removed member has no remaining workspace memberships, the
+        orphaned account record is deleted as well so the email can be reused.
         """
         if operator.id == account.id:
             raise CannotOperateSelfError("Cannot operate self.")
@@ -1319,20 +1318,18 @@ class TenantService:
 
         db.session.delete(ta)
 
-        # Clean up orphaned pending accounts (invited but never activated)
+        # autoflush flushes the join deletion before this query, so 0 means no remaining workspaces
         should_delete_account = False
-        if account.status == AccountStatus.PENDING:
-            # autoflush flushes ta deletion before this query, so 0 means no remaining joins
-            remaining_joins = db.session.query(TenantAccountJoin).filter_by(account_id=account_id).count()
-            if remaining_joins == 0:
-                db.session.delete(account)
-                should_delete_account = True
+        remaining_joins = db.session.query(TenantAccountJoin).filter_by(account_id=account_id).count()
+        if remaining_joins == 0:
+            db.session.delete(account)
+            should_delete_account = True
 
         db.session.commit()
 
         if should_delete_account:
             logger.info(
-                "Deleted orphaned pending account: account_id=%s, email=%s",
+                "Deleted account with no remaining workspaces: account_id=%s, email=%s",
                 account_id,
                 account_email,
             )
@@ -1529,6 +1526,9 @@ class RegisterService:
             existing = db.session.query(Account).filter_by(email=email).first()
         if existing:
             raise AccountEmailAlreadyInUseError(f"Email {normalized_email} is already in use.")
+
+        if is_department_admin and role not in {TenantAccountRole.ADMIN, TenantAccountRole.EDITOR}:
+            raise NoPermissionError("Department admin can only be assigned the editor or admin role.")
 
         if not password:
             password = dify_config.DEFAULT_MEMBER_PASSWORD

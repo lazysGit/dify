@@ -836,9 +836,8 @@ class TestTenantService:
             # Assert: only the join record should be deleted, not the account
             mock_db.session.delete.assert_called_once_with(mock_ta)
 
-    def test_remove_active_member_preserves_account(self):
-        """Test that removing an active member never deletes the account, even with no other workspaces."""
-        # Arrange
+    def test_remove_active_member_deletes_account_with_no_other_workspaces(self):
+        """Removing an active member with no other workspaces deletes the account."""
         mock_tenant = MagicMock()
         mock_tenant.id = "tenant-456"
         mock_operator = TestAccountAssociatedDataFactory.create_account_mock(account_id="operator-123", role="owner")
@@ -861,15 +860,54 @@ class TestTenantService:
             query_mock_ta = MagicMock()
             query_mock_ta.filter_by.return_value.first.return_value = mock_ta
 
-            mock_db.session.query.side_effect = [query_mock_permission, query_mock_ta]
+            query_mock_count = MagicMock()
+            query_mock_count.filter_by.return_value.count.return_value = 0
+
+            mock_db.session.query.side_effect = [query_mock_permission, query_mock_ta, query_mock_count]
 
             with patch("services.enterprise.account_deletion_sync.sync_workspace_member_removal") as mock_sync:
                 mock_sync.return_value = True
 
-                # Act
                 TenantService.remove_member_from_tenant(mock_tenant, mock_active_member, mock_operator)
 
-            # Assert: only the join record should be deleted
+            mock_db.session.delete.assert_any_call(mock_ta)
+            mock_db.session.delete.assert_any_call(mock_active_member)
+            assert mock_db.session.delete.call_count == 2
+
+    def test_remove_active_member_keeps_account_with_other_workspaces(self):
+        """Removing an active member who still belongs to another workspace keeps the account."""
+        mock_tenant = MagicMock()
+        mock_tenant.id = "tenant-456"
+        mock_operator = TestAccountAssociatedDataFactory.create_account_mock(account_id="operator-123", role="owner")
+        mock_active_member = TestAccountAssociatedDataFactory.create_account_mock(
+            account_id="active-user-789", email="active@example.com", status=AccountStatus.ACTIVE
+        )
+
+        mock_ta = TestAccountAssociatedDataFactory.create_tenant_join_mock(
+            tenant_id="tenant-456", account_id="active-user-789", role="normal"
+        )
+
+        with patch("services.account_service.db") as mock_db:
+            mock_operator_join = TestAccountAssociatedDataFactory.create_tenant_join_mock(
+                tenant_id="tenant-456", account_id="operator-123", role="owner"
+            )
+
+            query_mock_permission = MagicMock()
+            query_mock_permission.filter_by.return_value.first.return_value = mock_operator_join
+
+            query_mock_ta = MagicMock()
+            query_mock_ta.filter_by.return_value.first.return_value = mock_ta
+
+            query_mock_count = MagicMock()
+            query_mock_count.filter_by.return_value.count.return_value = 1
+
+            mock_db.session.query.side_effect = [query_mock_permission, query_mock_ta, query_mock_count]
+
+            with patch("services.enterprise.account_deletion_sync.sync_workspace_member_removal") as mock_sync:
+                mock_sync.return_value = True
+
+                TenantService.remove_member_from_tenant(mock_tenant, mock_active_member, mock_operator)
+
             mock_db.session.delete.assert_called_once_with(mock_ta)
 
     # ==================== Tenant Switching Tests ====================

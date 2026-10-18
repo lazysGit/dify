@@ -27,6 +27,7 @@ type TenantRole = 'editor' | 'normal' | 'dataset_operator' | 'admin'
 
 const ALL_ROLE_OPTIONS: TenantRole[] = ['admin', 'editor', 'normal', 'dataset_operator']
 const DEPT_ADMIN_ROLE_OPTIONS: TenantRole[] = ['editor', 'normal', 'dataset_operator']
+const DEPARTMENT_ADMIN_ASSIGNABLE_ROLES: TenantRole[] = ['admin', 'editor']
 
 const ROLE_I18N_MAP: Record<TenantRole, 'members.admin' | 'members.editor' | 'members.normal' | 'members.datasetOperator'> = {
   admin: 'members.admin',
@@ -61,9 +62,12 @@ export default function CreateMemberModal({ initialDepartmentId, onClose, onSucc
   const roleOptions = useMemo(
     () => {
       const options = isDepartmentAdmin ? DEPT_ADMIN_ROLE_OPTIONS : ALL_ROLE_OPTIONS
-      return datasetOperatorEnabled ? options : options.filter(r => r !== 'dataset_operator')
+      const visible = datasetOperatorEnabled ? options : options.filter(r => r !== 'dataset_operator')
+      if (!isDeptAdmin)
+        return visible
+      return visible.filter(r => DEPARTMENT_ADMIN_ASSIGNABLE_ROLES.includes(r))
     },
-    [isDepartmentAdmin, datasetOperatorEnabled],
+    [isDepartmentAdmin, datasetOperatorEnabled, isDeptAdmin],
   )
 
   const roleItems = useMemo(
@@ -212,7 +216,12 @@ export default function CreateMemberModal({ initialDepartmentId, onClose, onSucc
                 <input
                   type="checkbox"
                   checked={isDeptAdmin}
-                  onChange={e => setIsDeptAdmin(e.target.checked)}
+                  onChange={(e) => {
+                    const checked = e.target.checked
+                    setIsDeptAdmin(checked)
+                    if (checked && !DEPARTMENT_ADMIN_ASSIGNABLE_ROLES.includes(role))
+                      setRole('editor')
+                  }}
                   className="border-components-input-border h-4 w-4 rounded accent-components-checkbox-bg"
                 />
                 <span className="text-text-secondary system-sm-medium">

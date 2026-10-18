@@ -84,6 +84,28 @@ class TestCreateMemberByAdmin:
 
     @patch("services.account_service.send_member_created_mail_task")
     @patch("services.department_service.DepartmentAuditLog")
+    @patch("services.account_service.TenantService")
+    @patch("services.account_service.db")
+    def test_department_admin_flag_rejects_normal_role(self, mock_db, mock_ts, mock_audit, mock_mail):
+        _mock_db_queries(mock_db)
+        operator = _make_operator()
+
+        with pytest.raises(NoPermissionError, match="editor or admin"):
+            RegisterService.create_member_by_admin(
+                operator,
+                "t1",
+                name="New",
+                email="new@example.com",
+                password="Valid1234",
+                department_id="d1",
+                role=TenantAccountRole.NORMAL,
+                is_department_admin=True,
+            )
+
+        mock_db.session.add.assert_not_called()
+
+    @patch("services.account_service.send_member_created_mail_task")
+    @patch("services.department_service.DepartmentAuditLog")
     @patch("services.department_service.DepartmentService")
     @patch("services.account_service.TenantService")
     @patch("services.account_service.db")

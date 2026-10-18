@@ -136,6 +136,22 @@ describe('CreateMemberModal', () => {
     expect(screen.getByText('members.setAsDepartmentAdmin')).toBeInTheDocument()
   })
 
+  it('should only offer admin and editor when set as department admin', async () => {
+    const user = userEvent.setup()
+    render(<CreateMemberModal onClose={vi.fn()} onSuccess={vi.fn()} />)
+
+    expect(screen.getByRole('combobox')).toHaveTextContent('members.normal')
+    await user.click(screen.getByRole('checkbox'))
+
+    expect(screen.getByRole('combobox')).toHaveTextContent('members.editor')
+
+    const listbox = screen.getByRole('listbox', { hidden: true })
+    expect(listbox).toHaveTextContent('members.admin')
+    expect(listbox).toHaveTextContent('members.editor')
+    expect(listbox).not.toHaveTextContent('members.normal')
+    expect(listbox).not.toHaveTextContent('members.datasetOperator')
+  })
+
   it('should hide set as department admin checkbox for department admin', () => {
     mockAppContext.isCurrentWorkspaceOwner = false
     mockAppContext.isCurrentWorkspaceManager = false
