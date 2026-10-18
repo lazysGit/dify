@@ -64,6 +64,7 @@ export default defineConfig(({ mode }) => {
             exclude: ['@tanstack/react-query'],
           },
           server: {
+            host: '0.0.0.0',
             port: 3000,
           },
           ssr: {
