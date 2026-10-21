@@ -119,6 +119,18 @@ class RagPipelineDslService:
     def __init__(self, session: Session):
         self._session = session
 
+    @staticmethod
+    def _resolve_department_id(account: Account) -> str | None:
+        """Department for pipeline datasets created by DSL import.
+
+        A NULL department_id would be treated as the default department by ACL checks, locking the
+        creator (and everyone outside the default department) out of the dataset that was just
+        imported on their behalf.
+        """
+        from services.department_service import DepartmentService
+
+        return DepartmentService.resolve_department_id_for_creation(account, account.current_tenant_id, None)
+
     def import_rag_pipeline(
         self,
         *,
@@ -317,6 +329,7 @@ class RagPipelineDslService:
                             retrieval_model=knowledge_configuration.retrieval_model.model_dump(),
                             runtime_mode=DatasetRuntimeMode.RAG_PIPELINE,
                             chunk_structure=knowledge_configuration.chunk_structure,
+                            department_id=self._resolve_department_id(account),
                         )
                     if knowledge_configuration.indexing_technique == IndexTechniqueType.HIGH_QUALITY:
                         dataset_collection_binding = (
@@ -449,6 +462,7 @@ class RagPipelineDslService:
                             retrieval_model=knowledge_configuration.retrieval_model.model_dump(),
                             runtime_mode=DatasetRuntimeMode.RAG_PIPELINE,
                             chunk_structure=knowledge_configuration.chunk_structure,
+                            department_id=self._resolve_department_id(account),
                         )
                     else:
                         dataset.indexing_technique = IndexTechniqueType(knowledge_configuration.indexing_technique)

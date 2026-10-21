@@ -259,6 +259,7 @@ class ExternalDatasetCreateApi(Resource):
                 tenant_id=current_tenant_id,
                 user_id=current_user.id,
                 args=args,
+                account=current_user,
             )
         except services.errors.dataset.DatasetNameDuplicateError:
             raise DatasetNameDuplicateError()

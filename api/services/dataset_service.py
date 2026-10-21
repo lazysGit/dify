@@ -334,6 +334,8 @@ class DatasetService:
         tenant_id: str,
         rag_pipeline_dataset_create_entity: RagPipelineDatasetCreateEntity,
     ):
+        from services.department_service import DepartmentService
+
         if rag_pipeline_dataset_create_entity.name:
             # check if dataset name already exists
             if (
@@ -373,6 +375,7 @@ class DatasetService:
             icon_info=rag_pipeline_dataset_create_entity.icon_info.model_dump(),
             created_by=current_user.id,
             pipeline_id=pipeline.id,
+            department_id=DepartmentService.resolve_department_id_for_creation(current_user, tenant_id, None),
         )
         db.session.add(dataset)
         db.session.commit()

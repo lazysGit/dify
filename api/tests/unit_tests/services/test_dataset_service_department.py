@@ -455,6 +455,50 @@ class TestDatasetInitDepartmentOwnership:
         assert dataset.department_id == "resolved_dept"
 
 
+class TestRagPipelineDatasetDepartmentOwnership:
+    """create_empty_rag_pipeline_dataset must resolve department_id like create_empty_dataset;
+    a NULL department would pin the dataset to the default department for ACL checks."""
+
+    @patch("services.dataset_service.current_user")
+    @patch("services.department_service.DepartmentService")
+    @patch("services.dataset_service.db")
+    def test_create_sets_department_id(self, mock_db, mock_dept_service, mock_current_user):
+        from models.dataset import DatasetRuntimeMode
+
+        mock_current_user.id = "u1"
+        mock_dept_service.resolve_department_id_for_creation.return_value = "resolved_dept"
+        mock_db.session.query.return_value.filter_by.return_value.first.return_value = None
+
+        entity = MagicMock()
+        entity.name = "Untitled"
+        entity.description = "desc"
+        entity.permission = None
+        entity.icon_info.model_dump.return_value = {}
+
+        dataset = DatasetService.create_empty_rag_pipeline_dataset("t1", entity)
+
+        mock_dept_service.resolve_department_id_for_creation.assert_called_once_with(mock_current_user, "t1", None)
+        assert dataset.department_id == "resolved_dept"
+        assert dataset.runtime_mode == DatasetRuntimeMode.RAG_PIPELINE
+
+
+class TestRagPipelineDslDepartmentResolver:
+    """The DSL import helper must delegate to resolve_department_id_for_creation with the
+    importing account and its current tenant."""
+
+    def test_uses_account_and_tenant(self):
+        from services.rag_pipeline.rag_pipeline_dsl_service import RagPipelineDslService
+
+        account = MagicMock()
+        account.current_tenant_id = "t9"
+
+        with patch("services.department_service.DepartmentService") as mock_dept:
+            result = RagPipelineDslService(MagicMock())._resolve_department_id(account)
+
+            mock_dept.resolve_department_id_for_creation.assert_called_once_with(account, "t9", None)
+            assert result == mock_dept.resolve_department_id_for_creation.return_value
+
+
 class TestTransferDatasetDepartment:
     @patch("services.department_service.DepartmentAuditLog")
     @patch("services.dataset_service.db")
