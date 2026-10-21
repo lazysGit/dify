@@ -6,7 +6,7 @@ import pytest
 
 from models import Account, TenantAccountRole
 from models.dataset import Dataset, DatasetPermissionEnum
-from services.dataset_service import DatasetService
+from services.dataset_service import DatasetService, DocumentService
 from services.errors.department import DepartmentValidationError
 
 
@@ -412,6 +412,47 @@ class TestCreateDatasetDepartmentOwnership:
                 account=user,
                 department_id="forbidden_dept",
             )
+
+
+class TestDatasetInitDepartmentOwnership:
+    """save_document_without_dataset_id（POST /datasets/init 上传文档向导）必须与 create_empty_dataset
+    一样把部门归属解析落到 dataset.department_id；否则库的 department_id 为 NULL，
+    在部门权限检查里被视作默认部门资源，非默认部门用户创建后立刻被自己的库 403。"""
+
+    def _run_save_document(self, mock_feature_service, mock_dept_service, user):
+        from core.rag.index_processor.constant.index_type import IndexTechniqueType
+
+        features = MagicMock()
+        features.billing.enabled = False
+        mock_feature_service.get_features.return_value = features
+        mock_dept_service.resolve_department_id_for_creation.return_value = "resolved_dept"
+
+        knowledge_config = MagicMock()
+        knowledge_config.data_source = MagicMock()
+        knowledge_config.data_source.info_list.data_source_type = "upload_file"
+        knowledge_config.indexing_technique = IndexTechniqueType.ECONOMY
+        knowledge_config.retrieval_model = None
+        knowledge_config.summary_index_setting = None
+        knowledge_config.is_multimodal = False
+
+        document = Mock()
+        document.name = "uat-test.txt"
+        with (
+            patch("services.dataset_service.current_user", user),
+            patch("services.dataset_service.DocumentService.save_document_with_dataset_id") as mock_save,
+        ):
+            mock_save.return_value = ([document], "batch-1")
+            dataset, _, _ = DocumentService.save_document_without_dataset_id("t1", knowledge_config, user)
+        return dataset
+
+    @patch("services.dataset_service.FeatureService")
+    @patch("services.department_service.DepartmentService")
+    @patch("services.dataset_service.db")
+    def test_init_sets_department_id(self, mock_db, mock_dept_service, mock_feature_service):
+        user = _make_user()
+        dataset = self._run_save_document(mock_feature_service, mock_dept_service, user)
+        mock_dept_service.resolve_department_id_for_creation.assert_called_once_with(user, "t1", None)
+        assert dataset.department_id == "resolved_dept"
 
 
 class TestTransferDatasetDepartment:

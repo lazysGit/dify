@@ -2735,6 +2735,22 @@ class DocumentService:
 
     @staticmethod
     def save_document_without_dataset_id(tenant_id: str, knowledge_config: KnowledgeConfig, account: Account):
+        """Create the dataset backing the upload wizard (POST /datasets/init) and its first documents.
+
+        behavioural contract:
+        - The dataset must get a department assignment exactly like ``DatasetService.create_empty_dataset``:
+          ``resolve_department_id_for_creation(account, tenant_id, None)``. Omitting it leaves
+          ``department_id`` NULL, which department checks resolve to the default department — a member of
+          any other department would immediately lose access to a dataset they just created (403 on
+          indexing-status polling and hidden from the list).
+        - Side effects: inserts the dataset and documents, commits, and enqueues indexing tasks.
+        - Raises: ``DepartmentNotFoundError`` (via the department resolver) when the creator has no
+          department and the tenant has no default department; ``ValueError`` on billing batch-limit
+          violations; ``ProviderTokenNotInitError``/``ProviderNotInitializeError`` when the embedding
+          model is not initialized (HIGH_QUALITY path).
+
+        Returns ``(dataset, documents, batch)``.
+        """
         assert isinstance(current_user, Account)
         assert current_user.current_tenant_id is not None
         assert knowledge_config.data_source
@@ -2788,6 +2804,8 @@ class DocumentService:
                 score_threshold_enabled=False,
             )
         # save dataset
+        from services.department_service import DepartmentService
+
         dataset = Dataset(
             tenant_id=tenant_id,
             name="",
@@ -2800,6 +2818,7 @@ class DocumentService:
             retrieval_model=retrieval_model.model_dump() if retrieval_model else None,
             summary_index_setting=knowledge_config.summary_index_setting,
             is_multimodal=knowledge_config.is_multimodal,
+            department_id=DepartmentService.resolve_department_id_for_creation(account, tenant_id, None),
         )
 
         db.session.add(dataset)
