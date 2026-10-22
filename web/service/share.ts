@@ -260,7 +260,8 @@ export const fetchAccessToken = async ({ userId, appCode }: { userId?: string, a
   if (userId)
     params.append('user_id', userId)
   const url = `/passport?${params.toString()}`
-  return get<{ access_token: string }>(url, { headers }) as Promise<{ access_token: string }>
+  // silent: avoid toasting RESTX 404 help text that embeds "/api/passport"
+  return get<{ access_token: string }>(url, { headers }, { silent: true }) as Promise<{ access_token: string }>
 }
 
 export const getUserCanAccess = (appId: string, isInstalledApp: boolean) => {

@@ -121,21 +121,18 @@ class InstalledAppsListApi(Resource):
             logger.debug("installed_app_list: %s, user_id: %s", installed_app_list, user_id)
 
         if dify_config.DEPARTMENT_ACCESS_CONTROL_ENABLED:
+            # Align with department-apps: explore library only shows site-enabled apps
+            # that are published to at least one department (owners included; UAT-059).
+            installed_app_list = [item for item in installed_app_list if item["app"].enable_site]
             accessible = DepartmentService.get_accessible_department_ids(current_user, current_tenant_id)
-            if accessible is not None:
-                if not accessible:
-                    installed_app_list = []
-                else:
-                    visible_app_ids = set(
-                        db.session.execute(
-                            select(AppPublishedDepartment.app_id).where(
-                                AppPublishedDepartment.department_id.in_(accessible)
-                            )
-                        )
-                        .scalars()
-                        .all()
-                    )
-                    installed_app_list = [item for item in installed_app_list if item["app"].id in visible_app_ids]
+            if accessible is not None and not accessible:
+                installed_app_list = []
+            else:
+                published_query = select(AppPublishedDepartment.app_id)
+                if accessible is not None:
+                    published_query = published_query.where(AppPublishedDepartment.department_id.in_(accessible))
+                visible_app_ids = set(db.session.execute(published_query).scalars().all())
+                installed_app_list = [item for item in installed_app_list if item["app"].id in visible_app_ids]
 
         installed_app_list.sort(
             key=lambda app: (

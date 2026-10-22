@@ -49,6 +49,14 @@ const Splash: FC<PropsWithChildren> = ({ children }) => {
     if (message)
       return
 
+    // Under department ACL on /chat, share auth is console cookie + ChatAccessGuard
+    // (verify then passport). Splash must not call /passport first: site-disabled
+    // 404 text was leaking onto the share error UI. web_sso_token on this path is unused.
+    if (systemFeatures.department_access_control) {
+      setIsLoading(false)
+      return
+    }
+
     if (tokenFromUrl)
       setWebAppAccessToken(tokenFromUrl)
 
@@ -105,6 +113,7 @@ const Splash: FC<PropsWithChildren> = ({ children }) => {
     tokenFromUrl,
     embeddedUserId,
     skipDepartmentGuard,
+    systemFeatures.department_access_control,
   ])
 
   if (message) {

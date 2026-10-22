@@ -7,8 +7,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from flask import Flask
-from werkzeug.exceptions import Forbidden, NotFound, Unauthorized
+from werkzeug.exceptions import Forbidden, Unauthorized
 
+from controllers.web.error import NotFoundError
 from controllers.web.passport import PassportResource, _resolve_console_account
 
 
@@ -201,5 +202,5 @@ class TestPassportDepartmentGate:
         account = SimpleNamespace(id="acc-1")
         mock_db.session.scalar.side_effect = [account, None]
         with app.test_request_context("/passport", headers={"X-App-Code": "code1"}):
-            with pytest.raises(NotFound):
+            with pytest.raises(NotFoundError, match="App not found"):
                 PassportResource().get()

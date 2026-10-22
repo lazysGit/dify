@@ -9,7 +9,7 @@ from werkzeug.exceptions import Forbidden, NotFound, Unauthorized
 from configs import dify_config
 from constants import HEADER_NAME_APP_CODE
 from controllers.web import web_ns
-from controllers.web.error import WebAppAuthRequiredError
+from controllers.web.error import NotFoundError, WebAppAuthRequiredError
 from extensions.ext_database import db
 from libs.passport import PassportService
 from libs.token import extract_access_token, extract_webapp_access_token
@@ -48,10 +48,10 @@ class PassportResource(Resource):
 
             site_for_gate = db.session.scalar(select(Site).where(Site.code == app_code, Site.status == "normal"))
             if not site_for_gate:
-                raise NotFound()
+                raise NotFoundError("App not found.")
             app_for_gate = db.session.scalar(select(App).where(App.id == site_for_gate.app_id))
             if not app_for_gate or app_for_gate.status != "normal" or not app_for_gate.enable_site:
-                raise NotFound()
+                raise NotFoundError("App not found.")
 
             if not AppPublishService.can_access(account, app_for_gate.tenant_id, app_for_gate.id):
                 raise Forbidden("You do not have permission to access this app.")
@@ -97,11 +97,11 @@ class PassportResource(Resource):
         # get site from db and check if it is normal
         site = db.session.scalar(select(Site).where(Site.code == app_code, Site.status == "normal"))
         if not site:
-            raise NotFound()
+            raise NotFoundError("App not found.")
         # get app from db and check if it is normal and enable_site
         app_model = db.session.scalar(select(App).where(App.id == site.app_id))
         if not app_model or app_model.status != "normal" or not app_model.enable_site:
-            raise NotFound()
+            raise NotFoundError("App not found.")
 
         if user_id:
             end_user = db.session.scalar(

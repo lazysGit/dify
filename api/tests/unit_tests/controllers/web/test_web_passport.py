@@ -9,7 +9,7 @@ import pytest
 from flask import Flask
 from werkzeug.exceptions import NotFound, Unauthorized
 
-from controllers.web.error import WebAppAuthRequiredError
+from controllers.web.error import NotFoundError, WebAppAuthRequiredError
 from controllers.web.passport import (
     PassportResource,
     decode_enterprise_webapp_user_id,
@@ -185,7 +185,7 @@ class TestPassportResource:
         )
         mock_db.session.scalar.return_value = None
         with app.test_request_context("/passport", headers={"X-App-Code": "code1"}):
-            with pytest.raises(NotFound):
+            with pytest.raises(NotFoundError, match="App not found"):
                 PassportResource().get()
 
     @patch("controllers.web.passport.db")
@@ -198,5 +198,5 @@ class TestPassportResource:
         disabled_app = SimpleNamespace(id="app-1", status="normal", enable_site=False)
         mock_db.session.scalar.side_effect = [site, disabled_app]
         with app.test_request_context("/passport", headers={"X-App-Code": "code1"}):
-            with pytest.raises(NotFound):
+            with pytest.raises(NotFoundError, match="App not found"):
                 PassportResource().get()

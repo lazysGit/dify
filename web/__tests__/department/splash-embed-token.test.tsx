@@ -269,11 +269,30 @@ describe('Splash embed token', () => {
     await waitFor(() => {
       expect(screen.getByTestId('chat-access-guard')).toBeTruthy()
     })
-    expect(mockClearWebAppPassport).toHaveBeenCalledWith('code1')
-    expect(mockWebAppLoginStatus).toHaveBeenCalled()
-    expect(mockFetchAccessToken).toHaveBeenCalled()
-    expect(mockSetWebAppPassport).toHaveBeenCalledWith('code1', 'console-passport')
+    // ACL /chat: Splash must not hit /passport (site-disabled 404 leaks Flask URI text).
+    // ChatAccessGuard clears stale embed jwt and issues passport only after verify grants.
+    expect(mockWebAppLoginStatus).not.toHaveBeenCalled()
+    expect(mockFetchAccessToken).not.toHaveBeenCalled()
+    expect(mockSetWebAppPassport).not.toHaveBeenCalledWith('code1', 'console-passport')
     expect(mockSetWebAppPassport).not.toHaveBeenCalledWith('code1', embedJwt)
+  })
+
+  it('skips passport on /chat when ACL is on so site-disabled never surfaces /api/passport 404', async () => {
+    mockPathname = '/chat/code1'
+    mockWebAppLoginStatus.mockResolvedValue({ userLoggedIn: true, appLoggedIn: false })
+    mockFetchAccessToken.mockRejectedValue(new Error('should not be called'))
+
+    render(
+      <Splash>
+        <div data-testid="child">Chat Content</div>
+      </Splash>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByTestId('chat-access-guard')).toBeTruthy()
+    })
+    expect(mockFetchAccessToken).not.toHaveBeenCalled()
+    expect(mockWebAppLoginStatus).not.toHaveBeenCalled()
   })
 })
 

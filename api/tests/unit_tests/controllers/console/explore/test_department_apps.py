@@ -222,7 +222,9 @@ class TestInstalledAppsListWithDeptFilter:
         method = unwrap(api.get)
 
         mock_app_published = MagicMock(id="a_published")
+        mock_app_published.enable_site = True
         mock_app_unpublished = MagicMock(id="a_unpublished")
+        mock_app_unpublished.enable_site = True
         installed_published = MagicMock()
         installed_published.id = "ia1"
         installed_published.app = mock_app_published
@@ -263,6 +265,7 @@ class TestInstalledAppsListWithDeptFilter:
         method = unwrap(api.get)
 
         mock_app = MagicMock(id="a_was_published")
+        mock_app.enable_site = True
         installed = MagicMock()
         installed.id = "ia1"
         installed.app = mock_app
@@ -291,14 +294,62 @@ class TestInstalledAppsListWithDeptFilter:
 
         assert result["installed_apps"] == []
 
-    def test_flag_on_admin_sees_all(self, app, admin_user, tenant_id):
+    def test_flag_on_filters_site_disabled_even_if_published(self, app, member_user, tenant_id):
+        """Published to accessible dept but enable_site=false must not appear in explore library."""
         api = installed_module.InstalledAppsListApi()
         method = unwrap(api.get)
 
-        mock_app = MagicMock(id="a1")
+        mock_app_on = MagicMock(id="a_site_on")
+        mock_app_on.enable_site = True
+        mock_app_off = MagicMock(id="a_site_off")
+        mock_app_off.enable_site = False
+
+        installed_on = MagicMock()
+        installed_on.id = "ia_on"
+        installed_on.app = mock_app_on
+        installed_on.app_owner_tenant_id = "t2"
+        installed_on.is_pinned = False
+        installed_on.last_used_at = datetime(2024, 1, 1)
+
+        installed_off = MagicMock()
+        installed_off.id = "ia_off"
+        installed_off.app = mock_app_off
+        installed_off.app_owner_tenant_id = "t2"
+        installed_off.is_pinned = False
+        installed_off.last_used_at = datetime(2024, 1, 2)
+
+        session = MagicMock()
+        session.scalars.return_value.all.return_value = [installed_on, installed_off]
+        session.execute.return_value.scalars.return_value.all.return_value = ["a_site_on", "a_site_off"]
+
+        with (
+            app.test_request_context("/"),
+            patch.object(installed_module, "current_account_with_tenant", return_value=(member_user, tenant_id)),
+            patch.object(installed_module.db, "session", session),
+            patch.object(installed_module.TenantService, "get_user_role", return_value="member"),
+            patch.object(
+                installed_module.FeatureService,
+                "get_system_features",
+                return_value=MagicMock(webapp_auth=MagicMock(enabled=False)),
+            ),
+            patch.object(installed_module.dify_config, "DEPARTMENT_ACCESS_CONTROL_ENABLED", True),
+            patch.object(installed_module.DepartmentService, "get_accessible_department_ids", return_value=["d1"]),
+        ):
+            result = method(api)
+
+        assert len(result["installed_apps"]) == 1
+        assert result["installed_apps"][0]["app"].id == "a_site_on"
+
+    def test_flag_on_admin_filters_site_disabled(self, app, admin_user, tenant_id):
+        """Owner (accessible=None) must also hide enable_site=false from explore library."""
+        api = installed_module.InstalledAppsListApi()
+        method = unwrap(api.get)
+
+        mock_app_off = MagicMock(id="a_site_off")
+        mock_app_off.enable_site = False
         installed = MagicMock()
         installed.id = "ia1"
-        installed.app = mock_app
+        installed.app = mock_app_off
         installed.app_owner_tenant_id = "t2"
         installed.is_pinned = False
         installed.last_used_at = datetime(2024, 1, 1)
@@ -321,7 +372,53 @@ class TestInstalledAppsListWithDeptFilter:
         ):
             result = method(api)
 
+        assert result["installed_apps"] == []
+
+    def test_flag_on_admin_filters_unpublished(self, app, admin_user, tenant_id):
+        """Owner (accessible=None) still must not see apps with no published department (UAT-059)."""
+        api = installed_module.InstalledAppsListApi()
+        method = unwrap(api.get)
+
+        mock_app_published = MagicMock(id="a_published")
+        mock_app_published.enable_site = True
+        mock_app_unpublished = MagicMock(id="a_unpublished")
+        mock_app_unpublished.enable_site = True
+
+        installed_published = MagicMock()
+        installed_published.id = "ia1"
+        installed_published.app = mock_app_published
+        installed_published.app_owner_tenant_id = "t2"
+        installed_published.is_pinned = False
+        installed_published.last_used_at = datetime(2024, 1, 1)
+
+        installed_unpublished = MagicMock()
+        installed_unpublished.id = "ia2"
+        installed_unpublished.app = mock_app_unpublished
+        installed_unpublished.app_owner_tenant_id = "t2"
+        installed_unpublished.is_pinned = False
+        installed_unpublished.last_used_at = datetime(2024, 1, 2)
+
+        session = MagicMock()
+        session.scalars.return_value.all.return_value = [installed_published, installed_unpublished]
+        session.execute.return_value.scalars.return_value.all.return_value = ["a_published"]
+
+        with (
+            app.test_request_context("/"),
+            patch.object(installed_module, "current_account_with_tenant", return_value=(admin_user, tenant_id)),
+            patch.object(installed_module.db, "session", session),
+            patch.object(installed_module.TenantService, "get_user_role", return_value="owner"),
+            patch.object(
+                installed_module.FeatureService,
+                "get_system_features",
+                return_value=MagicMock(webapp_auth=MagicMock(enabled=False)),
+            ),
+            patch.object(installed_module.dify_config, "DEPARTMENT_ACCESS_CONTROL_ENABLED", True),
+            patch.object(installed_module.DepartmentService, "get_accessible_department_ids", return_value=None),
+        ):
+            result = method(api)
+
         assert len(result["installed_apps"]) == 1
+        assert result["installed_apps"][0]["app"].id == "a_published"
 
 
 class TestSystemFeaturesDepartmentAccessControl:

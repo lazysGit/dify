@@ -5,7 +5,12 @@ import ChatAccessGuard from '@/app/(shareLayout)/components/chat-access-guard'
 import { PUBLIC_API_PREFIX } from '@/config'
 
 const mockReplace = vi.fn()
+const mockFetchAccessToken = vi.fn()
+const mockSetWebAppPassport = vi.fn()
+const mockGetWebAppPassport = vi.fn()
+const mockClearWebAppPassport = vi.fn()
 let mockDepartmentAccessEnabled = false
+let mockEmbeddedUserId: string | null = null
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -25,6 +30,22 @@ vi.mock('@/context/global-public-context', () => ({
   },
 }))
 
+vi.mock('@/context/web-app-context', () => ({
+  useWebAppStore: (selector: (state: { embeddedUserId: string | null }) => unknown) => {
+    return selector({ embeddedUserId: mockEmbeddedUserId })
+  },
+}))
+
+vi.mock('@/service/share', () => ({
+  fetchAccessToken: (...args: unknown[]) => mockFetchAccessToken(...args),
+}))
+
+vi.mock('@/service/webapp-auth', () => ({
+  setWebAppPassport: (...args: unknown[]) => mockSetWebAppPassport(...args),
+  getWebAppPassport: (...args: unknown[]) => mockGetWebAppPassport(...args),
+  clearWebAppPassport: (...args: unknown[]) => mockClearWebAppPassport(...args),
+}))
+
 vi.mock('@/app/components/base/loading', () => ({
   default: () => <div data-testid="loading">Loading</div>,
 }))
@@ -33,6 +54,9 @@ describe('ChatAccessGuard', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockDepartmentAccessEnabled = false
+    mockEmbeddedUserId = null
+    mockGetWebAppPassport.mockReturnValue('')
+    mockFetchAccessToken.mockResolvedValue({ access_token: 'console-passport' })
     globalThis.fetch = vi.fn()
   })
 
@@ -114,6 +138,70 @@ describe('ChatAccessGuard', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('child')).toBeTruthy()
+    })
+    expect(mockFetchAccessToken).toHaveBeenCalledWith({ appCode: 'code1', userId: undefined })
+    expect(mockSetWebAppPassport).toHaveBeenCalledWith('code1', 'console-passport')
+  })
+
+  it('shows not_found when verify grants but passport returns 404 (site disabled race)', async () => {
+    mockDepartmentAccessEnabled = true
+    ;(globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      status: 200,
+      ok: true,
+      json: () => Promise.resolve({ access: true, app_info: {} }),
+    })
+    mockFetchAccessToken.mockRejectedValueOnce({ status: 404 })
+
+    render(
+      <ChatAccessGuard appCode="code1">
+        <div data-testid="child">Chat Content</div>
+      </ChatAccessGuard>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('common.appNotFound')).toBeTruthy()
+    })
+    expect(screen.queryByTestId('child')).toBeNull()
+  })
+
+  it('shows denied when verify grants but passport fails with non-404 error', async () => {
+    mockDepartmentAccessEnabled = true
+    ;(globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      status: 200,
+      ok: true,
+      json: () => Promise.resolve({ access: true, app_info: {} }),
+    })
+    mockFetchAccessToken.mockRejectedValueOnce({ status: 500 })
+
+    render(
+      <ChatAccessGuard appCode="code1">
+        <div data-testid="child">Chat Content</div>
+      </ChatAccessGuard>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('common.accessDenied')).toBeTruthy()
+    })
+    expect(screen.queryByTestId('child')).toBeNull()
+  })
+
+  it('redirects to signin when verify grants but passport returns 401', async () => {
+    mockDepartmentAccessEnabled = true
+    ;(globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      status: 200,
+      ok: true,
+      json: () => Promise.resolve({ access: true, app_info: {} }),
+    })
+    mockFetchAccessToken.mockRejectedValueOnce({ status: 401 })
+
+    render(
+      <ChatAccessGuard appCode="code1">
+        <div data-testid="child">Chat Content</div>
+      </ChatAccessGuard>,
+    )
+
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith(expect.stringContaining('/signin?redirect='))
     })
   })
 
