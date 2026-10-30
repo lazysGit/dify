@@ -199,6 +199,37 @@ class TestGetDatasetsDepartmentFiltering:
         stmt = call_args[1]["select"] if "select" in call_args[1] else call_args[0][0]
         compiled = str(stmt.compile(compile_kwargs={"literal_binds": True}))
         assert "coalesce" in compiled.lower() or "COALESCE" in compiled
+        # 分享层 1 次 + 部门过滤 OR 穿透 1 次
+        assert compiled.lower().count("all_team_members") >= 2
+
+    @patch("services.department_service.DepartmentService")
+    @patch("services.dataset_service.db")
+    def test_all_team_or_with_department_filter(self, mock_db, mock_dept_service):
+        """列表：all_team_members 与部门过滤 OR，跨部门可见全团队库。"""
+        from sqlalchemy import func
+
+        mock_dept_service.get_accessible_department_ids.return_value = ["d-mkt"]
+        default_dept = MagicMock()
+        default_dept.id = "d-default"
+        mock_dept_service.get_default_department.return_value = default_dept
+
+        def real_filter(model, tenant_id, accessible):
+            return func.coalesce(model.department_id, "d-default").in_(accessible)
+
+        mock_dept_service.resource_department_filter.side_effect = real_filter
+        mock_db.session.query.return_value.filter_by.return_value.all.return_value = []
+        mock_pagination = MagicMock()
+        mock_pagination.items = []
+        mock_pagination.total = 0
+        mock_db.paginate.return_value = mock_pagination
+
+        user = _make_user(role=TenantAccountRole.EDITOR, is_admin_or_owner=False)
+        DatasetService.get_datasets(1, 20, "t1", user)
+
+        compiled = _compiled_get_datasets_sql(mock_db).lower()
+        # 部门 ACL 子句必须 OR all_team，否则跨部门全团队库被 coalesce IN 挡掉
+        assert compiled.count("all_team_members") >= 2
+        assert "d-mkt" in compiled
 
 
 def _compiled_get_datasets_sql(mock_db) -> str:

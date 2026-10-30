@@ -29,7 +29,7 @@
   "form.permissions": "Permissions",
   "form.permissionsAllDepartmentMembers": "All department members",
   "form.permissionsAllMember": "All team members",
-  "form.permissionsInvitedMembers": "Partial team members",
+  "form.permissionsInvitedMembers": "Partial department members",
   "form.permissionsOnlyMe": "Only me",
   "form.retrievalSetting.description": " about retrieval method.",
   "form.retrievalSetting.learnMore": "Learn more",

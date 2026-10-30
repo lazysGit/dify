@@ -183,7 +183,13 @@ class DatasetService:
             if tenant_id:
                 accessible = DepartmentService.get_accessible_department_ids(user, tenant_id)
                 if accessible is not None:
-                    query = query.where(DepartmentService.resource_department_filter(Dataset, tenant_id, accessible))
+                    # all_team_members = workspace-wide share: must not be clipped by department ACL
+                    query = query.where(
+                        sa.or_(
+                            Dataset.permission == DatasetPermissionEnum.ALL_TEAM,
+                            DepartmentService.resource_department_filter(Dataset, tenant_id, accessible),
+                        )
+                    )
         else:
             query = query.where(Dataset.permission == DatasetPermissionEnum.ALL_TEAM)
 
@@ -1187,6 +1193,10 @@ class DatasetService:
                 if not DatasetService.user_in_dataset_department(user, dataset, user.current_tenant_id):
                     logger.debug("User %s does not have permission to access dataset %s", user.id, dataset.id)
                     raise NoPermissionError("You do not have permission to access this dataset.")
+
+        # Workspace-wide share: skip department ACL so other departments can open the dataset.
+        if dataset.permission == DatasetPermissionEnum.ALL_TEAM:
+            return
 
         from services.department_service import DepartmentService
         from services.errors.department import DepartmentPermissionDeniedError

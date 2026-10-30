@@ -41,8 +41,13 @@ def _make_dataset(
 
 class TestCheckDatasetPermissionDepartmentGuard:
     def test_member_other_dept_raises_no_permission(self) -> None:
+        """非 all_team 知识库仍受部门 ACL 约束。"""
         user = _make_user()
-        dataset = _make_dataset(department_id="dept-other", created_by="other-user")
+        dataset_partial = _make_dataset(
+            department_id="dept-other",
+            created_by="other-user",
+            permission=DatasetPermissionEnum.PARTIAL_TEAM,
+        )
 
         from services.department_service import DepartmentService
 
@@ -51,12 +56,38 @@ class TestCheckDatasetPermissionDepartmentGuard:
             "assert_department_access",
             side_effect=DepartmentPermissionDeniedError("无权访问该资源"),
         ):
-            with pytest.raises(NoPermissionError):
-                DatasetService.check_dataset_permission(dataset, user)
+            with patch("services.dataset_service.db") as mock_db:
+                mock_db.session.query.return_value.filter_by.return_value.first.return_value = Mock(account_id="u1")
+                with pytest.raises(NoPermissionError):
+                    DatasetService.check_dataset_permission(dataset_partial, user)
+
+    def test_all_team_members_skips_department_acl(self) -> None:
+        """所有团队成员：工作空间级分享，跨部门也应可打开（跳过部门 ACL）。"""
+        user = _make_user()
+        dataset = _make_dataset(
+            department_id="dept-other",
+            created_by="other-user",
+            permission=DatasetPermissionEnum.ALL_TEAM,
+        )
+
+        from services.department_service import DepartmentService
+
+        with patch.object(
+            DepartmentService,
+            "assert_department_access",
+            side_effect=DepartmentPermissionDeniedError("无权访问该资源"),
+        ) as mock_acl:
+            DatasetService.check_dataset_permission(dataset, user)
+            mock_acl.assert_not_called()
 
     def test_owner_passes(self) -> None:
         user = _make_user(role=TenantAccountRole.OWNER)
-        dataset = _make_dataset(department_id="dept-other", created_by="other-user")
+        # 非 all_team：特权角色仍走部门 ACL（通常可过）
+        dataset = _make_dataset(
+            department_id="dept-other",
+            created_by="other-user",
+            permission=DatasetPermissionEnum.ALL_DEPARTMENT,
+        )
 
         from services.department_service import DepartmentService
 
@@ -77,16 +108,25 @@ class TestCheckDatasetPermissionDepartmentGuard:
             assert call_args[0][2] is None
 
     def test_outside_accessible_dept_raises_no_permission(self) -> None:
-        user = _make_user()
-        dataset = _make_dataset(department_id="dept-x", created_by="other-user")
+        """部分成员在名单内仍受部门 ACL（除非另有穿透逻辑）；此处用仅自己以外且分享已过的场景。"""
+        user = _make_user(role=TenantAccountRole.EDITOR)
+        dataset = _make_dataset(
+            department_id="dept-x",
+            created_by="other-user",
+            permission=DatasetPermissionEnum.PARTIAL_TEAM,
+        )
 
         from services.department_service import DepartmentService
 
-        with patch.object(
-            DepartmentService,
-            "assert_department_access",
-            side_effect=DepartmentPermissionDeniedError("无权访问该资源"),
+        with (
+            patch.object(
+                DepartmentService,
+                "assert_department_access",
+                side_effect=DepartmentPermissionDeniedError("无权访问该资源"),
+            ),
+            patch("services.dataset_service.db") as mock_db,
         ):
+            mock_db.session.query.return_value.filter_by.return_value.first.return_value = Mock(account_id="u1")
             with pytest.raises(NoPermissionError):
                 DatasetService.check_dataset_permission(dataset, user)
 

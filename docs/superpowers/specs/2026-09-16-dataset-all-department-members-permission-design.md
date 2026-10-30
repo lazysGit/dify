@@ -40,8 +40,8 @@
 |---|---|---|
 | `only_me` | 只有我 | 仅 `created_by` |
 | `all_department_members` | 所有部门成员 | 用户当前所属部门 == 知识库当前所属部门（精确匹配） |
-| `all_team_members` | 所有团队成员 | 工作空间成员，再叠加现有部门 ACL |
-| `partial_members` | 部分团队成员 | `dataset_permissions` 显式名单，或创建者 |
+| `all_team_members` | 所有团队成员 | 工作空间全体成员可见（**不再叠加部门 ACL**；见 §3.1 2026-10 修正） |
+| `partial_members` | 部分部门成员 | `dataset_permissions` 显式名单，或创建者 |
 
 「所有部门成员」判定只有一条：
 
@@ -68,11 +68,23 @@ coalesce(dataset.department_id, 租户默认部门 id)
 
 对 `all_department_members`，分享层已要求所属部门精确相等，上级部门管理员会在分享层被拒绝，不会因为能管理子部门而看到。
 
-对 `all_team_members`，行为不变：分享层放行后，普通成员仍只能看到自己部门的资源，部门管理员仍能看到本部门及下级。
+对 `only_me` / `partial_members`：分享层通过后仍执行部门 ACL（除非另有名单穿透例外）。
+
+#### 2026-10 产品修正：`all_team_members` 不再叠加部门 ACL
+
+原表述「分享层放行后再叠部门 ACL」会导致跨部门成员永远看不到「所有团队成员」知识库，与「所有部门成员」在跨部门场景下结果相同，选项失去区分度。
+
+修正后：
+
+- 列表：`get_datasets` 部门过滤改为 `permission == all_team_members OR 部门 ACL`。
+- 详情/操作：`check_dataset_permission` 对 `ALL_TEAM` **跳过** `assert_department_access`。
+- `only_me` / `all_department_members` / `partial_members` 语义不变。
 
 ### 3.2 知识库操作员
 
-`dataset_operator` 对「只有我 / 所有团队成员 / 部分成员」保持现状（部分成员仍看显式名单；不能借本功能扩大「所有团队成员」）。
+`dataset_operator` 对「只有我 / 部分成员」保持现状（部分成员仍看显式名单）。
+
+列表侧 `sharing_visibility_filter` 的操作员分支仍可不含裸 `all_team_members`（与历史一致）；若通过其他入口拿到 ID，打开鉴权因 ALL_TEAM 跳过部门 ACL 而可访问。
 
 同部门的 `all_department_members` 知识库必须可见：他们也是该部门成员。实现上在 `sharing_visibility_filter` 的操作员分支中，把「同部门 all_department_members」与原有 `dataset_permissions` 名单做 OR，而不是只返回名单。
 

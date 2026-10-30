@@ -29,7 +29,7 @@
   "form.permissions": "可见权限",
   "form.permissionsAllDepartmentMembers": "所有部门成员",
   "form.permissionsAllMember": "所有团队成员",
-  "form.permissionsInvitedMembers": "部分团队成员",
+  "form.permissionsInvitedMembers": "部分部门成员",
   "form.permissionsOnlyMe": "只有我",
   "form.retrievalSetting.description": "关于检索方法。",
   "form.retrievalSetting.learnMore": "了解更多",

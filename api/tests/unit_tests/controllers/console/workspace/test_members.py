@@ -76,6 +76,174 @@ class TestMemberListApi:
             with pytest.raises(ValueError):
                 method(api)
 
+    def test_get_forbidden_for_normal_member(self, app):
+        """普通成员不能拉全量成员列表（设置页也不会用到）。"""
+        api = MemberListApi()
+        method = unwrap(api.get)
+
+        tenant = MagicMock(id="t1")
+        user = MagicMock(
+            current_tenant=tenant,
+            id="u1",
+            is_admin_or_owner=False,
+            is_dataset_editor=False,
+        )
+        members = [MagicMock(department_id="d1")]
+
+        with (
+            app.test_request_context("/"),
+            patch("controllers.console.workspace.members.current_account_with_tenant", return_value=(user, "t1")),
+            patch("controllers.console.workspace.members.TenantService.get_tenant_members", return_value=members),
+            patch("controllers.console.workspace.members.DepartmentService.is_department_admin", return_value=False),
+        ):
+            result, status = method(api)
+
+        assert status == 403
+        assert result["code"] == "forbidden"
+
+    def test_get_editor_sees_same_department_only(self, app):
+        """知识库设置「部分部门成员」选择器：编辑可列本部门成员，不能看其他部门。"""
+        api = MemberListApi()
+        method = unwrap(api.get)
+
+        tenant = MagicMock(id="t1")
+        user = MagicMock(
+            current_tenant=tenant,
+            id="editor1",
+            is_admin_or_owner=False,
+            is_dataset_editor=True,
+        )
+        same = MagicMock()
+        same.id = "m1"
+        same.name = "Peer"
+        same.email = "peer@test.com"
+        same.avatar = None
+        same.role = "editor"
+        same.status = "active"
+        same.department_id = "dept-rd"
+        same.department_name = "研发部"
+        same.is_department_admin = False
+        other = MagicMock()
+        other.id = "m2"
+        other.name = "Other"
+        other.email = "other@test.com"
+        other.avatar = None
+        other.role = "editor"
+        other.status = "active"
+        other.department_id = "dept-mkt"
+        other.department_name = "市场部"
+        other.is_department_admin = False
+
+        with (
+            app.test_request_context("/"),
+            patch("controllers.console.workspace.members.current_account_with_tenant", return_value=(user, "t1")),
+            patch(
+                "controllers.console.workspace.members.TenantService.get_tenant_members",
+                return_value=[same, other],
+            ),
+            patch("controllers.console.workspace.members.DepartmentService.is_department_admin", return_value=False),
+            patch(
+                "controllers.console.workspace.members.DepartmentService.get_user_department_id",
+                return_value="dept-rd",
+            ),
+        ):
+            result, status = method(api)
+
+        assert status == 200
+        assert [a["id"] for a in result["accounts"]] == ["m1"]
+
+    def test_get_editor_without_department_returns_empty(self, app):
+        """无所属部门的编辑：部分部门成员选择器为空，不泄露其他部门。"""
+        api = MemberListApi()
+        method = unwrap(api.get)
+
+        tenant = MagicMock(id="t1")
+        user = MagicMock(
+            current_tenant=tenant,
+            id="editor-no-dept",
+            is_admin_or_owner=False,
+            is_dataset_editor=True,
+        )
+        peer = MagicMock()
+        peer.id = "m1"
+        peer.name = "Peer"
+        peer.email = "peer@test.com"
+        peer.avatar = None
+        peer.role = "editor"
+        peer.status = "active"
+        peer.department_id = "dept-rd"
+        peer.department_name = "研发部"
+        peer.is_department_admin = False
+
+        with (
+            app.test_request_context("/"),
+            patch("controllers.console.workspace.members.current_account_with_tenant", return_value=(user, "t1")),
+            patch(
+                "controllers.console.workspace.members.TenantService.get_tenant_members",
+                return_value=[peer],
+            ),
+            patch("controllers.console.workspace.members.DepartmentService.is_department_admin", return_value=False),
+            patch(
+                "controllers.console.workspace.members.DepartmentService.get_user_department_id",
+                return_value=None,
+            ),
+        ):
+            result, status = method(api)
+
+        assert status == 200
+        assert result["accounts"] == []
+
+    def test_get_dataset_operator_sees_same_department_only(self, app):
+        """dataset_operator 同属 is_dataset_editor：仅本部门成员。"""
+        api = MemberListApi()
+        method = unwrap(api.get)
+
+        tenant = MagicMock(id="t1")
+        user = MagicMock(
+            current_tenant=tenant,
+            id="op1",
+            is_admin_or_owner=False,
+            is_dataset_editor=True,
+        )
+        same = MagicMock()
+        same.id = "m1"
+        same.name = "Peer"
+        same.email = "peer@test.com"
+        same.avatar = None
+        same.role = "normal"
+        same.status = "active"
+        same.department_id = "dept-rd"
+        same.department_name = "研发部"
+        same.is_department_admin = False
+        other = MagicMock()
+        other.id = "m2"
+        other.name = "Other"
+        other.email = "other@test.com"
+        other.avatar = None
+        other.role = "editor"
+        other.status = "active"
+        other.department_id = "dept-mkt"
+        other.department_name = "市场部"
+        other.is_department_admin = False
+
+        with (
+            app.test_request_context("/"),
+            patch("controllers.console.workspace.members.current_account_with_tenant", return_value=(user, "t1")),
+            patch(
+                "controllers.console.workspace.members.TenantService.get_tenant_members",
+                return_value=[same, other],
+            ),
+            patch("controllers.console.workspace.members.DepartmentService.is_department_admin", return_value=False),
+            patch(
+                "controllers.console.workspace.members.DepartmentService.get_user_department_id",
+                return_value="dept-rd",
+            ),
+        ):
+            result, status = method(api)
+
+        assert status == 200
+        assert [a["id"] for a in result["accounts"]] == ["m1"]
+
 
 class TestMemberInitialPasswordApi:
     def test_get_success_for_admin(self, app):

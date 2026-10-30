@@ -82,6 +82,15 @@ class MemberListApi(Resource):
     @account_initialization_required
     @console_ns.response(200, "Success", console_ns.models[AccountWithRoleList.__name__])
     def get(self):
+        """List members for settings UIs (member admin + dataset partial-member picker).
+
+        Scope:
+        - owner/admin: all members
+        - department admin: manageable departments (self + descendants)
+        - dataset editor roles (editor / dataset_operator): same department only
+          (needed by knowledge-base 「部分部门成员」 picker; must not leak other depts)
+        - others: forbidden
+        """
         current_user, _ = current_account_with_tenant()
         if not current_user.current_tenant:
             raise ValueError("No current tenant")
@@ -89,15 +98,23 @@ class MemberListApi(Resource):
         tenant_id = current_user.current_tenant.id
         is_admin_or_owner = current_user.is_admin_or_owner
         is_dept_admin = DepartmentService.is_department_admin(current_user.id, tenant_id)
+        is_dataset_editor = bool(getattr(current_user, "is_dataset_editor", False))
 
-        if not is_admin_or_owner and not is_dept_admin:
-            return {"code": "forbidden", "message": "Only admin or department admin can list members"}, 403
+        if not is_admin_or_owner and not is_dept_admin and not is_dataset_editor:
+            return {
+                "code": "forbidden",
+                "message": "Only admin, department admin, or dataset editor can list members",
+            }, 403
 
         members = TenantService.get_tenant_members(current_user.current_tenant)
 
         if not is_admin_or_owner and is_dept_admin:
             manageable = DepartmentService.get_manageable_department_ids(current_user, tenant_id)
             members = [m for m in members if getattr(m, "department_id", None) in manageable]
+        elif not is_admin_or_owner and not is_dept_admin and is_dataset_editor:
+            # No department → empty picker list (cannot assign 「部分部门成员」 meaningfully)
+            dept_id = DepartmentService.get_user_department_id(current_user.id, tenant_id)
+            members = [m for m in members if getattr(m, "department_id", None) == dept_id] if dept_id else []
 
         member_models = TypeAdapter(list[AccountWithRole]).validate_python(members, from_attributes=True)
         response = AccountWithRoleList(accounts=member_models)
