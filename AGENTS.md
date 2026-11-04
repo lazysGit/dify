@@ -6,6 +6,7 @@
 ## 用户约束
 
 - **沟通语言**: 使用简体中文
+- **提交信息**: 生成 git commit message 时使用简体中文
 - **文档格式**: 不使用 emoji 字符
 - **GitHub 访问**: 失败时使用 gh-proxy 重试
 - **Python 运行/测试**: 全部使用 `uv`，初始化虚拟环境使用 `uv venv` 或 `uv sync --group dev`
