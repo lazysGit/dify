@@ -1,23 +1,25 @@
 'use client'
-import type { InvitationResult } from '@/models/common'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Avatar } from '@/app/components/base/avatar'
+import Button from '@/app/components/base/button'
+import SearchInput from '@/app/components/base/search-input'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/app/components/base/ui/tooltip'
 import { NUM_INFINITE } from '@/app/components/billing/config'
 import { Plan } from '@/app/components/billing/type'
 import UpgradeBtn from '@/app/components/billing/upgrade-btn'
 import { useAppContext } from '@/context/app-context'
-import { useGlobalPublicStore } from '@/context/global-public-context'
 import { useLocale } from '@/context/i18n'
 import { useProviderContext } from '@/context/provider-context'
 import { useFormatTimeFromNow } from '@/hooks/use-format-time-from-now'
 import { LanguagesSupported } from '@/i18n-config/language'
 import { useMembers } from '@/service/use-common'
+import { useDepartmentList } from '@/service/use-departments'
+import CreateMemberModal from './create-member-modal'
+import DepartmentTreeSelect from './department-tree-select'
+import { collectSelfAndDescendantIds, matchNameOrEmail } from './department-tree-select/utils'
 import EditWorkspaceModal from './edit-workspace-modal'
-import InviteButton from './invite-button'
-import InviteModal from './invite-modal'
-import InvitedModal from './invited-modal'
+import ModelWhitelistModal from './model-whitelist-modal'
 import Operation from './operation'
 import TransferOwnership from './operation/transfer-ownership'
 import TransferOwnershipModal from './transfer-ownership-modal'
@@ -35,17 +37,53 @@ const MembersPage = () => {
 
   const { userProfile, currentWorkspace, isCurrentWorkspaceOwner, isCurrentWorkspaceManager } = useAppContext()
   const { data, refetch } = useMembers()
-  const systemFeatures = useGlobalPublicStore(s => s.systemFeatures)
   const { formatTimeFromNow } = useFormatTimeFromNow()
-  const [inviteModalVisible, setInviteModalVisible] = useState(false)
-  const [invitationResults, setInvitationResults] = useState<InvitationResult[]>([])
-  const [invitedModalVisible, setInvitedModalVisible] = useState(false)
-  const accounts = data?.accounts || []
+  const accounts = useMemo(() => data?.accounts || [], [data?.accounts])
   const { plan, enableBilling, isAllowTransferWorkspace } = useProviderContext()
   const isNotUnlimitedMemberPlan = enableBilling && plan.type !== Plan.team && plan.type !== Plan.enterprise
   const isMemberFull = enableBilling && isNotUnlimitedMemberPlan && accounts.length >= plan.total.teamMembers
   const [editWorkspaceModalVisible, setEditWorkspaceModalVisible] = useState(false)
   const [showTransferOwnershipModal, setShowTransferOwnershipModal] = useState(false)
+
+  const departmentListQuery = useDepartmentList()
+  const departments = useMemo(() => departmentListQuery.data?.departments ?? [], [departmentListQuery.data?.departments])
+  const tree = useMemo(() => departmentListQuery.data?.tree ?? [], [departmentListQuery.data?.tree])
+  const manageableDepartmentIds = departmentListQuery.data?.manageable_department_ids ?? []
+  const isDepartmentAdmin = departmentListQuery.data?.is_department_admin ?? false
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState<string>('')
+  const [searchKeyword, setSearchKeyword] = useState('')
+
+  const deptNameMap = useMemo(() => {
+    const map: Record<string, string> = {}
+    for (const d of departments)
+      map[d.id] = d.name
+    return map
+  }, [departments])
+
+  const filteredAccounts = useMemo(() => {
+    const allowedDeptIds = selectedDepartmentId
+      ? collectSelfAndDescendantIds(tree, selectedDepartmentId)
+      : null
+    return accounts.filter((account) => {
+      if (allowedDeptIds && !allowedDeptIds.has(account.department_id ?? ''))
+        return false
+      return matchNameOrEmail(account, searchKeyword)
+    })
+  }, [accounts, selectedDepartmentId, searchKeyword, tree])
+
+  const canCreateMember = isCurrentWorkspaceOwner || isCurrentWorkspaceManager || isDepartmentAdmin
+  const canEditMemberRole = (account: (typeof accounts)[number]) => {
+    if (account.role === 'owner')
+      return false
+    if (isCurrentWorkspaceOwner)
+      return true
+    if (!isDepartmentAdmin || userProfile.email === account.email)
+      return false
+    return !!account.department_id && manageableDepartmentIds.includes(account.department_id)
+  }
+  const [showCreateMemberModal, setShowCreateMemberModal] = useState(false)
+  const canManageModelPermission = isCurrentWorkspaceOwner || isCurrentWorkspaceManager
+  const [modelPermissionAccount, setModelPermissionAccount] = useState<{ id: string, name: string } | null>(null)
 
   return (
     <>
@@ -111,7 +149,27 @@ const MembersPage = () => {
             <UpgradeBtn className="mr-2" loc="member-invite" />
           )}
           <div className="shrink-0">
-            {isCurrentWorkspaceManager && <InviteButton disabled={isMemberFull} onClick={() => setInviteModalVisible(true)} />}
+            {canCreateMember && (
+              <Button variant="primary" onClick={() => setShowCreateMemberModal(true)}>
+                <span className="i-ri-user-add-line mr-1 h-4 w-4" />
+                {t('members.createMember', { ns: 'common' })}
+              </Button>
+            )}
+          </div>
+        </div>
+        <div className="mb-3 flex items-center gap-2">
+          <DepartmentTreeSelect
+            tree={tree}
+            manageableDepartmentIds={manageableDepartmentIds}
+            value={selectedDepartmentId}
+            onChange={setSelectedDepartmentId}
+          />
+          <div className="w-[240px]" data-testid="member-search">
+            <SearchInput
+              value={searchKeyword}
+              onChange={setSearchKeyword}
+              placeholder={t('members.searchPlaceholder', { ns: 'common' })}
+            />
           </div>
         </div>
         <div className="overflow-visible lg:overflow-visible">
@@ -119,10 +177,18 @@ const MembersPage = () => {
             <div className="grow px-3 text-text-tertiary system-xs-medium-uppercase">{t('members.name', { ns: 'common' })}</div>
             <div className="w-[104px] shrink-0 text-text-tertiary system-xs-medium-uppercase">{t('members.lastActive', { ns: 'common' })}</div>
             <div className="w-[96px] shrink-0 px-3 text-text-tertiary system-xs-medium-uppercase">{t('members.role', { ns: 'common' })}</div>
+            {canManageModelPermission && (
+              <div className="w-[104px] shrink-0 px-3 text-text-tertiary system-xs-medium-uppercase">{t('members.model_permission', { ns: 'common' })}</div>
+            )}
           </div>
           <div className="relative min-w-[480px]">
+            {filteredAccounts.length === 0 && (
+              <div className="px-3 py-8 text-center text-text-tertiary system-sm-regular">
+                {t('members.noMatchingMembers', { ns: 'common' })}
+              </div>
+            )}
             {
-              accounts.map(account => (
+              filteredAccounts.map(account => (
                 <div key={account.id} className="flex border-b border-divider-subtle">
                   <div className="flex grow items-center px-3 py-2">
                     <Avatar avatar={account.avatar_url} size="sm" className="mr-2" name={account.name} />
@@ -132,7 +198,15 @@ const MembersPage = () => {
                         {account.status === 'pending' && <span className="ml-1 text-text-warning system-xs-medium">{t('members.pending', { ns: 'common' })}</span>}
                         {userProfile.email === account.email && <span className="text-text-tertiary system-xs-regular">{t('members.you', { ns: 'common' })}</span>}
                       </div>
-                      <div className="text-text-tertiary system-xs-regular">{account.email}</div>
+                      <div className="flex items-center gap-1 text-text-tertiary system-xs-regular">
+                        <span>{account.email}</span>
+                        {account.department_id && deptNameMap[account.department_id] && (
+                          <>
+                            <span className="text-divider-regular">/</span>
+                            <span>{deptNameMap[account.department_id]}</span>
+                          </>
+                        )}
+                      </div>
                     </div>
                   </div>
                   <div className="flex w-[104px] shrink-0 items-center py-2 text-text-secondary system-sm-regular">{formatTimeFromNow(Number((account.last_active_at || account.created_at)) * 1000)}</div>
@@ -143,40 +217,33 @@ const MembersPage = () => {
                     {isCurrentWorkspaceOwner && account.role === 'owner' && !isAllowTransferWorkspace && (
                       <div className="px-3 text-text-secondary system-sm-regular">{RoleMap[account.role] || RoleMap.normal}</div>
                     )}
-                    {isCurrentWorkspaceOwner && account.role !== 'owner' && (
-                      <Operation member={account} operatorRole={currentWorkspace.role} onOperate={refetch} />
+                    {canEditMemberRole(account) && (
+                      <Operation member={account} operatorRole={currentWorkspace.role} onOperate={refetch} isDepartmentAdmin={isDepartmentAdmin} />
                     )}
-                    {!isCurrentWorkspaceOwner && (
+                    {!canEditMemberRole(account) && account.role !== 'owner' && (
+                      <div className="px-3 text-text-secondary system-sm-regular">{RoleMap[account.role] || RoleMap.normal}</div>
+                    )}
+                    {!isCurrentWorkspaceOwner && account.role === 'owner' && (
                       <div className="px-3 text-text-secondary system-sm-regular">{RoleMap[account.role] || RoleMap.normal}</div>
                     )}
                   </div>
+                  {canManageModelPermission && (
+                    <div className="flex w-[104px] shrink-0 items-center px-3">
+                      <Button
+                        variant="secondary"
+                        size="small"
+                        onClick={() => setModelPermissionAccount({ id: account.id, name: account.name })}
+                      >
+                        {t('members.model_permission', { ns: 'common' })}
+                      </Button>
+                    </div>
+                  )}
                 </div>
               ))
             }
           </div>
         </div>
       </div>
-      {
-        inviteModalVisible && (
-          <InviteModal
-            isEmailSetup={systemFeatures.is_email_setup}
-            onCancel={() => setInviteModalVisible(false)}
-            onSend={(invitationResults) => {
-              setInvitedModalVisible(true)
-              setInvitationResults(invitationResults)
-              refetch()
-            }}
-          />
-        )
-      }
-      {
-        invitedModalVisible && (
-          <InvitedModal
-            invitationResults={invitationResults}
-            onCancel={() => setInvitedModalVisible(false)}
-          />
-        )
-      }
       {
         editWorkspaceModalVisible && (
           <EditWorkspaceModal
@@ -188,6 +255,19 @@ const MembersPage = () => {
         <TransferOwnershipModal
           show={showTransferOwnershipModal}
           onClose={() => setShowTransferOwnershipModal(false)}
+        />
+      )}
+      {showCreateMemberModal && (
+        <CreateMemberModal
+          onClose={() => setShowCreateMemberModal(false)}
+          onSuccess={refetch}
+        />
+      )}
+      {modelPermissionAccount && (
+        <ModelWhitelistModal
+          accountId={modelPermissionAccount.id}
+          accountName={modelPermissionAccount.name}
+          onClose={() => setModelPermissionAccount(null)}
         />
       )}
     </>

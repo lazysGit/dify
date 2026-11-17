@@ -1,5 +1,5 @@
 import type { Member } from '@/models/common'
-import { RiArrowDownSLine, RiGroup2Line, RiLock2Line } from '@remixicon/react'
+import { RiArrowDownSLine, RiBuildingLine, RiGroup2Line, RiLock2Line } from '@remixicon/react'
 import { useDebounceFn } from 'ahooks'
 import * as React from 'react'
 import { useCallback, useMemo, useState } from 'react'
@@ -74,6 +74,11 @@ const PermissionSelector = ({
     setOpen(false)
   }, [onChange])
 
+  const onSelectAllDepartmentMembers = useCallback(() => {
+    onChange(DatasetPermission.allDepartmentMembers)
+    setOpen(false)
+  }, [onChange])
+
   const onSelectAllMembers = useCallback(() => {
     onChange(DatasetPermission.allTeamMembers)
     setOpen(false)
@@ -85,6 +90,7 @@ const PermissionSelector = ({
   }, [onChange, onMemberSelect, userProfile])
 
   const isOnlyMe = permission === DatasetPermission.onlyMe
+  const isAllDepartmentMembers = permission === DatasetPermission.allDepartmentMembers
   const isAllTeamMembers = permission === DatasetPermission.allTeamMembers
   const isPartialMembers = permission === DatasetPermission.partialMembers
   const selectedMemberNames = selectedMembers.map(member => member.name).join(', ')
@@ -108,8 +114,20 @@ const PermissionSelector = ({
                   <div className="flex size-6 shrink-0 items-center justify-center">
                     <Avatar avatar={userProfile.avatar_url} name={userProfile.name} size="xs" />
                   </div>
-                  <div className="system-sm-regular grow p-1 text-components-input-text-filled">
+                  <div className="grow p-1 text-components-input-text-filled system-sm-regular">
                     {t('form.permissionsOnlyMe', { ns: 'datasetSettings' })}
+                  </div>
+                </>
+              )
+            }
+            {
+              isAllDepartmentMembers && (
+                <>
+                  <div className="flex size-6 shrink-0 items-center justify-center">
+                    <RiBuildingLine className="size-4 text-text-secondary" />
+                  </div>
+                  <div className="grow p-1 text-components-input-text-filled system-sm-regular">
+                    {t('form.permissionsAllDepartmentMembers', { ns: 'datasetSettings' })}
                   </div>
                 </>
               )
@@ -120,7 +138,7 @@ const PermissionSelector = ({
                   <div className="flex size-6 shrink-0 items-center justify-center">
                     <RiGroup2Line className="size-4 text-text-secondary" />
                   </div>
-                  <div className="system-sm-regular grow p-1 text-components-input-text-filled">
+                  <div className="grow p-1 text-components-input-text-filled system-sm-regular">
                     {t('form.permissionsAllMember', { ns: 'datasetSettings' })}
                   </div>
                 </>
@@ -160,7 +178,7 @@ const PermissionSelector = ({
                   </div>
                   <div
                     title={selectedMemberNames}
-                    className="system-sm-regular grow truncate p-1 text-components-input-text-filled"
+                    className="grow truncate p-1 text-components-input-text-filled system-sm-regular"
                   >
                     {selectedMemberNames}
                   </div>
@@ -187,6 +205,16 @@ const PermissionSelector = ({
                 text={t('form.permissionsOnlyMe', { ns: 'datasetSettings' })}
                 onClick={onSelectOnlyMe}
                 isSelected={isOnlyMe}
+              />
+              <Item
+                leftIcon={(
+                  <div className="flex size-6 shrink-0 items-center justify-center">
+                    <RiBuildingLine className="size-4 text-text-secondary" />
+                  </div>
+                )}
+                text={t('form.permissionsAllDepartmentMembers', { ns: 'datasetSettings' })}
+                onClick={onSelectAllDepartmentMembers}
+                isSelected={isAllDepartmentMembers}
               />
               {/* All team members */}
               <Item
@@ -247,7 +275,7 @@ const PermissionSelector = ({
                   ))}
                   {
                     !showMe && filteredMemberList.length === 0 && (
-                      <div className="system-xs-regular flex items-center justify-center whitespace-pre-wrap px-1 py-6 text-center text-text-tertiary">
+                      <div className="flex items-center justify-center whitespace-pre-wrap px-1 py-6 text-center text-text-tertiary system-xs-regular">
                         {t('form.onSearchResults', { ns: 'datasetSettings' })}
                       </div>
                     )

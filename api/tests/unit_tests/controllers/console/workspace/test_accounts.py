@@ -27,9 +27,11 @@ from controllers.console.workspace.account import (
 from controllers.console.workspace.error import (
     AccountAlreadyInitedError,
     CurrentPasswordIncorrectError,
+    DefaultPasswordNotAllowedError,
     InvalidAccountDeletionCodeError,
 )
 from services.errors.account import CurrentPasswordIncorrectError as ServicePwdError
+from services.errors.account import DefaultPasswordNotAllowedError as ServiceDefaultPwdError
 
 
 def unwrap(func):
@@ -186,6 +188,29 @@ class TestAccountPasswordApi:
             ),
         ):
             with pytest.raises(CurrentPasswordIncorrectError):
+                method(api)
+
+    def test_password_rejects_default_password(self, app):
+        api = AccountPasswordApi()
+        method = unwrap(api.post)
+
+        payload = {
+            "password": "old",
+            "new_password": "Dify1234",
+            "repeat_new_password": "Dify1234",
+        }
+
+        with (
+            app.test_request_context("/", json=payload),
+            patch(
+                "controllers.console.workspace.account.current_account_with_tenant", return_value=(MagicMock(), "t1")
+            ),
+            patch(
+                "controllers.console.workspace.account.AccountService.update_account_password",
+                side_effect=ServiceDefaultPwdError(),
+            ),
+        ):
+            with pytest.raises(DefaultPasswordNotAllowedError):
                 method(api)
 
 

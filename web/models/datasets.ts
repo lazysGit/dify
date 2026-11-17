@@ -19,6 +19,7 @@ export enum DatasetPermission {
   onlyMe = 'only_me',
   allTeamMembers = 'all_team_members',
   partialMembers = 'partial_members',
+  allDepartmentMembers = 'all_department_members',
 }
 
 export enum ChunkingMode {
@@ -96,6 +97,8 @@ export type DataSet = {
   enable_api: boolean // Indicates if the service API is enabled
   is_multimodal: boolean // Indicates if the dataset supports multimodal
   summary_index_setting?: SummaryIndexSetting
+  department_id?: string | null
+  department_name?: string | null
 }
 
 export type ExternalAPIItem = {
@@ -196,6 +199,7 @@ export type FetchDatasetsParams = {
     limit?: number
     include_all?: boolean
     keyword?: string
+    department_id?: string
   }
 }
 
@@ -205,6 +209,7 @@ export type DatasetListRequest = {
   limit: number
   include_all?: boolean
   keyword?: string
+  department_id?: string
 }
 
 export type DataSetListResponse = {

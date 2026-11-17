@@ -81,6 +81,8 @@ tenant_fields = {
     "status": fields.String,
     "created_at": TimestampField,
     "role": fields.String,
+    "department_id": fields.String,
+    "department_path": fields.String,
     "in_trial": fields.Boolean,
     "trial_end_reason": fields.String,
     "custom_config": fields.Raw(attribute="custom_config"),

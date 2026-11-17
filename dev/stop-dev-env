@@ -1,0 +1,149 @@
+#!/usr/bin/env bash
+#
+# Dify 本地调试环境停止脚本
+# 用法: dev/stop-dev-env [--include-middleware]
+#
+# 参数:
+#   --include-middleware  同时停止中间件容器
+#
+
+set -e
+
+SCRIPT_DIR="$(dirname "$(realpath "$0")")"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+
+# 颜色定义
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+INCLUDE_MIDDLEWARE=false
+
+for arg in "$@"; do
+    case $arg in
+        --include-middleware)
+            INCLUDE_MIDDLEWARE=true
+            shift
+            ;;
+        *)
+            echo "未知参数: $arg"
+            exit 1
+            ;;
+    esac
+done
+
+log_info() {
+    echo -e "${BLUE}[INFO]${NC} $1"
+}
+
+log_success() {
+    echo -e "${GREEN}[OK]${NC} $1"
+}
+
+log_warn() {
+    echo -e "${YELLOW}[WARN]${NC} $1"
+}
+
+# 停止后端服务
+stop_backend() {
+    log_info "停止后端服务..."
+
+    # 停止 Flask API
+    if pkill -f "flask run.*5001" 2>/dev/null; then
+        log_success "Flask API 已停止"
+    else
+        log_info "Flask API 未运行"
+    fi
+
+    # 停止 Celery Worker
+    if pkill -f "celery.*worker" 2>/dev/null; then
+        log_success "Celery Worker 已停止"
+    else
+        log_info "Celery Worker 未运行"
+    fi
+
+    # 停止 Celery Beat
+    if pkill -f "celery.*beat" 2>/dev/null; then
+        log_success "Celery Beat 已停止"
+    else
+        log_info "Celery Beat 未运行"
+    fi
+
+    # 清理残留进程
+    pkill -f "uv run flask" 2>/dev/null || true
+    pkill -f "uv run celery" 2>/dev/null || true
+}
+
+# 停止前端
+stop_frontend() {
+    log_info "停止前端服务..."
+
+    if pkill -f "vinext" 2>/dev/null; then
+        log_success "前端已停止"
+    else
+        log_info "前端未运行"
+    fi
+
+    # 清理残留进程
+    pkill -f "pnpm dev:vinext" 2>/dev/null || true
+}
+
+# 停止中间件
+stop_middleware() {
+    if [[ "$INCLUDE_MIDDLEWARE" != "true" ]]; then
+        log_info "保留中间件运行 (使用 --include-middleware 停止)"
+        return
+    fi
+
+    log_info "停止中间件服务..."
+
+    # 优先使用 podman，兼容 docker
+    if command -v podman &> /dev/null; then
+        systemctl --user start podman.socket 2>/dev/null || true
+        export DOCKER_HOST="unix:///run/user/$(id -u)/podman/podman.sock"
+    fi
+
+    cd "$PROJECT_ROOT/docker"
+    if docker compose -f docker-compose.middleware.yaml --env-file middleware.env ps -q | grep -q .; then
+        docker compose -f docker-compose.middleware.yaml --env-file middleware.env down
+        log_success "中间件服务已停止"
+    else
+        log_info "中间件服务未运行"
+    fi
+}
+
+# 显示最终状态
+show_final_status() {
+    echo ""
+    echo "=========================================="
+    echo -e "${GREEN}Dify 调试环境已停止${NC}"
+    echo "=========================================="
+    echo ""
+
+    if [[ "$INCLUDE_MIDDLEWARE" == "true" ]]; then
+        echo "所有服务已停止"
+    else
+        echo "应用已停止，中间件仍在运行"
+        echo "使用以下命令停止中间件:"
+        echo "  dev/stop-dev-env --include-middleware"
+    fi
+    echo ""
+}
+
+# 主流程
+main() {
+    echo ""
+    echo "=========================================="
+    echo "  Dify 本地调试环境停止"
+    echo "=========================================="
+    echo ""
+
+    stop_backend
+    stop_frontend
+    stop_middleware
+    show_final_status
+}
+
+main "$@"

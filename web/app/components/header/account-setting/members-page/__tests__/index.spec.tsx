@@ -10,6 +10,7 @@ import { useGlobalPublicStore } from '@/context/global-public-context'
 import { useProviderContext } from '@/context/provider-context'
 import { useFormatTimeFromNow } from '@/hooks/use-format-time-from-now'
 import { useMembers } from '@/service/use-common'
+import { useDepartmentList } from '@/service/use-departments'
 import MembersPage from '../index'
 
 vi.mock('@/context/app-context')
@@ -17,34 +18,13 @@ vi.mock('@/context/global-public-context')
 vi.mock('@/context/provider-context')
 vi.mock('@/hooks/use-format-time-from-now')
 vi.mock('@/service/use-common')
+vi.mock('@/service/use-departments')
 
 vi.mock('../edit-workspace-modal', () => ({
   default: ({ onCancel }: { onCancel: () => void }) => (
     <div>
       <div>Edit Workspace Modal</div>
       <button onClick={onCancel}>Close Edit Workspace</button>
-    </div>
-  ),
-}))
-vi.mock('../invite-button', () => ({
-  default: ({ onClick, disabled }: { onClick: () => void, disabled: boolean }) => (
-    <button onClick={onClick} disabled={disabled}>Invite</button>
-  ),
-}))
-vi.mock('../invite-modal', () => ({
-  default: ({ onCancel, onSend }: { onCancel: () => void, onSend: (results: Array<{ email: string, status: 'success', url: string }>) => void }) => (
-    <div>
-      <div>Invite Modal</div>
-      <button onClick={onCancel}>Close Invite Modal</button>
-      <button onClick={() => onSend([{ email: 'sent@example.com', status: 'success', url: 'http://invite/link' }])}>Send Invite Results</button>
-    </div>
-  ),
-}))
-vi.mock('../invited-modal', () => ({
-  default: ({ onCancel }: { onCancel: () => void }) => (
-    <div>
-      <div>Invited Modal</div>
-      <button onClick={onCancel}>Close Invited Modal</button>
     </div>
   ),
 }))
@@ -59,6 +39,14 @@ vi.mock('../transfer-ownership-modal', () => ({
     <div>
       <div>Transfer Ownership Modal</div>
       <button onClick={onClose}>Close Transfer Modal</button>
+    </div>
+  ),
+}))
+vi.mock('../create-member-modal', () => ({
+  default: ({ onClose }: { onClose: () => void }) => (
+    <div>
+      <div>Create Member Modal</div>
+      <button onClick={onClose}>Close Create Member</button>
     </div>
   ),
 }))
@@ -112,6 +100,15 @@ describe('MembersPage', () => {
       refetch: mockRefetch,
     } as unknown as ReturnType<typeof useMembers>)
 
+    vi.mocked(useDepartmentList).mockReturnValue({
+      data: {
+        departments: [],
+        tree: [],
+        manageable_department_ids: [],
+        is_department_admin: false,
+      },
+    } as unknown as ReturnType<typeof useDepartmentList>)
+
     vi.mocked(useGlobalPublicStore).mockImplementation(selector => selector({
       systemFeatures: { is_email_setup: true },
     } as unknown as Parameters<typeof selector>[0]))
@@ -132,33 +129,6 @@ describe('MembersPage', () => {
     expect(screen.getByText('Test Workspace')).toBeInTheDocument()
     expect(screen.getByText('Owner User')).toBeInTheDocument()
     expect(screen.getByText('Admin User')).toBeInTheDocument()
-  })
-
-  it('should open and close invite modal', async () => {
-    const user = userEvent.setup()
-
-    render(<MembersPage />)
-
-    await user.click(screen.getByRole('button', { name: /invite/i }))
-    expect(screen.getByText('Invite Modal')).toBeInTheDocument()
-
-    await user.click(screen.getByRole('button', { name: 'Close Invite Modal' }))
-    expect(screen.queryByText('Invite Modal')).not.toBeInTheDocument()
-  })
-
-  it('should open invited modal after invite results are sent', async () => {
-    const user = userEvent.setup()
-
-    render(<MembersPage />)
-
-    await user.click(screen.getByRole('button', { name: /invite/i }))
-    await user.click(screen.getByRole('button', { name: 'Send Invite Results' }))
-
-    expect(screen.getByText('Invited Modal')).toBeInTheDocument()
-    expect(mockRefetch).toHaveBeenCalled()
-
-    await user.click(screen.getByRole('button', { name: 'Close Invited Modal' }))
-    expect(screen.queryByText('Invited Modal')).not.toBeInTheDocument()
   })
 
   it('should open transfer ownership modal when transfer action is used', async () => {
@@ -192,7 +162,6 @@ describe('MembersPage', () => {
 
     render(<MembersPage />)
 
-    expect(screen.queryByRole('button', { name: /invite/i })).not.toBeInTheDocument()
     expect(screen.queryByText('Transfer ownership')).not.toBeInTheDocument()
   })
 
@@ -233,7 +202,7 @@ describe('MembersPage', () => {
     render(<MembersPage />)
 
     expect(screen.getByText(/members\.pending/i)).toBeInTheDocument()
-    expect(screen.getByText(/members\.you/i)).toBeInTheDocument() // Current user is owner@example.com
+    expect(screen.getByText(/members\.you/i)).toBeInTheDocument()
   })
 
   it('should show billing information for limited plan', () => {
@@ -248,9 +217,9 @@ describe('MembersPage', () => {
     render(<MembersPage />)
 
     expect(screen.getByText(/plansCommon\.member/i)).toBeInTheDocument()
-    expect(screen.getByText('2')).toBeInTheDocument() // accounts.length
+    expect(screen.getByText('2')).toBeInTheDocument()
     expect(screen.getByText('/')).toBeInTheDocument()
-    expect(screen.getByText('5')).toBeInTheDocument() // plan.total.teamMembers
+    expect(screen.getByText('5')).toBeInTheDocument()
   })
 
   it('should show unlimited billing information', () => {
@@ -278,22 +247,7 @@ describe('MembersPage', () => {
 
     render(<MembersPage />)
 
-    // Plan.team is an unlimited member plan → isNotUnlimitedMemberPlan=false → non-billing layout
     expect(screen.getByText(/plansCommon\.memberAfter/i)).toBeInTheDocument()
-  })
-
-  it('should show invite button when user is manager but not owner', () => {
-    vi.mocked(useAppContext).mockReturnValue({
-      userProfile: { email: 'admin@example.com' },
-      currentWorkspace: { name: 'Test Workspace', role: 'admin' } as ICurrentWorkspace,
-      isCurrentWorkspaceOwner: false,
-      isCurrentWorkspaceManager: true,
-    } as unknown as AppContextValue)
-
-    render(<MembersPage />)
-
-    expect(screen.getByRole('button', { name: /invite/i })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /transfer ownership/i })).not.toBeInTheDocument()
   })
 
   it('should use created_at as fallback when last_active_at is empty', () => {

@@ -14,6 +14,7 @@ from dify_graph.model_runtime.utils.encoders import jsonable_encoder
 from libs.helper import uuid_value
 from libs.login import current_account_with_tenant, login_required
 from services.model_load_balancing_service import ModelLoadBalancingService
+from services.model_permission_service import ModelPermissionService
 from services.model_provider_service import ModelProviderService
 
 logger = logging.getLogger(__name__)
@@ -530,8 +531,11 @@ class ModelProviderAvailableModelApi(Resource):
     @login_required
     @account_initialization_required
     def get(self, model_type):
-        _, tenant_id = current_account_with_tenant()
-        model_provider_service = ModelProviderService()
-        models = model_provider_service.get_models_by_model_type(tenant_id=tenant_id, model_type=model_type)
+        user, tenant_id = current_account_with_tenant()
+        # Single backend chokepoint: every frontend model selector funnels through
+        # this endpoint, so whitelist filtering here covers all of them at once.
+        models = ModelPermissionService.get_filtered_models(
+            account_id=user.id, tenant_id=tenant_id, model_type=model_type, user=user
+        )
 
         return jsonable_encoder({"data": models})

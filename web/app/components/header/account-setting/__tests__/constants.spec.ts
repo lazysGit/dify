@@ -18,6 +18,7 @@ describe('AccountSetting Constants', () => {
     expect(ACCOUNT_SETTING_TAB.API_BASED_EXTENSION).toBe('api-based-extension')
     expect(ACCOUNT_SETTING_TAB.CUSTOM).toBe('custom')
     expect(ACCOUNT_SETTING_TAB.LANGUAGE).toBe('language')
+    expect(ACCOUNT_SETTING_TAB).not.toHaveProperty('MODEL_SETTINGS')
   })
 
   it('should have correct DEFAULT_ACCOUNT_SETTING_TAB', () => {
@@ -38,5 +39,6 @@ describe('AccountSetting Constants', () => {
     expect(isValidAccountSettingTab(null)).toBe(false)
     expect(isValidAccountSettingTab('')).toBe(false)
     expect(isValidAccountSettingTab('invalid')).toBe(false)
+    expect(isValidAccountSettingTab('model_settings')).toBe(false)
   })
 })

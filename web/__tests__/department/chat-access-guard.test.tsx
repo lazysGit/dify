@@ -1,0 +1,275 @@
+import { render, screen, waitFor } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+import ChatAccessGuard from '@/app/(shareLayout)/components/chat-access-guard'
+import { PUBLIC_API_PREFIX } from '@/config'
+
+const mockReplace = vi.fn()
+const mockFetchAccessToken = vi.fn()
+const mockSetWebAppPassport = vi.fn()
+const mockGetWebAppPassport = vi.fn()
+const mockClearWebAppPassport = vi.fn()
+let mockDepartmentAccessEnabled = false
+let mockEmbeddedUserId: string | null = null
+
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string) => key,
+  }),
+}))
+
+vi.mock('@/next/navigation', () => ({
+  useRouter: () => ({
+    replace: mockReplace,
+  }),
+}))
+
+vi.mock('@/context/global-public-context', () => ({
+  useGlobalPublicStore: (selector: (state: { systemFeatures: { department_access_control: boolean } }) => unknown) => {
+    return selector({ systemFeatures: { department_access_control: mockDepartmentAccessEnabled } })
+  },
+}))
+
+vi.mock('@/context/web-app-context', () => ({
+  useWebAppStore: (selector: (state: { embeddedUserId: string | null }) => unknown) => {
+    return selector({ embeddedUserId: mockEmbeddedUserId })
+  },
+}))
+
+vi.mock('@/service/share', () => ({
+  fetchAccessToken: (...args: unknown[]) => mockFetchAccessToken(...args),
+}))
+
+vi.mock('@/service/webapp-auth', () => ({
+  setWebAppPassport: (...args: unknown[]) => mockSetWebAppPassport(...args),
+  getWebAppPassport: (...args: unknown[]) => mockGetWebAppPassport(...args),
+  clearWebAppPassport: (...args: unknown[]) => mockClearWebAppPassport(...args),
+}))
+
+vi.mock('@/app/components/base/loading', () => ({
+  default: () => <div data-testid="loading">Loading</div>,
+}))
+
+describe('ChatAccessGuard', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockDepartmentAccessEnabled = false
+    mockEmbeddedUserId = null
+    mockGetWebAppPassport.mockReturnValue('')
+    mockFetchAccessToken.mockResolvedValue({ access_token: 'console-passport' })
+    globalThis.fetch = vi.fn()
+  })
+
+  it('renders children directly when flag is off', async () => {
+    mockDepartmentAccessEnabled = false
+    render(
+      <ChatAccessGuard appCode="code1">
+        <div data-testid="child">Chat Content</div>
+      </ChatAccessGuard>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByTestId('child')).toBeTruthy()
+    })
+    expect(globalThis.fetch).not.toHaveBeenCalled()
+  })
+
+  it('redirects to signin on 401 response', async () => {
+    mockDepartmentAccessEnabled = true
+    ;(globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      status: 401,
+      ok: false,
+    })
+
+    render(
+      <ChatAccessGuard appCode="code1">
+        <div data-testid="child">Chat Content</div>
+      </ChatAccessGuard>,
+    )
+
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith(expect.stringContaining('/signin?redirect='))
+    })
+  })
+
+  it('renders denied page on 403 response', async () => {
+    mockDepartmentAccessEnabled = true
+    ;(globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      status: 403,
+      ok: false,
+    })
+
+    render(
+      <ChatAccessGuard appCode="code1">
+        <div data-testid="child">Chat Content</div>
+      </ChatAccessGuard>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('common.accessDenied')).toBeTruthy()
+    })
+    expect(screen.getByText('common.returnToConsole')).toBeTruthy()
+  })
+
+  it('renders children on 200 with access=true', async () => {
+    mockDepartmentAccessEnabled = true
+    ;(globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      status: 200,
+      ok: true,
+      json: () => Promise.resolve({
+        access: true,
+        app_info: {
+          app_id: 'app-1',
+          name: 'Test App',
+          icon_type: 'emoji',
+          icon: 'robot',
+          icon_background: '#FF0000',
+          description: 'Test',
+          mode: 'chat',
+        },
+      }),
+    })
+
+    render(
+      <ChatAccessGuard appCode="code1">
+        <div data-testid="child">Chat Content</div>
+      </ChatAccessGuard>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByTestId('child')).toBeTruthy()
+    })
+    expect(mockFetchAccessToken).toHaveBeenCalledWith({ appCode: 'code1', userId: undefined })
+    expect(mockSetWebAppPassport).toHaveBeenCalledWith('code1', 'console-passport')
+  })
+
+  it('shows not_found when verify grants but passport returns 404 (site disabled race)', async () => {
+    mockDepartmentAccessEnabled = true
+    ;(globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      status: 200,
+      ok: true,
+      json: () => Promise.resolve({ access: true, app_info: {} }),
+    })
+    mockFetchAccessToken.mockRejectedValueOnce({ status: 404 })
+
+    render(
+      <ChatAccessGuard appCode="code1">
+        <div data-testid="child">Chat Content</div>
+      </ChatAccessGuard>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('common.appNotFound')).toBeTruthy()
+    })
+    expect(screen.queryByTestId('child')).toBeNull()
+  })
+
+  it('shows denied when verify grants but passport fails with non-404 error', async () => {
+    mockDepartmentAccessEnabled = true
+    ;(globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      status: 200,
+      ok: true,
+      json: () => Promise.resolve({ access: true, app_info: {} }),
+    })
+    mockFetchAccessToken.mockRejectedValueOnce({ status: 500 })
+
+    render(
+      <ChatAccessGuard appCode="code1">
+        <div data-testid="child">Chat Content</div>
+      </ChatAccessGuard>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('common.accessDenied')).toBeTruthy()
+    })
+    expect(screen.queryByTestId('child')).toBeNull()
+  })
+
+  it('redirects to signin when verify grants but passport returns 401', async () => {
+    mockDepartmentAccessEnabled = true
+    ;(globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      status: 200,
+      ok: true,
+      json: () => Promise.resolve({ access: true, app_info: {} }),
+    })
+    mockFetchAccessToken.mockRejectedValueOnce({ status: 401 })
+
+    render(
+      <ChatAccessGuard appCode="code1">
+        <div data-testid="child">Chat Content</div>
+      </ChatAccessGuard>,
+    )
+
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith(expect.stringContaining('/signin?redirect='))
+    })
+  })
+
+  it('renders denied on 200 with access=false and code=access_denied', async () => {
+    mockDepartmentAccessEnabled = true
+    ;(globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      status: 200,
+      ok: true,
+      json: () => Promise.resolve({
+        access: false,
+        code: 'access_denied',
+        message: 'No permission',
+      }),
+    })
+
+    render(
+      <ChatAccessGuard appCode="code1">
+        <div data-testid="child">Chat Content</div>
+      </ChatAccessGuard>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('common.accessDenied')).toBeTruthy()
+    })
+  })
+
+  it('renders not_found on 200 with access=false and code=not_found', async () => {
+    mockDepartmentAccessEnabled = true
+    ;(globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      status: 200,
+      ok: true,
+      json: () => Promise.resolve({
+        access: false,
+        code: 'not_found',
+      }),
+    })
+
+    render(
+      <ChatAccessGuard appCode="code1">
+        <div data-testid="child">Chat Content</div>
+      </ChatAccessGuard>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('common.appNotFound')).toBeTruthy()
+    })
+  })
+
+  it('uses credentials include in fetch request', async () => {
+    mockDepartmentAccessEnabled = true
+    const mockFetch = vi.fn().mockResolvedValueOnce({
+      status: 200,
+      ok: true,
+      json: () => Promise.resolve({ access: true, app_info: {} }),
+    })
+    globalThis.fetch = mockFetch
+
+    render(
+      <ChatAccessGuard appCode="code1">
+        <div data-testid="child">Chat Content</div>
+      </ChatAccessGuard>,
+    )
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledWith(
+        `${PUBLIC_API_PREFIX}/chat-access/verify?app_code=code1`,
+        expect.objectContaining({ credentials: 'include' }),
+      )
+    })
+  })
+})

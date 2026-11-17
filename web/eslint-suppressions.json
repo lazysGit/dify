@@ -4498,9 +4498,6 @@
       "count": 2
     },
     "tailwindcss/enforce-consistent-class-order": {
-      "count": 2
-    },
-    "ts/no-explicit-any": {
       "count": 1
     },
     "unicorn/prefer-number-properties": {
@@ -4721,11 +4718,6 @@
   "app/components/header/account-setting/members-page/edit-workspace-modal/index.tsx": {
     "no-restricted-imports": {
       "count": 1
-    }
-  },
-  "app/components/header/account-setting/members-page/invite-modal/index.tsx": {
-    "react/set-state-in-effect": {
-      "count": 3
     }
   },
   "app/components/header/account-setting/members-page/operation/index.tsx": {
@@ -9483,11 +9475,6 @@
       "count": 1
     }
   },
-  "app/signin/invite-settings/page.tsx": {
-    "no-restricted-imports": {
-      "count": 2
-    }
-  },
   "app/signin/layout.tsx": {
     "tailwindcss/enforce-consistent-class-order": {
       "count": 1
@@ -9775,7 +9762,7 @@
   },
   "service/common.ts": {
     "ts/no-explicit-any": {
-      "count": 29
+      "count": 28
     }
   },
   "service/datasets.ts": {

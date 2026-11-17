@@ -3,8 +3,10 @@
 import * as React from 'react'
 import { useCallback, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
+import { shouldSkipWebSsoRedirect } from '@/app/(shareLayout)/components/embed-access'
 import AppUnavailable from '@/app/components/base/app-unavailable'
 import Loading from '@/app/components/base/loading'
+import { useGlobalPublicStore } from '@/context/global-public-context'
 import { useWebAppStore } from '@/context/web-app-context'
 import { usePathname, useRouter, useSearchParams } from '@/next/navigation'
 import { useGetUserCanAccessApp } from '@/service/access-control'
@@ -13,6 +15,7 @@ import { webAppLogout } from '@/service/webapp-auth'
 
 const AuthenticatedLayout = ({ children }: { children: React.ReactNode }) => {
   const { t } = useTranslation()
+  const departmentAccessControl = useGlobalPublicStore(s => s.systemFeatures.department_access_control)
   const shareCode = useWebAppStore(s => s.shareCode)
   const updateAppInfo = useWebAppStore(s => s.updateAppInfo)
   const updateAppParams = useWebAppStore(s => s.updateAppParams)
@@ -36,6 +39,9 @@ const AuthenticatedLayout = ({ children }: { children: React.ReactNode }) => {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
+  const embedUnavailableReason = shouldSkipWebSsoRedirect(pathname, departmentAccessControl)
+    ? t('common.embedLinkInvalid', { ns: 'share' })
+    : undefined
   const getSigninUrl = useCallback(() => {
     const params = new URLSearchParams(searchParams)
     params.delete('message')
@@ -52,14 +58,14 @@ const AuthenticatedLayout = ({ children }: { children: React.ReactNode }) => {
   if (appInfoError) {
     return (
       <div className="flex h-full items-center justify-center">
-        <AppUnavailable unknownReason={appInfoError.message} />
+        <AppUnavailable unknownReason={embedUnavailableReason ?? appInfoError.message} />
       </div>
     )
   }
   if (appParamsError) {
     return (
       <div className="flex h-full items-center justify-center">
-        <AppUnavailable unknownReason={appParamsError.message} />
+        <AppUnavailable unknownReason={embedUnavailableReason ?? appParamsError.message} />
       </div>
     )
   }
@@ -81,7 +87,7 @@ const AuthenticatedLayout = ({ children }: { children: React.ReactNode }) => {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-y-2">
         <AppUnavailable className="h-auto w-auto" code={403} unknownReason="no permission." />
-        <span className="system-sm-regular cursor-pointer text-text-tertiary" onClick={backToHome}>{t('userProfile.logout', { ns: 'common' })}</span>
+        <span className="cursor-pointer text-text-tertiary system-sm-regular" onClick={backToHome}>{t('userProfile.logout', { ns: 'common' })}</span>
       </div>
     )
   }

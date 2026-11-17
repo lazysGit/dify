@@ -1,10 +1,12 @@
 import type { InferContractRouterInputs } from '@orpc/contract'
-import { appDeleteContract } from './console/apps'
+import { appDeleteContract, appSiteEmbedTokenContract, appSiteEmbedTokenResetContract } from './console/apps'
 import { bindPartnerStackContract, invoicesContract } from './console/billing'
+import { departmentRouterContract } from './console/departments'
 import {
   exploreAppDetailContract,
   exploreAppsContract,
   exploreBannersContract,
+  exploreDepartmentAppsContract,
   exploreInstalledAppAccessModeContract,
   exploreInstalledAppMetaContract,
   exploreInstalledAppParametersContract,
@@ -13,6 +15,9 @@ import {
   exploreInstalledAppUninstallContract,
 } from './console/explore'
 import { changePreferredProviderTypeContract, modelProvidersModelsContract } from './console/model-providers'
+import {
+  modelPermissionsRouterContract,
+} from './console/model_permissions'
 import { notificationContract, notificationDismissContract } from './console/notification'
 import { pluginCheckInstalledContract, pluginLatestVersionsContract } from './console/plugins'
 import { systemFeaturesContract } from './console/system'
@@ -48,6 +53,8 @@ export const consoleRouterContract = {
   systemFeatures: systemFeaturesContract,
   apps: {
     deleteApp: appDeleteContract,
+    embedToken: appSiteEmbedTokenContract,
+    resetEmbedToken: appSiteEmbedTokenResetContract,
   },
   explore: {
     apps: exploreAppsContract,
@@ -59,6 +66,7 @@ export const consoleRouterContract = {
     installedAppParameters: exploreInstalledAppParametersContract,
     installedAppMeta: exploreInstalledAppMetaContract,
     banners: exploreBannersContract,
+    departmentApps: exploreDepartmentAppsContract,
   },
   trialApps: {
     info: trialAppInfoContract,
@@ -70,6 +78,7 @@ export const consoleRouterContract = {
     models: modelProvidersModelsContract,
     changePreferredProviderType: changePreferredProviderTypeContract,
   },
+  modelPermissions: modelPermissionsRouterContract,
   plugins: {
     checkInstalled: pluginCheckInstalledContract,
     latestVersions: pluginLatestVersionsContract,
@@ -80,6 +89,7 @@ export const consoleRouterContract = {
   },
   notification: notificationContract,
   notificationDismiss: notificationDismissContract,
+  departments: departmentRouterContract,
   triggers: {
     list: triggersContract,
     providerInfo: triggerProviderInfoContract,

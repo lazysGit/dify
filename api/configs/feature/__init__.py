@@ -191,6 +191,17 @@ class CodeExecutionSandboxConfig(BaseSettings):
     )
 
 
+class DepartmentConfig(BaseSettings):
+    """
+    Configuration for department access control
+    """
+
+    DEPARTMENT_ACCESS_CONTROL_ENABLED: bool = Field(
+        description="Enable or disable department-based access control for explore listings",
+        default=False,
+    )
+
+
 class TriggerConfig(BaseSettings):
     """
     Configuration for trigger
@@ -1312,6 +1323,12 @@ class AccountConfig(BaseSettings):
         default=False,
     )
 
+    DEFAULT_MEMBER_PASSWORD: str = Field(
+        description="Default initial password prefilled when an admin creates a member. "
+        "Users whose current password still matches this value must change it after login.",
+        default="Dify1234",
+    )
+
 
 class WorkflowLogConfig(BaseSettings):
     WORKFLOW_LOG_CLEANUP_ENABLED: bool = Field(default=False, description="Enable workflow run log cleanup")
@@ -1372,6 +1389,7 @@ class FeatureConfig(
     AuthConfig,  # Changed from OAuthConfig to AuthConfig
     BillingConfig,
     CodeExecutionSandboxConfig,
+    DepartmentConfig,
     TriggerConfig,
     AsyncWorkflowConfig,
     PluginConfig,

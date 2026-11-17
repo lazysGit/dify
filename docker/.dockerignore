@@ -1,0 +1,3 @@
+# Local smoke/runtime volumes must never enter image build context
+volumes-nbys-smoke/
+volumes/

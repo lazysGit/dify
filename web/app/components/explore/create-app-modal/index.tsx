@@ -14,7 +14,9 @@ import Switch from '@/app/components/base/switch'
 import Textarea from '@/app/components/base/textarea'
 import Toast from '@/app/components/base/toast'
 import AppsFull from '@/app/components/billing/apps-full-in-dialog'
+import { useAppContext } from '@/context/app-context'
 import { useProviderContext } from '@/context/provider-context'
+import { useDepartmentList } from '@/service/use-departments'
 import { AppModeEnum } from '@/types/app'
 import AppIconPicker from '../../base/app-icon-picker'
 import ShortcutsName from '../../workflow/shortcuts-name'
@@ -39,6 +41,7 @@ export type CreateAppModalProps = {
     description: string
     use_icon_as_answer_icon?: boolean
     max_active_requests?: number | null
+    department_id?: string
   }) => Promise<void>
   confirmDisabled?: boolean
   onHide: () => void
@@ -78,6 +81,11 @@ const CreateAppModal = ({
 
   const { plan, enableBilling } = useProviderContext()
   const isAppsFull = (enableBilling && plan.usage.buildApps >= plan.total.buildApps)
+  const { isCurrentWorkspaceManager } = useAppContext()
+  const { data: deptListData } = useDepartmentList()
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState<string | undefined>(undefined)
+
+  const departments = deptListData?.departments ?? []
 
   const submit = useCallback(() => {
     if (!name.trim()) {
@@ -85,20 +93,22 @@ const CreateAppModal = ({
       return
     }
     const isValid = maxActiveRequestsInput.trim() !== '' && !isNaN(Number(maxActiveRequestsInput))
-    const payload: any = {
+    const payload: Record<string, unknown> = {
       name,
       icon_type: appIcon.type,
       icon: appIcon.type === 'emoji' ? appIcon.icon : appIcon.fileId,
-      icon_background: appIcon.type === 'emoji' ? appIcon.background! : undefined,
+      icon_background: appIcon.type === 'emoji' ? appIcon.background : undefined,
       description,
       use_icon_as_answer_icon: useIconAsAnswerIcon,
     }
     if (isValid)
       payload.max_active_requests = Number(maxActiveRequestsInput)
+    if (isCurrentWorkspaceManager && selectedDepartmentId)
+      payload.department_id = selectedDepartmentId
 
-    onConfirm(payload)
+    onConfirm(payload as Parameters<typeof onConfirm>[0])
     onHide()
-  }, [name, appIcon, description, useIconAsAnswerIcon, onConfirm, onHide, t, maxActiveRequestsInput])
+  }, [name, appIcon, description, useIconAsAnswerIcon, onConfirm, onHide, t, maxActiveRequestsInput, isCurrentWorkspaceManager, selectedDepartmentId])
 
   const { run: handleSubmit } = useDebounceFn(submit, { wait: 300 })
 
@@ -160,6 +170,28 @@ const CreateAppModal = ({
               onChange={e => setDescription(e.target.value)}
             />
           </div>
+          {/* department */}
+          {!isEditModal && (
+            <div className="pt-2">
+              <div className="py-2 text-sm font-medium leading-[20px] text-text-primary">{t('newApp.captionDepartment', { ns: 'app' })}</div>
+              {isCurrentWorkspaceManager
+                ? (
+                    <select
+                      className="border-components-input-border bg-components-input-bg focus:border-components-input-border-focus focus:ring-components-input-border-focus h-10 w-full rounded-lg border px-3 text-sm text-text-primary focus:outline-none focus:ring-1"
+                      value={selectedDepartmentId || ''}
+                      onChange={e => setSelectedDepartmentId(e.target.value || undefined)}
+                    >
+                      <option value="">{t('newApp.departmentAutoAssign', { ns: 'app' })}</option>
+                      {departments.map(dept => (
+                        <option key={dept.id} value={dept.id}>{dept.name}</option>
+                      ))}
+                    </select>
+                  )
+                : (
+                    <p className="text-text-tertiary body-xs-regular">{t('newApp.departmentAutoAssignHint', { ns: 'app' })}</p>
+                  )}
+            </div>
+          )}
           {/* answer icon */}
           {isEditModal && (appMode === AppModeEnum.CHAT || appMode === AppModeEnum.ADVANCED_CHAT || appMode === AppModeEnum.AGENT_CHAT) && (
             <div className="pt-2">
@@ -170,7 +202,7 @@ const CreateAppModal = ({
                   onChange={v => setUseIconAsAnswerIcon(v)}
                 />
               </div>
-              <p className="body-xs-regular text-text-tertiary">{t('answerIcon.descriptionInExplore', { ns: 'app' })}</p>
+              <p className="text-text-tertiary body-xs-regular">{t('answerIcon.descriptionInExplore', { ns: 'app' })}</p>
             </div>
           )}
           {isEditModal && (
@@ -186,7 +218,7 @@ const CreateAppModal = ({
                 }}
                 className="h-10 w-full"
               />
-              <p className="body-xs-regular mb-0 mt-2 text-text-tertiary">{t('maxActiveRequestsTip', { ns: 'app' })}</p>
+              <p className="text-text-tertiary body-xs-regular mb-0 mt-2">{t('maxActiveRequestsTip', { ns: 'app' })}</p>
             </div>
           )}
           {!isEditModal && isAppsFull && <AppsFull className="mt-4" loc="app-explore-create" />}

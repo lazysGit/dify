@@ -12,9 +12,11 @@ import Button from '@/app/components/base/button'
 import { ACCOUNT_SETTING_TAB } from '@/app/components/header/account-setting/constants'
 import checkTaskStatus from '@/app/components/plugins/install-plugin/base/check-task-status'
 import useRefreshPluginList from '@/app/components/plugins/install-plugin/hooks/use-refresh-plugin-list'
+import { useAppContext } from '@/context/app-context'
 import { useSystemFeaturesQuery } from '@/context/global-public-context'
 import { useModalContext } from '@/context/modal-context'
 import { useProviderContext } from '@/context/provider-context'
+import { useDepartmentList } from '@/service/use-departments'
 import { useInstallPackageFromMarketPlace } from '@/service/use-plugins'
 import { cn } from '@/utils/classnames'
 import { supportFunctionCall } from '@/utils/tool-call'
@@ -51,6 +53,10 @@ const Popup: FC<PopupProps> = ({
   const [searchText, setSearchText] = useState('')
   const [marketplaceCollapsed, setMarketplaceCollapsed] = useState(false)
   const { setShowAccountSettingModal } = useModalContext()
+  const { isCurrentWorkspaceEditor, isCurrentWorkspaceManager } = useAppContext()
+  const departmentListQuery = useDepartmentList()
+  const isDepartmentAdmin = departmentListQuery.data?.is_department_admin ?? false
+  const canOpenProviderSettings = isCurrentWorkspaceManager || (isCurrentWorkspaceEditor && isDepartmentAdmin)
   const { modelProviders } = useProviderContext()
   const {
     plugins: allPlugins,
@@ -249,17 +255,19 @@ const Popup: FC<PopupProps> = ({
                 {t('modelProvider.selector.noProviderConfiguredDesc', { ns: 'common' })}
               </p>
             </div>
-            <Button
-              variant="primary"
-              className="w-[108px]"
-              onClick={() => {
-                onHide()
-                setShowAccountSettingModal({ payload: ACCOUNT_SETTING_TAB.PROVIDER })
-              }}
-            >
-              {t('modelProvider.selector.configure', { ns: 'common' })}
-              <span className="i-ri-arrow-right-line h-4 w-4" />
-            </Button>
+            {canOpenProviderSettings && (
+              <Button
+                variant="primary"
+                className="w-[108px]"
+                onClick={() => {
+                  onHide()
+                  setShowAccountSettingModal({ payload: ACCOUNT_SETTING_TAB.PROVIDER })
+                }}
+              >
+                {t('modelProvider.selector.configure', { ns: 'common' })}
+                <span className="i-ri-arrow-right-line h-4 w-4" />
+              </Button>
+            )}
           </div>
         )}
         {!filteredModelList.length && installedModelList.length > 0 && (
@@ -267,7 +275,7 @@ const Popup: FC<PopupProps> = ({
             {`No model found for \u201C${searchText}\u201D`}
           </div>
         )}
-        {marketplaceProviders.length > 0 && (
+        {canOpenProviderSettings && marketplaceProviders.length > 0 && (
           <>
             <div className="mx-2 my-1 border-t border-divider-subtle" />
             <div className="mb-1">
@@ -329,16 +337,18 @@ const Popup: FC<PopupProps> = ({
           </>
         )}
       </div>
-      <div
-        className="sticky bottom-0 flex cursor-pointer items-center gap-1 rounded-b-lg border-t border-divider-subtle bg-components-panel-bg px-3 py-2 text-text-tertiary hover:text-text-secondary"
-        onClick={() => {
-          onHide()
-          setShowAccountSettingModal({ payload: ACCOUNT_SETTING_TAB.PROVIDER })
-        }}
-      >
-        <span className="i-ri-equalizer-2-line h-4 w-4 shrink-0" />
-        <span className="system-xs-medium">{t('modelProvider.selector.modelProviderSettings', { ns: 'common' })}</span>
-      </div>
+      {canOpenProviderSettings && (
+        <div
+          className="sticky bottom-0 flex cursor-pointer items-center gap-1 rounded-b-lg border-t border-divider-subtle bg-components-panel-bg px-3 py-2 text-text-tertiary hover:text-text-secondary"
+          onClick={() => {
+            onHide()
+            setShowAccountSettingModal({ payload: ACCOUNT_SETTING_TAB.PROVIDER })
+          }}
+        >
+          <span className="i-ri-equalizer-2-line h-4 w-4 shrink-0" />
+          <span className="system-xs-medium">{t('modelProvider.selector.modelProviderSettings', { ns: 'common' })}</span>
+        </div>
+      )}
     </div>
   )
 }

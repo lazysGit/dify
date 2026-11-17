@@ -5,6 +5,7 @@ from enums.cloud_plan import CloudPlan
 from extensions.ext_database import db
 from models.account import Tenant, TenantAccountJoin, TenantAccountRole
 from services.account_service import TenantService
+from services.department_service import DepartmentService
 from services.feature_service import FeatureService
 
 
@@ -31,6 +32,11 @@ class WorkspaceService:
         )
         assert tenant_account_join is not None, "TenantAccountJoin not found"
         tenant_info["role"] = tenant_account_join.role
+        department_id = tenant_account_join.department_id
+        tenant_info["department_id"] = department_id
+        tenant_info["department_path"] = (
+            DepartmentService.get_department_display_path(department_id, tenant.id) if department_id else None
+        )
 
         feature = FeatureService.get_features(tenant.id)
         can_replace_logo = feature.can_replace_logo

@@ -63,6 +63,9 @@ const DSLExportConfirmModal = dynamic(() => import('@/app/components/workflow/ds
 const AccessControl = dynamic(() => import('@/app/components/app/app-access-control'), {
   ssr: false,
 })
+const TransferDepartmentModal = dynamic(() => import('@/app/components/apps/transfer-department-modal'), {
+  ssr: false,
+})
 
 export type AppCardProps = {
   app: App
@@ -73,7 +76,7 @@ const AppCard = ({ app, onRefresh }: AppCardProps) => {
   const { t } = useTranslation()
   const { notify } = useContext(ToastContext)
   const systemFeatures = useGlobalPublicStore(s => s.systemFeatures)
-  const { isCurrentWorkspaceEditor } = useAppContext()
+  const { isCurrentWorkspaceEditor, isCurrentWorkspaceManager } = useAppContext()
   const { onPlanInfoChanged } = useProviderContext()
   const { push } = useRouter()
   const openAsyncWindow = useAsyncWindowOpen()
@@ -84,6 +87,7 @@ const AppCard = ({ app, onRefresh }: AppCardProps) => {
   const [showConfirmDelete, setShowConfirmDelete] = useState(false)
   const [confirmDeleteInput, setConfirmDeleteInput] = useState('')
   const [showAccessControl, setShowAccessControl] = useState(false)
+  const [showTransferDepartment, setShowTransferDepartment] = useState(false)
   const [secretEnvList, setSecretEnvList] = useState<EnvironmentVariable[]>([])
   const { mutateAsync: mutateDeleteApp, isPending: isDeleting } = useDeleteAppMutation()
 
@@ -262,6 +266,12 @@ const AppCard = ({ app, onRefresh }: AppCardProps) => {
       e.preventDefault()
       setShowAccessControl(true)
     }
+    const onClickTransferDepartment = async (e: React.MouseEvent<HTMLButtonElement>) => {
+      e.stopPropagation()
+      props.onClick?.()
+      e.preventDefault()
+      setShowTransferDepartment(true)
+    }
     const onClickInstalledApp = async (e: React.MouseEvent<HTMLButtonElement>) => {
       e.stopPropagation()
       props.onClick?.()
@@ -339,6 +349,16 @@ const AppCard = ({ app, onRefresh }: AppCardProps) => {
             </>
           )
         }
+        {
+          isCurrentWorkspaceManager && (
+            <>
+              <button type="button" className="mx-1 flex h-8 cursor-pointer items-center rounded-lg px-3 hover:bg-state-base-hover" onClick={onClickTransferDepartment}>
+                <span className="text-sm leading-5 text-text-secondary">{t('transferDepartmentAction', { ns: 'app' })}</span>
+              </button>
+              <Divider className="my-1" />
+            </>
+          )
+        }
         <button
           type="button"
           className="group mx-1 flex h-8 cursor-pointer items-center gap-2 rounded-lg px-3 py-[6px] hover:bg-state-destructive-hover"
@@ -390,6 +410,12 @@ const AppCard = ({ app, onRefresh }: AppCardProps) => {
               <div className="truncate" title={app.name}>{app.name}</div>
             </div>
             <div className="flex items-center gap-1 text-[10px] font-medium leading-[18px] text-text-tertiary">
+              {app.department_name && (
+                <>
+                  <div className="truncate" title={app.department_name}>{app.department_name}</div>
+                  <div>·</div>
+                </>
+              )}
               <div className="truncate" title={app.author_name}>{app.author_name}</div>
               <div>·</div>
               <div className="truncate" title={EditTimeText}>{EditTimeText}</div>
@@ -561,6 +587,19 @@ const AppCard = ({ app, onRefresh }: AppCardProps) => {
       )}
       {showAccessControl && (
         <AccessControl app={app} onConfirm={onUpdateAccessControl} onClose={() => setShowAccessControl(false)} />
+      )}
+      {showTransferDepartment && (
+        <TransferDepartmentModal
+          show={showTransferDepartment}
+          resourceId={app.id}
+          resourceType="app"
+          currentDepartmentId={app.department_id}
+          onClose={() => setShowTransferDepartment(false)}
+          onSuccess={() => {
+            setShowTransferDepartment(false)
+            onRefresh?.()
+          }}
+        />
       )}
     </>
   )

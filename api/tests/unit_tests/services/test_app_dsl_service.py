@@ -517,6 +517,12 @@ def test_create_or_update_app_creates_workflow_app_and_saves_dependencies(monkey
         AppDslService, "decrypt_dataset_id", lambda *_args, **_kwargs: "00000000-0000-0000-0000-000000000000"
     )
 
+    from services.department_service import DepartmentService
+
+    monkeypatch.setattr(
+        DepartmentService, "resolve_department_id_for_creation", lambda *_args, **_kwargs: "default-dept-id"
+    )
+
     session = MagicMock()
     service = AppDslService(session)
     deps = [

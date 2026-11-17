@@ -458,6 +458,11 @@ class AppDslService:
             app = App()
             app.id = str(uuid4())
             app.tenant_id = account.current_tenant_id
+            from services.department_service import DepartmentService
+
+            app.department_id = DepartmentService.resolve_department_id_for_creation(
+                account, account.current_tenant_id, None
+            )
             app.mode = app_mode
             app.name = name or app_data.get("name", "")
             app.description = description or app_data.get("description", "")

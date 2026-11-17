@@ -3,6 +3,7 @@ from functools import wraps
 from typing import ParamSpec, TypeVar, Union
 
 from sqlalchemy import select
+from werkzeug.exceptions import Forbidden
 
 from controllers.console.app.error import AppNotFoundError
 from extensions.ext_database import db
@@ -57,6 +58,20 @@ def get_app_model(view: Callable[P, R] | None = None, *, mode: Union[AppMode, li
                     mode_values = {m.value for m in modes}
                     raise AppNotFoundError(f"App mode is not in the supported list: {mode_values}")
 
+            from services.department_service import DepartmentService
+            from services.errors.department import DepartmentPermissionDeniedError
+
+            user, tenant_id = current_account_with_tenant()
+            try:
+                DepartmentService.assert_department_access(
+                    user,
+                    tenant_id,
+                    app_model.department_id,
+                    resource_tenant_id=app_model.tenant_id,
+                )
+            except DepartmentPermissionDeniedError:
+                raise Forbidden("无权访问该资源")
+
             kwargs["app_model"] = app_model
 
             return view_func(*args, **kwargs)
@@ -97,6 +112,21 @@ def get_app_model_with_trial(view: Callable[P, R] | None = None, *, mode: Union[
                 if app_mode not in modes:
                     mode_values = {m.value for m in modes}
                     raise AppNotFoundError(f"App mode is not in the supported list: {mode_values}")
+
+            user, current_tenant_id = current_account_with_tenant()
+            if app_model.tenant_id == current_tenant_id:
+                from services.department_service import DepartmentService
+                from services.errors.department import DepartmentPermissionDeniedError
+
+                try:
+                    DepartmentService.assert_department_access(
+                        user,
+                        current_tenant_id,
+                        app_model.department_id,
+                        resource_tenant_id=app_model.tenant_id,
+                    )
+                except DepartmentPermissionDeniedError:
+                    raise Forbidden("无权访问该资源")
 
             kwargs["app_model"] = app_model
 

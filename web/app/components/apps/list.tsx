@@ -20,6 +20,7 @@ import { AppModeEnum, AppModes } from '@/types/app'
 import { cn } from '@/utils/classnames'
 import AppCard from './app-card'
 import { AppCardSkeleton } from './app-card-skeleton'
+import DepartmentFilterTabs from './department-filter-tabs'
 import Empty from './empty'
 import Footer from './footer'
 import useAppsQueryState from './hooks/use-apps-query-state'
@@ -60,7 +61,7 @@ const List: FC<Props> = ({
     parseAsAppListCategory,
   )
 
-  const { query: { tagIDs = [], keywords = '', isCreatedByMe: queryIsCreatedByMe = false }, setQuery } = useAppsQueryState()
+  const { query: { tagIDs = [], keywords = '', isCreatedByMe: queryIsCreatedByMe = false, departmentId }, setQuery } = useAppsQueryState()
   const [isCreatedByMe, setIsCreatedByMe] = useState(queryIsCreatedByMe)
   const [tagFilterValue, setTagFilterValue] = useState<string[]>(tagIDs)
   const [searchKeywords, setSearchKeywords] = useState(keywords)
@@ -93,6 +94,7 @@ const List: FC<Props> = ({
     tag_ids: tagIDs,
     is_created_by_me: isCreatedByMe,
     ...(activeTab !== 'all' ? { mode: activeTab } : {}),
+    ...(departmentId ? { department_id: departmentId } : {}),
   }
 
   const {
@@ -211,6 +213,12 @@ const List: FC<Props> = ({
                 {t('showMyCreatedAppsOnly', { ns: 'app' })}
               </div>
             </label>
+            <DepartmentFilterTabs
+              selectedDepartmentId={departmentId}
+              onDepartmentChange={(deptId) => {
+                setQuery(prev => ({ ...prev, departmentId: deptId }))
+              }}
+            />
             <TagFilter type="app" value={tagFilterValue} onChange={handleTagsChange} />
             <Input
               showLeftIcon

@@ -1,0 +1,27 @@
+# NBYS: thin build FROM official 1.13.3 (see api/Dockerfile.nbys, web/Dockerfile.nbys).
+# Project group is always "dify" (containers: dify-api-1, dify-web-1, ...).
+# Use with:
+#   docker compose -p dify --env-file .env.nbys -f docker-compose.yaml -f docker-compose.nbys.yaml ...
+# Do not redeclare volumes here — VOLUMES_ROOT comes from .env.nbys.
+# Web: run `pnpm install && pnpm build` under web/ before `compose build web`.
+name: dify
+services:
+  api:
+    image: dify-api:${IMAGE_TAG:-1.13.3-nbys}
+    build:
+      context: ../api
+      dockerfile: Dockerfile.nbys
+      args:
+        COMMIT_SHA: ${COMMIT_SHA:-dev}
+        UV_DEFAULT_INDEX: ${UV_DEFAULT_INDEX:-}
+  worker:
+    image: dify-api:${IMAGE_TAG:-1.13.3-nbys}
+  worker_beat:
+    image: dify-api:${IMAGE_TAG:-1.13.3-nbys}
+  web:
+    image: dify-web:${IMAGE_TAG:-1.13.3-nbys}
+    build:
+      context: ../web
+      dockerfile: Dockerfile.nbys
+      args:
+        COMMIT_SHA: ${COMMIT_SHA:-dev}

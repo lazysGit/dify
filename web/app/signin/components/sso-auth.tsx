@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next'
 import Button from '@/app/components/base/button'
 import { Lock01 } from '@/app/components/base/icons/src/vender/solid/security'
 import { toast } from '@/app/components/base/ui/toast'
-import { useRouter, useSearchParams } from '@/next/navigation'
+import { useRouter } from '@/next/navigation'
 import { getUserOAuth2SSOUrl, getUserOIDCSSOUrl, getUserSAMLSSOUrl } from '@/service/sso'
 import { SSOProtocol } from '@/types/feature'
 
@@ -18,22 +18,20 @@ const SSOAuth: FC<SSOAuthProps> = ({
 }) => {
   const router = useRouter()
   const { t } = useTranslation()
-  const searchParams = useSearchParams()
-  const invite_token = decodeURIComponent(searchParams.get('invite_token') || '')
 
   const [isLoading, setIsLoading] = useState(false)
 
   const handleSSOLogin = () => {
     setIsLoading(true)
     if (protocol === SSOProtocol.SAML) {
-      getUserSAMLSSOUrl(invite_token).then((res) => {
+      getUserSAMLSSOUrl().then((res) => {
         router.push(res.url)
       }).finally(() => {
         setIsLoading(false)
       })
     }
     else if (protocol === SSOProtocol.OIDC) {
-      getUserOIDCSSOUrl(invite_token).then((res) => {
+      getUserOIDCSSOUrl().then((res) => {
         document.cookie = `user-oidc-state=${res.state};Path=/`
         router.push(res.url)
       }).finally(() => {
@@ -41,7 +39,7 @@ const SSOAuth: FC<SSOAuthProps> = ({
       })
     }
     else if (protocol === SSOProtocol.OAuth2) {
-      getUserOAuth2SSOUrl(invite_token).then((res) => {
+      getUserOAuth2SSOUrl().then((res) => {
         document.cookie = `user-oauth2-state=${res.state};Path=/`
         router.push(res.url)
       }).finally(() => {

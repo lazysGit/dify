@@ -109,58 +109,97 @@ logger = logging.getLogger(__name__)
 
 class DatasetService:
     @staticmethod
-    def get_datasets(page, per_page, tenant_id=None, user=None, search=None, tag_ids=None, include_all=False):
+    def user_in_dataset_department(user: Any, dataset: Any, tenant_id: str) -> bool:
+        from services.department_service import DepartmentService
+
+        user_dept_id = DepartmentService.get_user_department_id(user.id, tenant_id)
+        if not user_dept_id:
+            return False
+        default_dept_id = DepartmentService.get_default_department(tenant_id).id
+        return user_dept_id == (dataset.department_id or default_dept_id)
+
+    @staticmethod
+    def _department_members_clause(user: Any, tenant_id: str | None):
+        from services.department_service import DepartmentService
+
+        if not tenant_id:
+            return sa.false()
+        user_dept_id = DepartmentService.get_user_department_id(user.id, tenant_id)
+        if not user_dept_id:
+            return sa.false()
+        default_dept_id = DepartmentService.get_default_department(tenant_id).id
+        return sa.and_(
+            Dataset.permission == DatasetPermissionEnum.ALL_DEPARTMENT,
+            func.coalesce(Dataset.department_id, default_dept_id) == user_dept_id,
+        )
+
+    @staticmethod
+    def sharing_visibility_filter(user: Any, tenant_id: str | None, include_all: bool = False):
+        if user is None:
+            return None
+        if TenantAccountRole.is_privileged_role(user.current_role) and include_all:
+            return None
+
+        dataset_permission = (
+            db.session.query(DatasetPermission).filter_by(account_id=user.id, tenant_id=tenant_id).all()
+        )
+        permitted_dataset_ids = {dp.dataset_id for dp in dataset_permission} if dataset_permission else None
+        department_clause = DatasetService._department_members_clause(user, tenant_id)
+
+        if user.current_role == TenantAccountRole.DATASET_OPERATOR:
+            if permitted_dataset_ids:
+                return sa.or_(department_clause, Dataset.id.in_(permitted_dataset_ids))
+            return department_clause
+
+        if permitted_dataset_ids:
+            return sa.or_(
+                Dataset.permission == DatasetPermissionEnum.ALL_TEAM,
+                sa.and_(Dataset.permission == DatasetPermissionEnum.ONLY_ME, Dataset.created_by == user.id),
+                sa.and_(
+                    Dataset.permission == DatasetPermissionEnum.PARTIAL_TEAM,
+                    Dataset.id.in_(permitted_dataset_ids),
+                ),
+                department_clause,
+            )
+        return sa.or_(
+            Dataset.permission == DatasetPermissionEnum.ALL_TEAM,
+            sa.and_(Dataset.permission == DatasetPermissionEnum.ONLY_ME, Dataset.created_by == user.id),
+            department_clause,
+        )
+
+    @staticmethod
+    def get_datasets(
+        page, per_page, tenant_id=None, user=None, search=None, tag_ids=None, include_all=False, department_id=None
+    ):
         query = select(Dataset).where(Dataset.tenant_id == tenant_id).order_by(Dataset.created_at.desc(), Dataset.id)
 
         if user:
-            # get permitted dataset ids
-            dataset_permission = (
-                db.session.query(DatasetPermission).filter_by(account_id=user.id, tenant_id=tenant_id).all()
-            )
-            permitted_dataset_ids = {dp.dataset_id for dp in dataset_permission} if dataset_permission else None
+            from services.department_service import DepartmentService
 
-            if user.current_role == TenantAccountRole.DATASET_OPERATOR:
-                # only show datasets that the user has permission to access
-                # Check if permitted_dataset_ids is not empty to avoid WHERE false condition
-                if permitted_dataset_ids and len(permitted_dataset_ids) > 0:
-                    query = query.where(Dataset.id.in_(permitted_dataset_ids))
-                else:
-                    return [], 0
-            else:
-                if user.current_role != TenantAccountRole.OWNER or not include_all:
-                    # show all datasets that the user has permission to access
-                    # Check if permitted_dataset_ids is not empty to avoid WHERE false condition
-                    if permitted_dataset_ids and len(permitted_dataset_ids) > 0:
-                        query = query.where(
-                            sa.or_(
-                                Dataset.permission == DatasetPermissionEnum.ALL_TEAM,
-                                sa.and_(
-                                    Dataset.permission == DatasetPermissionEnum.ONLY_ME, Dataset.created_by == user.id
-                                ),
-                                sa.and_(
-                                    Dataset.permission == DatasetPermissionEnum.PARTIAL_TEAM,
-                                    Dataset.id.in_(permitted_dataset_ids),
-                                ),
-                            )
+            clause = DatasetService.sharing_visibility_filter(user, tenant_id, include_all=include_all)
+            if clause is not None:
+                query = query.where(clause)
+
+            if tenant_id:
+                accessible = DepartmentService.get_accessible_department_ids(user, tenant_id)
+                if accessible is not None:
+                    # all_team_members = workspace-wide share: must not be clipped by department ACL
+                    query = query.where(
+                        sa.or_(
+                            Dataset.permission == DatasetPermissionEnum.ALL_TEAM,
+                            DepartmentService.resource_department_filter(Dataset, tenant_id, accessible),
                         )
-                    else:
-                        query = query.where(
-                            sa.or_(
-                                Dataset.permission == DatasetPermissionEnum.ALL_TEAM,
-                                sa.and_(
-                                    Dataset.permission == DatasetPermissionEnum.ONLY_ME, Dataset.created_by == user.id
-                                ),
-                            )
-                        )
+                    )
         else:
-            # if no user, only show datasets that are shared with all team members
             query = query.where(Dataset.permission == DatasetPermissionEnum.ALL_TEAM)
+
+        if department_id:
+            query = query.where(Dataset.department_id == department_id)
 
         if search:
             escaped_search = helper.escape_like_pattern(search)
             query = query.where(Dataset.name.ilike(f"%{escaped_search}%", escape="\\"))
 
-        # Check if tag_ids is not empty to avoid WHERE false condition
         if tag_ids and len(tag_ids) > 0:
             if tenant_id is not None:
                 target_ids = TagService.get_target_ids_by_tag_ids(
@@ -223,8 +262,8 @@ class DatasetService:
         embedding_model_name: str | None = None,
         retrieval_model: RetrievalModel | None = None,
         summary_index_setting: dict | None = None,
+        department_id: str | None = None,
     ):
-        # check if dataset name already exists
         if db.session.query(Dataset).filter_by(name=name, tenant_id=tenant_id).first():
             raise DatasetNameDuplicateError(f"Dataset with name {name} already exists.")
         embedding_model = None
@@ -270,6 +309,11 @@ class DatasetService:
         dataset.provider = provider
         if summary_index_setting is not None:
             dataset.summary_index_setting = summary_index_setting
+
+        from services.department_service import DepartmentService
+
+        dataset.department_id = DepartmentService.resolve_department_id_for_creation(account, tenant_id, department_id)
+
         db.session.add(dataset)
         db.session.flush()
 
@@ -296,6 +340,8 @@ class DatasetService:
         tenant_id: str,
         rag_pipeline_dataset_create_entity: RagPipelineDatasetCreateEntity,
     ):
+        from services.department_service import DepartmentService
+
         if rag_pipeline_dataset_create_entity.name:
             # check if dataset name already exists
             if (
@@ -335,6 +381,7 @@ class DatasetService:
             icon_info=rag_pipeline_dataset_create_entity.icon_info.model_dump(),
             created_by=current_user.id,
             pipeline_id=pipeline.id,
+            department_id=DepartmentService.resolve_department_id_for_creation(current_user, tenant_id, None),
         )
         db.session.add(dataset)
         db.session.commit()
@@ -1129,7 +1176,7 @@ class DatasetService:
         if dataset.tenant_id != user.current_tenant_id:
             logger.debug("User %s does not have permission to access dataset %s", user.id, dataset.id)
             raise NoPermissionError("You do not have permission to access this dataset.")
-        if user.current_role != TenantAccountRole.OWNER:
+        if not TenantAccountRole.is_privileged_role(user.current_role):
             if dataset.permission == DatasetPermissionEnum.ONLY_ME and dataset.created_by != user.id:
                 logger.debug("User %s does not have permission to access dataset %s", user.id, dataset.id)
                 raise NoPermissionError("You do not have permission to access this dataset.")
@@ -1142,6 +1189,45 @@ class DatasetService:
                     if not user_permission:
                         logger.debug("User %s does not have permission to access dataset %s", user.id, dataset.id)
                         raise NoPermissionError("You do not have permission to access this dataset.")
+            if dataset.permission == DatasetPermissionEnum.ALL_DEPARTMENT:
+                if not DatasetService.user_in_dataset_department(user, dataset, user.current_tenant_id):
+                    logger.debug("User %s does not have permission to access dataset %s", user.id, dataset.id)
+                    raise NoPermissionError("You do not have permission to access this dataset.")
+
+        # Workspace-wide share: skip department ACL so other departments can open the dataset.
+        if dataset.permission == DatasetPermissionEnum.ALL_TEAM:
+            return
+
+        from services.department_service import DepartmentService
+        from services.errors.department import DepartmentPermissionDeniedError
+
+        try:
+            DepartmentService.assert_department_access(
+                user,
+                user.current_tenant_id,
+                dataset.department_id,
+                resource_tenant_id=dataset.tenant_id,
+            )
+        except DepartmentPermissionDeniedError:
+            raise NoPermissionError("You do not have permission to access this dataset.")
+
+    @staticmethod
+    def transfer_dataset_department(
+        dataset: Dataset, target_department_id: str, operator: Account, tenant_id: str
+    ) -> None:
+        from services.department_service import DepartmentAuditLog
+
+        dataset.department_id = target_department_id
+        dataset.updated_by = operator.id
+        db.session.commit()
+
+        DepartmentAuditLog.log(
+            tenant_id,
+            operator.id,
+            None,
+            "transfer_dataset",
+            {"dataset_id": dataset.id, "dataset_name": dataset.name, "target_department_id": target_department_id},
+        )
 
     @staticmethod
     def check_dataset_operator_permission(user: Account | None = None, dataset: Dataset | None = None):
@@ -1151,7 +1237,7 @@ class DatasetService:
         if not user:
             raise ValueError("User not found")
 
-        if user.current_role != TenantAccountRole.OWNER:
+        if not TenantAccountRole.is_privileged_role(user.current_role):
             if dataset.permission == DatasetPermissionEnum.ONLY_ME:
                 if dataset.created_by != user.id:
                     raise NoPermissionError("You do not have permission to access this dataset.")
@@ -1161,6 +1247,10 @@ class DatasetService:
                     dp.dataset_id == dataset.id
                     for dp in db.session.query(DatasetPermission).filter_by(account_id=user.id).all()
                 ):
+                    raise NoPermissionError("You do not have permission to access this dataset.")
+
+            elif dataset.permission == DatasetPermissionEnum.ALL_DEPARTMENT:
+                if not DatasetService.user_in_dataset_department(user, dataset, user.current_tenant_id):
                     raise NoPermissionError("You do not have permission to access this dataset.")
 
     @staticmethod
@@ -2658,6 +2748,22 @@ class DocumentService:
 
     @staticmethod
     def save_document_without_dataset_id(tenant_id: str, knowledge_config: KnowledgeConfig, account: Account):
+        """Create the dataset backing the upload wizard (POST /datasets/init) and its first documents.
+
+        behavioural contract:
+        - The dataset must get a department assignment exactly like ``DatasetService.create_empty_dataset``:
+          ``resolve_department_id_for_creation(account, tenant_id, None)``. Omitting it leaves
+          ``department_id`` NULL, which department checks resolve to the default department — a member of
+          any other department would immediately lose access to a dataset they just created (403 on
+          indexing-status polling and hidden from the list).
+        - Side effects: inserts the dataset and documents, commits, and enqueues indexing tasks.
+        - Raises: ``DepartmentNotFoundError`` (via the department resolver) when the creator has no
+          department and the tenant has no default department; ``ValueError`` on billing batch-limit
+          violations; ``ProviderTokenNotInitError``/``ProviderNotInitializeError`` when the embedding
+          model is not initialized (HIGH_QUALITY path).
+
+        Returns ``(dataset, documents, batch)``.
+        """
         assert isinstance(current_user, Account)
         assert current_user.current_tenant_id is not None
         assert knowledge_config.data_source
@@ -2711,6 +2817,8 @@ class DocumentService:
                 score_threshold_enabled=False,
             )
         # save dataset
+        from services.department_service import DepartmentService
+
         dataset = Dataset(
             tenant_id=tenant_id,
             name="",
@@ -2723,6 +2831,7 @@ class DocumentService:
             retrieval_model=retrieval_model.model_dump() if retrieval_model else None,
             summary_index_setting=knowledge_config.summary_index_setting,
             is_multimodal=knowledge_config.is_multimodal,
+            department_id=DepartmentService.resolve_department_id_for_creation(account, tenant_id, None),
         )
 
         db.session.add(dataset)

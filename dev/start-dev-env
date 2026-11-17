@@ -1,0 +1,304 @@
+#!/usr/bin/env bash
+#
+# Dify 本地调试环境一键启动脚本
+# 用法: dev/start-dev-env [--skip-middleware] [--skip-deps]
+#
+# 参数:
+#   --skip-middleware  跳过中间件启动（已运行时使用）
+#   --skip-deps        跳过依赖安装
+#
+# 启动的服务:
+#   - 中间件: PostgreSQL, Redis, Weaviate, Sandbox, Plugin Daemon, SSRF Proxy
+#   - 后端: Flask API (:5001), Celery Worker, Celery Beat
+#   - 前端: vinext (:3000) 省资源模式
+#
+
+set -e
+
+SCRIPT_DIR="$(dirname "$(realpath "$0")")"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+
+# 颜色定义
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# 日志文件
+LOG_API="/tmp/dify-api.log"
+LOG_WORKER="/tmp/dify-worker.log"
+LOG_BEAT="/tmp/dify-beat.log"
+LOG_WEB="/tmp/dify-web.log"
+
+# 参数解析
+SKIP_MIDDLEWARE=false
+SKIP_DEPS=false
+
+for arg in "$@"; do
+    case $arg in
+        --skip-middleware)
+            SKIP_MIDDLEWARE=true
+            shift
+            ;;
+        --skip-deps)
+            SKIP_DEPS=true
+            shift
+            ;;
+        *)
+            echo "未知参数: $arg"
+            exit 1
+            ;;
+    esac
+done
+
+log_info() {
+    echo -e "${BLUE}[INFO]${NC} $1"
+}
+
+log_success() {
+    echo -e "${GREEN}[OK]${NC} $1"
+}
+
+log_warn() {
+    echo -e "${YELLOW}[WARN]${NC} $1"
+}
+
+log_error() {
+    echo -e "${RED}[ERROR]${NC} $1"
+}
+
+# 检查前置条件
+check_prerequisites() {
+    log_info "检查前置条件..."
+
+    # 检查 Node 版本
+    local node_version=$(node -v 2>/dev/null | sed 's/v//' | cut -d. -f1)
+    if [[ -z "$node_version" ]] || [[ "$node_version" -lt 22 ]]; then
+        log_warn "Node.js 版本过低或未安装，请使用 fnm 切换到 v22"
+        log_info "  fnm use 22"
+    fi
+
+    # 检查 podman/docker
+    if command -v podman &> /dev/null; then
+        log_success "podman 已安装"
+    elif command -v docker &> /dev/null; then
+        log_success "docker 已安装"
+    else
+        log_error "未找到 podman 或 docker"
+        exit 1
+    fi
+
+    # 检查 uv
+    if ! command -v uv &> /dev/null; then
+        log_error "未找到 uv，请先安装: curl -LsSf https://astral.sh/uv/install.sh | sh"
+        exit 1
+    fi
+
+    # 检查 pnpm
+    if ! command -v pnpm &> /dev/null; then
+        log_error "未找到 pnpm，请先安装: npm install -g pnpm"
+        exit 1
+    fi
+}
+
+# 初始化环境文件
+init_env_files() {
+    log_info "初始化环境文件..."
+
+    # 后端 .env
+    if [[ ! -f "$PROJECT_ROOT/api/.env" ]]; then
+        cp "$PROJECT_ROOT/api/.env.example" "$PROJECT_ROOT/api/.env"
+        # 生成 SECRET_KEY
+        local secret_key=$(openssl rand -base64 42)
+        sed -i "s|^SECRET_KEY=$|SECRET_KEY=$secret_key|" "$PROJECT_ROOT/api/.env"
+        log_success "创建 api/.env"
+    else
+        log_info "api/.env 已存在"
+    fi
+
+    # 前端 .env.local
+    if [[ ! -f "$PROJECT_ROOT/web/.env.local" ]]; then
+        cp "$PROJECT_ROOT/web/.env.example" "$PROJECT_ROOT/web/.env.local"
+        log_success "创建 web/.env.local"
+    else
+        log_info "web/.env.local 已存在"
+    fi
+
+    # 中间件 .env
+    if [[ ! -f "$PROJECT_ROOT/docker/middleware.env" ]]; then
+        cp "$PROJECT_ROOT/docker/middleware.env.example" "$PROJECT_ROOT/docker/middleware.env"
+        log_success "创建 docker/middleware.env"
+    else
+        log_info "docker/middleware.env 已存在"
+    fi
+}
+
+# 安装依赖
+install_deps() {
+    if [[ "$SKIP_DEPS" == "true" ]]; then
+        log_info "跳过依赖安装 (--skip-deps)"
+        return
+    fi
+
+    log_info "安装后端依赖..."
+    cd "$PROJECT_ROOT/api"
+    uv sync --group dev
+    log_success "后端依赖安装完成"
+
+    log_info "安装前端依赖..."
+    cd "$PROJECT_ROOT/web"
+    pnpm install
+    log_success "前端依赖安装完成"
+}
+
+# 启动中间件
+start_middleware() {
+    if [[ "$SKIP_MIDDLEWARE" == "true" ]]; then
+        log_info "跳过中间件启动 (--skip-middleware)"
+        return
+    fi
+
+    log_info "启动中间件服务..."
+
+    # 优先使用 podman，兼容 docker compose
+    if command -v podman &> /dev/null; then
+        # 启动 podman socket
+        systemctl --user start podman.socket 2>/dev/null || true
+        export DOCKER_HOST="unix:///run/user/$(id -u)/podman/podman.sock"
+
+        # 检查 docker compose 是否可用
+        if ! docker compose version &> /dev/null; then
+            log_error "docker compose 不可用，请安装 docker-compose-v2"
+            exit 1
+        fi
+    fi
+
+    cd "$PROJECT_ROOT/docker"
+
+    # 先启动数据库和基础服务
+    log_info "启动数据库和基础服务..."
+    docker compose -f docker-compose.middleware.yaml --env-file middleware.env up -d db_postgres redis weaviate ssrf_proxy sandbox
+
+    # 等待 PostgreSQL 健康
+    log_info "等待 PostgreSQL 就绪..."
+    local max_wait=30
+    local waited=0
+    while [[ $waited -lt $max_wait ]]; do
+        if docker exec docker-db_postgres-1 pg_isready -h localhost -U postgres &>/dev/null; then
+            log_success "PostgreSQL 已就绪"
+            break
+        fi
+        sleep 1
+        waited=$((waited + 1))
+    done
+    if [[ $waited -ge $max_wait ]]; then
+        log_warn "PostgreSQL 启动超时"
+    fi
+
+    # PostgreSQL 就绪后再启动 Plugin Daemon
+    log_info "启动 Plugin Daemon..."
+    docker compose -f docker-compose.middleware.yaml --env-file middleware.env up -d plugin_daemon
+
+    log_success "中间件服务启动完成"
+}
+
+# 运行数据库迁移
+run_migrations() {
+    log_info "运行数据库迁移..."
+    cd "$PROJECT_ROOT/api"
+    uv run flask db upgrade
+    log_success "数据库迁移完成"
+}
+
+# 启动后端服务
+start_backend() {
+    log_info "启动后端服务..."
+
+    cd "$PROJECT_ROOT/api"
+
+    # 启动 Flask API
+    if pgrep -f "flask run.*5001" > /dev/null; then
+        log_info "Flask API 已在运行"
+    else
+        setsid uv run flask run --host 0.0.0.0 --port=5001 --debug > "$LOG_API" 2>&1 < /dev/null &
+        disown
+        log_success "Flask API 启动中 (日志: $LOG_API)"
+    fi
+
+    # 启动 Celery Worker
+    if pgrep -f "celery.*worker" > /dev/null; then
+        log_info "Celery Worker 已在运行"
+    else
+        setsid uv run celery -A celery_entrypoint.celery worker -P gevent -c 1 --loglevel INFO > "$LOG_WORKER" 2>&1 < /dev/null &
+        disown
+        log_success "Celery Worker 启动中 (日志: $LOG_WORKER)"
+    fi
+
+    # 启动 Celery Beat
+    if pgrep -f "celery.*beat" > /dev/null; then
+        log_info "Celery Beat 已在运行"
+    else
+        setsid uv run celery -A celery_entrypoint.celery beat --loglevel INFO --scheduler celery.beat:PersistentScheduler > "$LOG_BEAT" 2>&1 < /dev/null &
+        disown
+        log_success "Celery Beat 启动中 (日志: $LOG_BEAT)"
+    fi
+}
+
+# 启动前端
+start_frontend() {
+    log_info "启动前端服务 (vinext 省资源模式)..."
+
+    cd "$PROJECT_ROOT/web"
+
+    if pgrep -f "vinext" > /dev/null; then
+        log_info "前端已在运行"
+    else
+        NODE_OPTIONS="--max-old-space-size=2048" setsid pnpm dev:vinext > "$LOG_WEB" 2>&1 < /dev/null &
+        disown
+        log_success "前端启动中 (日志: $LOG_WEB)"
+    fi
+}
+
+# 显示最终状态
+show_final_status() {
+    echo ""
+    echo "=========================================="
+    echo -e "${GREEN}Dify 调试环境启动完成!${NC}"
+    echo "=========================================="
+    echo ""
+    echo "访问地址:"
+    echo "  前端: http://localhost:3000"
+    echo "  API:  http://localhost:5001"
+    echo ""
+    echo "日志文件:"
+    echo "  API:     $LOG_API"
+    echo "  Worker:  $LOG_WORKER"
+    echo "  Beat:    $LOG_BEAT"
+    echo "  Frontend: $LOG_WEB"
+    echo ""
+    echo "停止命令:"
+    echo "  dev/stop-dev-env                    # 停止应用"
+    echo "  dev/stop-dev-env --include-middleware # 完全停止"
+    echo ""
+}
+
+# 主流程
+main() {
+    echo ""
+    echo "=========================================="
+    echo "  Dify 本地调试环境启动"
+    echo "=========================================="
+    echo ""
+
+    check_prerequisites
+    init_env_files
+    install_deps
+    start_middleware
+    run_migrations
+    start_backend
+    start_frontend
+    show_final_status
+}
+
+main "$@"

@@ -408,9 +408,9 @@ class TestParameterAndAvailableModels:
                 "controllers.console.workspace.models.current_account_with_tenant",
                 return_value=(MagicMock(), "tenant1"),
             ),
-            patch("controllers.console.workspace.models.ModelProviderService") as service_mock,
+            patch("controllers.console.workspace.models.ModelPermissionService") as service_mock,
         ):
-            service_mock.return_value.get_models_by_model_type.return_value = []
+            service_mock.get_filtered_models.return_value = []
 
             result = method(api, ModelType.LLM.value)
 
@@ -438,9 +438,9 @@ class TestParameterAndAvailableModels:
         with (
             app.test_request_context("/"),
             patch("controllers.console.workspace.models.current_account_with_tenant", return_value=(MagicMock(), "t1")),
-            patch("controllers.console.workspace.models.ModelProviderService") as service,
+            patch("controllers.console.workspace.models.ModelPermissionService") as service,
         ):
-            service.return_value.get_models_by_model_type.return_value = []
+            service.get_filtered_models.return_value = []
 
             result = method(api, ModelType.LLM.value)
 

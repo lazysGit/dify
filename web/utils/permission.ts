@@ -12,6 +12,8 @@ export const hasEditPermissionForDataset = (userId: string, datasetConfig: Datas
     return userId === createdBy
   if (permission === DatasetPermission.allTeamMembers)
     return true
+  if (permission === DatasetPermission.allDepartmentMembers)
+    return true
   if (permission === DatasetPermission.partialMembers)
     return partialMemberList.includes(userId)
   return false

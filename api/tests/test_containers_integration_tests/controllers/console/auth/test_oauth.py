@@ -206,34 +206,6 @@ class TestOAuthCallback:
         assert status_code == 400
         assert response["error"] == expected_error
 
-    @patch("controllers.console.auth.oauth.dify_config")
-    @patch("controllers.console.auth.oauth.get_oauth_providers")
-    @patch("controllers.console.auth.oauth.RegisterService")
-    @patch("controllers.console.auth.oauth.redirect")
-    def test_invitation_comparison_is_case_insensitive(
-        self,
-        mock_redirect,
-        mock_register_service,
-        mock_get_providers,
-        mock_config,
-        resource,
-        app,
-        oauth_setup,
-    ):
-        mock_config.CONSOLE_WEB_URL = "http://localhost:3000"
-        oauth_setup["provider"].get_user_info.return_value = OAuthUserInfo(
-            id="123", name="Test User", email="User@Example.com"
-        )
-        mock_get_providers.return_value = {"github": oauth_setup["provider"]}
-        mock_register_service.is_valid_invite_token.return_value = True
-        mock_register_service.get_invitation_by_token.return_value = {"email": "user@example.com"}
-
-        with app.test_request_context("/auth/oauth/github/callback?code=test_code&state=invite123"):
-            resource.get("github")
-
-        mock_register_service.get_invitation_by_token.assert_called_once_with(token="invite123")
-        mock_redirect.assert_called_once_with("http://localhost:3000/signin/invite-settings?invite_token=invite123")
-
     @pytest.mark.parametrize(
         ("account_status", "expected_redirect"),
         [

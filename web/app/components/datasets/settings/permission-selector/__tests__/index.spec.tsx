@@ -50,6 +50,11 @@ describe('PermissionSelector', () => {
       expect(screen.getByText(/form\.permissionsAllMember/)).toBeInTheDocument()
     })
 
+    it('should render All Department Members option when permission is allDepartmentMembers', () => {
+      render(<PermissionSelector {...defaultProps} permission={DatasetPermission.allDepartmentMembers} />)
+      expect(screen.getByText(/form\.permissionsAllDepartmentMembers/)).toBeInTheDocument()
+    })
+
     it('should render selected member names when permission is partialMembers', () => {
       render(
         <PermissionSelector
@@ -118,6 +123,21 @@ describe('PermissionSelector', () => {
       expect(handleChange).toHaveBeenCalledWith(DatasetPermission.allTeamMembers)
     })
 
+    it('should call onChange with allDepartmentMembers when All Department Members is selected', async () => {
+      const handleChange = vi.fn()
+      render(<PermissionSelector {...defaultProps} onChange={handleChange} />)
+
+      const trigger = screen.getByText(/form\.permissionsOnlyMe/)
+      fireEvent.click(trigger)
+
+      await waitFor(() => {
+        const options = screen.getAllByText(/form\.permissionsAllDepartmentMembers/)
+        fireEvent.click(options[0])
+      })
+
+      expect(handleChange).toHaveBeenCalledWith(DatasetPermission.allDepartmentMembers)
+    })
+
     it('should call onChange with partialMembers when Invited Members is selected', async () => {
       const handleChange = vi.fn()
       const handleMemberSelect = vi.fn()
@@ -143,6 +163,16 @@ describe('PermissionSelector', () => {
   })
 
   describe('Member Selection', () => {
+    it('should not show member list when allDepartmentMembers is selected', () => {
+      render(
+        <PermissionSelector
+          {...defaultProps}
+          permission={DatasetPermission.allDepartmentMembers}
+        />,
+      )
+      expect(screen.queryByPlaceholderText(/search/i)).not.toBeInTheDocument()
+    })
+
     it('should show member list when partialMembers is selected', async () => {
       render(
         <PermissionSelector

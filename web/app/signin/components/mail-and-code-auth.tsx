@@ -10,11 +10,7 @@ import { useLocale } from '@/context/i18n'
 import { useRouter, useSearchParams } from '@/next/navigation'
 import { sendEMailLoginCode } from '@/service/common'
 
-type MailAndCodeAuthProps = {
-  isInvite: boolean
-}
-
-export default function MailAndCodeAuth({ isInvite }: MailAndCodeAuthProps) {
+export default function MailAndCodeAuth() {
   const { t } = useTranslation()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -63,7 +59,7 @@ export default function MailAndCodeAuth({ isInvite }: MailAndCodeAuthProps) {
       <div className="mb-2">
         <label htmlFor="email" className="system-md-semibold my-2 text-text-secondary">{t('email', { ns: 'login' })}</label>
         <div className="mt-1">
-          <Input id="email" type="email" disabled={isInvite} value={email} placeholder={t('emailPlaceholder', { ns: 'login' }) as string} onChange={e => setEmail(e.target.value)} />
+          <Input id="email" type="email" value={email} placeholder={t('emailPlaceholder', { ns: 'login' }) as string} onChange={e => setEmail(e.target.value)} />
         </div>
         <div className="mt-3">
           <Button type="submit" loading={loading} disabled={loading || !email} variant="primary" className="w-full">{t('signup.verifyMail', { ns: 'login' })}</Button>

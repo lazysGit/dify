@@ -25,6 +25,10 @@ class CurrentPasswordIncorrectError(BaseServiceError):
     pass
 
 
+class DefaultPasswordNotAllowedError(BaseServiceError):
+    pass
+
+
 class LinkAccountIntegrateError(BaseServiceError):
     pass
 
@@ -54,4 +58,8 @@ class MemberNotInTenantError(BaseServiceError):
 
 
 class RoleAlreadyAssignedError(BaseServiceError):
+    pass
+
+
+class AccountEmailAlreadyInUseError(BaseServiceError):
     pass

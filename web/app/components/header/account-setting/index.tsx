@@ -14,10 +14,12 @@ import MenuDialog from '@/app/components/header/account-setting/menu-dialog'
 import { useAppContext } from '@/context/app-context'
 import { useProviderContext } from '@/context/provider-context'
 import useBreakpoints, { MediaType } from '@/hooks/use-breakpoints'
+import { useDepartmentList } from '@/service/use-departments'
 import { cn } from '@/utils/classnames'
 import Button from '../../base/button'
 import ApiBasedExtensionPage from './api-based-extension-page'
 import DataSourcePage from './data-source-page-new'
+import DepartmentPage from './department-page'
 import LanguagePage from './language-page'
 import MembersPage from './members-page'
 import ModelProviderPage from './model-provider-page'
@@ -50,10 +52,15 @@ export default function AccountSetting({
   const activeMenu = activeTab
   const { t } = useTranslation()
   const { enableBilling, enableReplaceWebAppLogo } = useProviderContext()
-  const { isCurrentWorkspaceDatasetOperator } = useAppContext()
+  const { isCurrentWorkspaceEditor, isCurrentWorkspaceManager } = useAppContext()
+  const departmentListQuery = useDepartmentList()
+  const isDepartmentAdmin = departmentListQuery.data?.is_department_admin ?? false
+  const departmentApiFailed = departmentListQuery.isError
+  const canViewWorkplaceTabs = isCurrentWorkspaceManager || (isCurrentWorkspaceEditor && isDepartmentAdmin)
+  const showDepartmentsTab = isCurrentWorkspaceManager || isDepartmentAdmin
 
   const workplaceGroupItems: GroupItem[] = (() => {
-    if (isCurrentWorkspaceDatasetOperator)
+    if (!canViewWorkplaceTabs)
       return []
 
     const items: GroupItem[] = [
@@ -63,13 +70,25 @@ export default function AccountSetting({
         icon: <span className={cn('i-ri-brain-2-line', iconClassName)} />,
         activeIcon: <span className={cn('i-ri-brain-2-fill', iconClassName)} />,
       },
+    ]
+
+    if (showDepartmentsTab) {
+      items.push({
+        key: ACCOUNT_SETTING_TAB.DEPARTMENTS,
+        name: t('settings.departments', { ns: 'common' }),
+        icon: <span className={cn('i-ri-organization-chart', iconClassName)} />,
+        activeIcon: <span className={cn('i-ri-organization-chart', iconClassName)} />,
+      })
+    }
+
+    items.push(
       {
         key: ACCOUNT_SETTING_TAB.MEMBERS,
         name: t('settings.members', { ns: 'common' }),
         icon: <span className={cn('i-ri-group-2-line', iconClassName)} />,
         activeIcon: <span className={cn('i-ri-group-2-fill', iconClassName)} />,
       },
-    ]
+    )
 
     if (enableBilling) {
       items.push({
@@ -129,8 +148,12 @@ export default function AccountSetting({
         },
       ],
     },
-  ]
-  const activeItem = [...menuItems[0].items, ...menuItems[1].items].find(item => item.key === activeMenu)
+  ].filter(menuItem => menuItem.items.length > 0)
+  const visibleItems = menuItems.flatMap(menuItem => menuItem.items)
+  const resolvedMenu = visibleItems.some(item => item.key === activeMenu)
+    ? activeMenu
+    : ACCOUNT_SETTING_TAB.LANGUAGE
+  const activeItem = visibleItems.find(item => item.key === resolvedMenu)
 
   const [searchValue, setSearchValue] = useState<string>('')
 
@@ -158,7 +181,7 @@ export default function AccountSetting({
             {
               menuItems.map(menuItem => (
                 <div key={menuItem.key} className="mb-2">
-                  {!isCurrentWorkspaceDatasetOperator && (
+                  {canViewWorkplaceTabs && (
                     <div className="mb-0.5 py-2 pb-1 pl-3 text-text-tertiary system-xs-medium-uppercase">{menuItem.name}</div>
                   )}
                   <div>
@@ -169,7 +192,7 @@ export default function AccountSetting({
                           key={item.key}
                           className={cn(
                             'mb-0.5 flex h-[37px] w-full items-center rounded-lg p-1 pl-3 text-left text-sm',
-                            activeMenu === item.key ? 'bg-state-base-active text-components-menu-item-text-active system-sm-semibold' : 'text-components-menu-item-text system-sm-medium',
+                            resolvedMenu === item.key ? 'bg-state-base-active text-components-menu-item-text-active system-sm-semibold' : 'text-components-menu-item-text system-sm-medium',
                           )}
                           aria-label={item.name}
                           title={item.name}
@@ -177,7 +200,7 @@ export default function AccountSetting({
                             handleTabChange(item.key)
                           }}
                         >
-                          {activeMenu === item.key ? item.activeIcon : item.icon}
+                          {resolvedMenu === item.key ? item.activeIcon : item.icon}
                           {!isMobile && <div className="truncate">{item.name}</div>}
                         </button>
                       ))
@@ -226,13 +249,20 @@ export default function AccountSetting({
               )}
             </div>
             <div className="px-4 pt-2 sm:px-8">
-              {activeMenu === ACCOUNT_SETTING_TAB.PROVIDER && <ModelProviderPage searchText={searchValue} />}
-              {activeMenu === ACCOUNT_SETTING_TAB.MEMBERS && <MembersPage />}
-              {activeMenu === ACCOUNT_SETTING_TAB.BILLING && <BillingPage />}
-              {activeMenu === ACCOUNT_SETTING_TAB.DATA_SOURCE && <DataSourcePage />}
-              {activeMenu === ACCOUNT_SETTING_TAB.API_BASED_EXTENSION && <ApiBasedExtensionPage />}
-              {activeMenu === ACCOUNT_SETTING_TAB.CUSTOM && <CustomPage />}
-              {activeMenu === ACCOUNT_SETTING_TAB.LANGUAGE && <LanguagePage />}
+              {resolvedMenu === ACCOUNT_SETTING_TAB.PROVIDER && <ModelProviderPage searchText={searchValue} />}
+              {resolvedMenu === ACCOUNT_SETTING_TAB.MEMBERS && <MembersPage />}
+              {resolvedMenu === ACCOUNT_SETTING_TAB.DEPARTMENTS && (
+                <DepartmentPage
+                  isAdmin={isCurrentWorkspaceManager}
+                  isDepartmentAdmin={isDepartmentAdmin}
+                  apiFailed={departmentApiFailed}
+                />
+              )}
+              {resolvedMenu === ACCOUNT_SETTING_TAB.BILLING && <BillingPage />}
+              {resolvedMenu === ACCOUNT_SETTING_TAB.DATA_SOURCE && <DataSourcePage />}
+              {resolvedMenu === ACCOUNT_SETTING_TAB.API_BASED_EXTENSION && <ApiBasedExtensionPage />}
+              {resolvedMenu === ACCOUNT_SETTING_TAB.CUSTOM && <CustomPage />}
+              {resolvedMenu === ACCOUNT_SETTING_TAB.LANGUAGE && <LanguagePage />}
             </div>
           </ScrollArea>
         </div>

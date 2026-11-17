@@ -8,7 +8,7 @@ Target: 1500+ lines of comprehensive test coverage.
 import json
 import re
 from datetime import datetime
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, Mock, create_autospec, patch
 
 import pytest
 
@@ -1918,3 +1918,50 @@ class TestExternalDatasetServiceFetchRetrieval:
             ExternalDatasetService.fetch_external_knowledge_retrieval(
                 "tenant-123", "dataset-123", "query", {"top_k": 5}
             )
+
+
+class TestCreateExternalDatasetDepartmentOwnership:
+    """create_external_dataset must resolve department_id like the other dataset
+    creation paths; a NULL department would be treated as the default department
+    by ACL checks and lock the creator out of the dataset they just created."""
+
+    @patch("services.department_service.DepartmentService")
+    @patch("services.external_knowledge_service.db")
+    def test_create_sets_department_from_account(self, mock_db, mock_dept_service):
+        from models import Account
+
+        account = create_autospec(Account, instance=True)
+        account.id = "user-123"
+        account.current_tenant_id = "tenant-123"
+        mock_dept_service.resolve_department_id_for_creation.return_value = "resolved_dept"
+
+        factory = ExternalDatasetServiceTestDataFactory()
+        api = factory.create_external_knowledge_api_mock(api_id="api-123")
+
+        mock_dataset_query = MagicMock()
+        mock_api_query = MagicMock()
+
+        def query_side_effect(model):
+            if model == Dataset:
+                return mock_dataset_query
+            elif model == ExternalKnowledgeApis:
+                return mock_api_query
+            return MagicMock()
+
+        mock_db.session.query.side_effect = query_side_effect
+        mock_dataset_query.filter_by.return_value = mock_dataset_query
+        mock_dataset_query.first.return_value = None
+        mock_api_query.filter_by.return_value = mock_api_query
+        mock_api_query.first.return_value = api
+
+        args = {
+            "name": "Test External Dataset",
+            "description": "desc",
+            "external_knowledge_api_id": "api-123",
+            "external_knowledge_id": "knowledge-123",
+        }
+
+        result = ExternalDatasetService.create_external_dataset("tenant-123", "user-123", args, account=account)
+
+        mock_dept_service.resolve_department_id_for_creation.assert_called_once_with(account, "tenant-123", None)
+        assert result.department_id == "resolved_dept"

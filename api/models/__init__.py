@@ -26,6 +26,7 @@ from .dataset import (
     TidbAuthBinding,
     Whitelist,
 )
+from .department import AppPublishedDepartment, Department
 from .enums import (
     AppTriggerStatus,
     AppTriggerType,
@@ -68,6 +69,7 @@ from .model import (
     TrialApp,
     UploadFile,
 )
+from .model_permission import AccountModelWhitelist
 from .oauth import DatasourceOauthParamConfig, DatasourceProvider
 from .provider import (
     LoadBalancingModelConfig,
@@ -118,6 +120,7 @@ __all__ = [
     "APIBasedExtensionPoint",
     "Account",
     "AccountIntegrate",
+    "AccountModelWhitelist",
     "AccountStatus",
     "AccountTrialAppRecord",
     "ApiRequest",
@@ -130,6 +133,7 @@ __all__ = [
     "AppMCPServer",
     "AppMode",
     "AppModelConfig",
+    "AppPublishedDepartment",
     "AppTrigger",
     "AppTriggerStatus",
     "AppTriggerType",
@@ -151,6 +155,7 @@ __all__ = [
     "DatasetRetrieverResource",
     "DatasourceOauthParamConfig",
     "DatasourceProvider",
+    "Department",
     "DifySetup",
     "Document",
     "DocumentSegment",

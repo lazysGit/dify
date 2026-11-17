@@ -6,11 +6,13 @@ from . import (
     base,
     conversation,
     dataset,
+    department,
     document,
     enterprise,
     file,
     index,
     message,
+    model_permission,
 )
 
 __all__ = [
@@ -21,9 +23,11 @@ __all__ = [
     "base",
     "conversation",
     "dataset",
+    "department",
     "document",
     "enterprise",
     "file",
     "index",
     "message",
+    "model_permission",
 ]

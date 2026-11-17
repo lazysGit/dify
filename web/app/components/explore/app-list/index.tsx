@@ -23,7 +23,6 @@ import {
   DSLImportMode,
 } from '@/models/app'
 import { fetchAppDetail } from '@/service/explore'
-import { useMembers } from '@/service/use-common'
 import { useExploreAppList } from '@/service/use-explore'
 import { cn } from '@/utils/classnames'
 import TryApp from '../try-app'
@@ -37,12 +36,10 @@ const Apps = ({
   onSuccess,
 }: AppsProps) => {
   const { t } = useTranslation()
-  const { userProfile } = useAppContext()
+  const { isCurrentWorkspaceEditor } = useAppContext()
   const { systemFeatures } = useGlobalPublicStore()
-  const { data: membersData } = useMembers()
   const allCategoriesEn = t('apps.allCategories', { ns: 'explore', lng: 'en' })
-  const userAccount = membersData?.accounts?.find(account => account.id === userProfile.id)
-  const hasEditPermission = !!userAccount && userAccount.role !== 'normal'
+  const hasEditPermission = isCurrentWorkspaceEditor
 
   const [keywords, setKeywords] = useState('')
   const [searchKeywords, setSearchKeywords] = useState('')

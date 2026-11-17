@@ -80,6 +80,7 @@ export type Member = Pick<UserProfileResponse, 'id' | 'name' | 'email' | 'last_l
   avatar: string
   status: 'pending' | 'active' | 'banned' | 'closed'
   role: 'owner' | 'admin' | 'editor' | 'normal' | 'dataset_operator'
+  department_id?: string
 }
 
 export enum ProviderName {
@@ -146,6 +147,8 @@ export type ICurrentWorkspace = Omit<IWorkspace, 'current'> & {
   trial_credits_used: number
   next_credit_reset_date: number
   trial_end_reason?: string
+  department_id?: string | null
+  department_path?: string | null
   custom_config?: {
     remove_webapp_brand?: boolean
     replace_webapp_logo?: string

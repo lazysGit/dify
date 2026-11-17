@@ -61,6 +61,7 @@ from .app import (
     message,
     model_config,
     ops_trace,
+    publish_department,
     site,
     statistic,
     workflow,
@@ -73,7 +74,6 @@ from .app import (
 
 # Import auth controllers
 from .auth import (
-    activate,
     data_source_bearer_auth,
     data_source_oauth,
     email_register,
@@ -110,6 +110,7 @@ from .datasets.rag_pipeline import (
 # Import explore controllers
 from .explore import (
     banner,
+    department_app,
     installed_app,
     parameter,
     recommended_app,
@@ -124,9 +125,11 @@ from .tag import tags
 from .workspace import (
     account,
     agent_providers,
+    department,
     endpoint,
     load_balancing_config,
     members,
+    model_permission,
     model_providers,
     models,
     plugin,
@@ -138,8 +141,6 @@ from .workspace import (
 api.add_namespace(console_ns)
 
 __all__ = [
-    "account",
-    "activate",
     "admin",
     "advanced_prompt_template",
     "agent",
@@ -165,6 +166,8 @@ __all__ = [
     "datasets_segments",
     "datasource_auth",
     "datasource_content_preview",
+    "department",
+    "department_app",
     "email_register",
     "endpoint",
     "extension",
@@ -183,6 +186,7 @@ __all__ = [
     "message",
     "metadata",
     "model_config",
+    "model_permission",
     "model_providers",
     "models",
     "notification",
@@ -192,6 +196,7 @@ __all__ = [
     "parameter",
     "ping",
     "plugin",
+    "publish_department",
     "rag_pipeline",
     "rag_pipeline_datasets",
     "rag_pipeline_draft_variable",

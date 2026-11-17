@@ -7,7 +7,6 @@ import { IS_CE_EDITION } from '@/config'
 import { useGlobalPublicStore } from '@/context/global-public-context'
 import Link from '@/next/link'
 import { useRouter, useSearchParams } from '@/next/navigation'
-import { invitationCheck } from '@/service/common'
 import { useIsLogin } from '@/service/use-common'
 import { LicenseStatus } from '@/types/feature'
 import { cn } from '@/utils/classnames'
@@ -26,7 +25,6 @@ const NormalForm = () => {
   const { isLoading: isCheckLoading, data: loginData } = useIsLogin()
   const isLoggedIn = loginData?.logged_in
   const message = decodeURIComponent(searchParams.get('message') || '')
-  const invite_token = decodeURIComponent(searchParams.get('invite_token') || '')
   const [isInitCheckLoading, setInitCheckLoading] = useState(true)
   const [isRedirecting, setIsRedirecting] = useState(false)
   const isLoading = isCheckLoading || isInitCheckLoading || isRedirecting
@@ -34,9 +32,6 @@ const NormalForm = () => {
   const [authType, updateAuthType] = useState<'code' | 'password'>('password')
   const [showORLine, setShowORLine] = useState(false)
   const [allMethodsAreDisabled, setAllMethodsAreDisabled] = useState(false)
-  const [workspaceName, setWorkSpaceName] = useState('')
-
-  const isInviteLink = Boolean(invite_token && invite_token !== 'null')
 
   const init = useCallback(async () => {
     try {
@@ -53,22 +48,13 @@ const NormalForm = () => {
       setAllMethodsAreDisabled(!systemFeatures.enable_social_oauth_login && !systemFeatures.enable_email_code_login && !systemFeatures.enable_email_password_login && !systemFeatures.sso_enforced_for_signin)
       setShowORLine((systemFeatures.enable_social_oauth_login || systemFeatures.sso_enforced_for_signin) && (systemFeatures.enable_email_code_login || systemFeatures.enable_email_password_login))
       updateAuthType(systemFeatures.enable_email_password_login ? 'password' : 'code')
-      if (isInviteLink) {
-        const checkRes = await invitationCheck({
-          url: '/activate/check',
-          params: {
-            token: invite_token,
-          },
-        })
-        setWorkSpaceName(checkRes?.data?.workspace_name || '')
-      }
     }
     catch (error) {
       console.error(error)
       setAllMethodsAreDisabled(true)
     }
     finally { setInitCheckLoading(false) }
-  }, [isLoggedIn, message, router, invite_token, isInviteLink, systemFeatures])
+  }, [isLoggedIn, message, router, systemFeatures])
   useEffect(() => {
     init()
   }, [init])
@@ -138,28 +124,10 @@ const NormalForm = () => {
   return (
     <>
       <div className="mx-auto mt-8 w-full">
-        {isInviteLink
-          ? (
-              <div className="mx-auto w-full">
-                <h2 className="text-text-primary title-4xl-semi-bold">
-                  {t('join', { ns: 'login' })}
-                  {workspaceName}
-                </h2>
-                {!systemFeatures.branding.enabled && (
-                  <p className="mt-2 text-text-tertiary body-md-regular">
-                    {t('joinTipStart', { ns: 'login' })}
-                    {workspaceName}
-                    {t('joinTipEnd', { ns: 'login' })}
-                  </p>
-                )}
-              </div>
-            )
-          : (
-              <div className="mx-auto w-full">
-                <h2 className="text-text-primary title-4xl-semi-bold">{systemFeatures.branding.enabled ? t('pageTitleForE', { ns: 'login' }) : t('pageTitle', { ns: 'login' })}</h2>
-                <p className="mt-2 text-text-tertiary body-md-regular">{t('welcome', { ns: 'login' })}</p>
-              </div>
-            )}
+        <div className="mx-auto w-full">
+          <h2 className="text-text-primary title-4xl-semi-bold">{systemFeatures.branding.enabled ? t('pageTitleForE', { ns: 'login' }) : t('pageTitle', { ns: 'login' })}</h2>
+          <p className="mt-2 text-text-tertiary body-md-regular">{t('welcome', { ns: 'login' })}</p>
+        </div>
         <div className="relative">
           <div className="mt-6 flex flex-col gap-3">
             {systemFeatures.enable_social_oauth_login && <SocialAuth />}
@@ -184,7 +152,7 @@ const NormalForm = () => {
               <>
                 {systemFeatures.enable_email_code_login && authType === 'code' && (
                   <>
-                    <MailAndCodeAuth isInvite={isInviteLink} />
+                    <MailAndCodeAuth />
                     {systemFeatures.enable_email_password_login && (
                       <div className="cursor-pointer py-1 text-center" onClick={() => { updateAuthType('password') }}>
                         <span className="text-components-button-secondary-accent-text system-xs-medium">{t('usePassword', { ns: 'login' })}</span>
@@ -194,7 +162,7 @@ const NormalForm = () => {
                 )}
                 {systemFeatures.enable_email_password_login && authType === 'password' && (
                   <>
-                    <MailAndPasswordAuth isInvite={isInviteLink} isEmailSetup={systemFeatures.is_email_setup} allowRegistration={systemFeatures.is_allow_register} />
+                    <MailAndPasswordAuth isEmailSetup={systemFeatures.is_email_setup} allowRegistration={systemFeatures.is_allow_register} />
                     {systemFeatures.enable_email_code_login && (
                       <div className="cursor-pointer py-1 text-center" onClick={() => { updateAuthType('code') }}>
                         <span className="text-components-button-secondary-accent-text system-xs-medium">{t('useVerificationCode', { ns: 'login' })}</span>

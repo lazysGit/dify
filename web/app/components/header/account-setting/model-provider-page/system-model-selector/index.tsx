@@ -191,6 +191,7 @@ const SystemModel: FC<SystemModelSelectorProps> = ({
                   defaultModel={currentTextGenerationDefaultModel}
                   modelList={textGenerationModelList}
                   onSelect={model => handleChangeDefaultModel(ModelTypeEnum.textGeneration, model)}
+                  readonly={!isCurrentWorkspaceManager}
                 />
               </div>
             </div>
@@ -201,6 +202,7 @@ const SystemModel: FC<SystemModelSelectorProps> = ({
                   defaultModel={currentEmbeddingsDefaultModel}
                   modelList={embeddingModelList}
                   onSelect={model => handleChangeDefaultModel(ModelTypeEnum.textEmbedding, model)}
+                  readonly={!isCurrentWorkspaceManager}
                 />
               </div>
             </div>
@@ -211,6 +213,7 @@ const SystemModel: FC<SystemModelSelectorProps> = ({
                   defaultModel={currentRerankDefaultModel}
                   modelList={rerankModelList}
                   onSelect={model => handleChangeDefaultModel(ModelTypeEnum.rerank, model)}
+                  readonly={!isCurrentWorkspaceManager}
                 />
               </div>
             </div>
@@ -221,6 +224,7 @@ const SystemModel: FC<SystemModelSelectorProps> = ({
                   defaultModel={currentSpeech2textDefaultModel}
                   modelList={speech2textModelList}
                   onSelect={model => handleChangeDefaultModel(ModelTypeEnum.speech2text, model)}
+                  readonly={!isCurrentWorkspaceManager}
                 />
               </div>
             </div>
@@ -231,6 +235,7 @@ const SystemModel: FC<SystemModelSelectorProps> = ({
                   defaultModel={currentTTSDefaultModel}
                   modelList={ttsModelList}
                   onSelect={model => handleChangeDefaultModel(ModelTypeEnum.tts, model)}
+                  readonly={!isCurrentWorkspaceManager}
                 />
               </div>
             </div>

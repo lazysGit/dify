@@ -17,6 +17,22 @@ vi.mock('@/context/modal-context', () => ({
   }),
 }))
 
+const mockAppContext = vi.hoisted(() => ({
+  isCurrentWorkspaceManager: true,
+  isCurrentWorkspaceEditor: false,
+}))
+vi.mock('@/context/app-context', () => ({
+  useAppContext: () => mockAppContext,
+}))
+
+const mockIsDepartmentAdmin = vi.hoisted(() => ({ current: false }))
+vi.mock('@/service/use-departments', () => ({
+  useDepartmentList: () => ({
+    data: { is_department_admin: mockIsDepartmentAdmin.current },
+    isError: false,
+  }),
+}))
+
 const mockSupportFunctionCall = vi.hoisted(() => vi.fn())
 vi.mock('@/utils/tool-call', () => ({
   supportFunctionCall: mockSupportFunctionCall,
@@ -173,6 +189,11 @@ describe('Popup', () => {
     mockMarketplacePlugins.isLoading = false
     mockContextModelProviders.current = []
     mockTrialModels.current = ['test-openai', 'test-anthropic']
+    Object.assign(mockAppContext, {
+      isCurrentWorkspaceManager: true,
+      isCurrentWorkspaceEditor: false,
+    })
+    mockIsDepartmentAdmin.current = false
     Object.assign(mockTrialCredits, {
       credits: 200,
       totalCredits: 200,
@@ -407,6 +428,101 @@ describe('Popup', () => {
     expect(mockSetShowAccountSettingModal).toHaveBeenCalledWith({
       payload: 'provider',
     })
+  })
+
+  it('should hide provider settings footer for editor who is not a department admin', () => {
+    Object.assign(mockAppContext, {
+      isCurrentWorkspaceManager: false,
+      isCurrentWorkspaceEditor: true,
+    })
+    mockIsDepartmentAdmin.current = false
+
+    render(
+      <Popup
+        modelList={[makeModel()]}
+        onSelect={vi.fn()}
+        onHide={vi.fn()}
+      />,
+    )
+
+    expect(screen.queryByText('common.modelProvider.selector.modelProviderSettings')).not.toBeInTheDocument()
+  })
+
+  it('should show provider settings footer for editor who is a department admin', () => {
+    Object.assign(mockAppContext, {
+      isCurrentWorkspaceManager: false,
+      isCurrentWorkspaceEditor: true,
+    })
+    mockIsDepartmentAdmin.current = true
+
+    render(
+      <Popup
+        modelList={[makeModel()]}
+        onSelect={vi.fn()}
+        onHide={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText('common.modelProvider.selector.modelProviderSettings')).toBeInTheDocument()
+  })
+
+  it('should hide empty-state configure action when the user cannot open provider settings', () => {
+    Object.assign(mockAppContext, {
+      isCurrentWorkspaceManager: false,
+      isCurrentWorkspaceEditor: false,
+    })
+    mockIsDepartmentAdmin.current = false
+
+    render(
+      <Popup
+        modelList={[]}
+        onSelect={vi.fn()}
+        onHide={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText(/modelProvider\.selector\.noProviderConfigured(?!Desc)/)).toBeInTheDocument()
+    expect(screen.queryByText(/modelProvider\.selector\.configure/)).not.toBeInTheDocument()
+  })
+
+  it('should hide marketplace install for editor who is not a department admin', () => {
+    Object.assign(mockAppContext, {
+      isCurrentWorkspaceManager: false,
+      isCurrentWorkspaceEditor: true,
+    })
+    mockIsDepartmentAdmin.current = false
+
+    render(
+      <Popup
+        modelList={[makeModel()]}
+        onSelect={vi.fn()}
+        onHide={vi.fn()}
+      />,
+    )
+
+    expect(screen.queryByText(/modelProvider\.selector\.fromMarketplace/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/modelProvider\.selector\.discoverMoreInMarketplace/)).not.toBeInTheDocument()
+    expect(screen.queryByText('TestOpenAI')).not.toBeInTheDocument()
+    expect(screen.queryByText('TestAnthropic')).not.toBeInTheDocument()
+  })
+
+  it('should show marketplace install for editor who is a department admin', () => {
+    Object.assign(mockAppContext, {
+      isCurrentWorkspaceManager: false,
+      isCurrentWorkspaceEditor: true,
+    })
+    mockIsDepartmentAdmin.current = true
+
+    render(
+      <Popup
+        modelList={[makeModel()]}
+        onSelect={vi.fn()}
+        onHide={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText(/modelProvider\.selector\.fromMarketplace/)).toBeInTheDocument()
+    expect(screen.getByText(/modelProvider\.selector\.discoverMoreInMarketplace/)).toBeInTheDocument()
   })
 
   it('should show empty state when no providers are configured', () => {

@@ -19,6 +19,7 @@ from fields.app_fields import app_site_fields
 from libs.datetime_utils import naive_utc_now
 from libs.login import current_account_with_tenant, login_required
 from models import Site
+from services.embed_token_service import EmbedTokenService
 
 DEFAULT_REF_TEMPLATE_SWAGGER_2_0 = "#/definitions/{model}"
 
@@ -136,3 +137,45 @@ class AppSiteAccessTokenReset(Resource):
         db.session.commit()
 
         return site
+
+
+@console_ns.route("/apps/<uuid:app_id>/site/embed-token")
+class AppSiteEmbedToken(Resource):
+    @console_ns.doc("get_app_site_embed_token")
+    @console_ns.doc(description="Return the current department embed token, issuing one if needed")
+    @console_ns.doc(params={"app_id": "Application ID"})
+    @console_ns.response(200, "Embed token returned successfully")
+    @console_ns.response(403, "Insufficient permissions")
+    @console_ns.response(404, "App or site not found")
+    @setup_required
+    @login_required
+    @edit_permission_required
+    @account_initialization_required
+    @get_app_model
+    def get(self, app_model):
+        site = db.session.scalar(select(Site).where(Site.app_id == app_model.id).limit(1))
+        if not site:
+            raise NotFound
+
+        return EmbedTokenService.ensure_token(app_model, site)
+
+
+@console_ns.route("/apps/<uuid:app_id>/site/embed-token/reset")
+class AppSiteEmbedTokenReset(Resource):
+    @console_ns.doc("reset_app_site_embed_token")
+    @console_ns.doc(description="Reset the department embed token without changing the site code")
+    @console_ns.doc(params={"app_id": "Application ID"})
+    @console_ns.response(200, "Embed token reset successfully")
+    @console_ns.response(403, "Insufficient permissions")
+    @console_ns.response(404, "App or site not found")
+    @setup_required
+    @login_required
+    @edit_permission_required
+    @account_initialization_required
+    @get_app_model
+    def post(self, app_model):
+        site = db.session.scalar(select(Site).where(Site.app_id == app_model.id).limit(1))
+        if not site:
+            raise NotFound
+
+        return EmbedTokenService.reset_token(app_model, site)

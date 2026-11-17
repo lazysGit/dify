@@ -45,13 +45,16 @@ const afterResponseErrorCode = (otherOptions: IOtherOptions): AfterResponseHook 
         .json()
         .then(data => data as ResponseError)
         .catch(() => null)
-      const shouldNotifyError = response.status !== 401 && errorData && !otherOptions.silent
-
-      if (shouldNotifyError)
-        toast.error(errorData.message)
+      const shouldNotifyError = response.status !== 401 && errorData && !otherOptions.silent && errorData.code !== 'must_change_password'
 
       if (response.status === 403 && errorData?.code === 'already_setup')
         globalThis.location.href = `${globalThis.location.origin}/signin`
+
+      if (errorData?.code === 'must_change_password' && !globalThis.location.pathname.includes('force-change-password'))
+        globalThis.location.href = `${globalThis.location.origin}/force-change-password`
+
+      if (shouldNotifyError)
+        toast.error(errorData.message)
     }
   }
 }

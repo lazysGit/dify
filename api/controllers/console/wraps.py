@@ -11,7 +11,7 @@ from sqlalchemy import select
 
 from configs import dify_config
 from controllers.console.auth.error import AuthenticationFailedError, EmailCodeError
-from controllers.console.workspace.error import AccountNotInitializedError
+from controllers.console.workspace.error import AccountNotInitializedError, MustChangePasswordError
 from enums.cloud_plan import CloudPlan
 from extensions.ext_database import db
 from extensions.ext_redis import redis_client
@@ -44,6 +44,11 @@ def account_initialization_required(view: Callable[P, R]) -> Callable[P, R]:
         current_user, _ = current_account_with_tenant()
         if current_user.status == AccountStatus.UNINITIALIZED:
             raise AccountNotInitializedError()
+
+        from services.account_service import AccountService
+
+        if AccountService.is_using_default_password(current_user):
+            raise MustChangePasswordError()
 
         return view(*args, **kwargs)
 

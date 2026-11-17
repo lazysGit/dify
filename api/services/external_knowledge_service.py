@@ -12,6 +12,7 @@ from core.rag.entities.metadata_entities import MetadataCondition
 from dify_graph.nodes.http_request.exc import InvalidHttpMethodError
 from extensions.ext_database import db
 from libs.datetime_utils import naive_utc_now
+from models.account import Account
 from models.dataset import (
     Dataset,
     ExternalKnowledgeApis,
@@ -236,7 +237,7 @@ class ExternalDatasetService:
         return ExternalKnowledgeApiSetting.model_validate(settings)
 
     @staticmethod
-    def create_external_dataset(tenant_id: str, user_id: str, args: dict) -> Dataset:
+    def create_external_dataset(tenant_id: str, user_id: str, args: dict, account: Account | None = None) -> Dataset:
         # check if dataset name already exists
         if db.session.query(Dataset).filter_by(name=args.get("name"), tenant_id=tenant_id).first():
             raise DatasetNameDuplicateError(f"Dataset with name {args.get('name')} already exists.")
@@ -249,6 +250,15 @@ class ExternalDatasetService:
         if external_knowledge_api is None:
             raise ValueError("api template not found")
 
+        # A NULL department_id would be treated as the default department by ACL checks, locking the
+        # creator (and everyone outside the default department) out of the dataset they just created.
+        # The console controller must pass the Account; keep the legacy behaviour when absent.
+        from services.department_service import DepartmentService
+
+        department_id = (
+            DepartmentService.resolve_department_id_for_creation(account, tenant_id, None) if account else None
+        )
+
         dataset = Dataset(
             tenant_id=tenant_id,
             name=args.get("name"),
@@ -256,6 +266,7 @@ class ExternalDatasetService:
             provider="external",
             retrieval_model=args.get("external_retrieval_model"),
             created_by=user_id,
+            department_id=department_id,
         )
 
         db.session.add(dataset)

@@ -8,17 +8,21 @@ import Operations from '../operations'
 type OperationsPopoverProps = {
   dataset: DataSet
   isCurrentWorkspaceDatasetOperator: boolean
+  showTransferDepartment: boolean
   openRenameModal: () => void
   handleExportPipeline: (include?: boolean) => void
   detectIsUsedByApp: () => void
+  openTransferDepartment: () => void
 }
 
 const OperationsPopover = ({
   dataset,
   isCurrentWorkspaceDatasetOperator,
+  showTransferDepartment,
   openRenameModal,
   handleExportPipeline,
   detectIsUsedByApp,
+  openTransferDepartment,
 }: OperationsPopoverProps) => (
   <div className="absolute right-2 top-2 z-[15] hidden group-hover:block">
     <CustomPopover
@@ -26,9 +30,11 @@ const OperationsPopover = ({
         <Operations
           showDelete={!isCurrentWorkspaceDatasetOperator}
           showExportPipeline={dataset.runtime_mode === 'rag_pipeline'}
+          showTransferDepartment={showTransferDepartment}
           openRenameModal={openRenameModal}
           handleExportPipeline={handleExportPipeline}
           detectIsUsedByApp={detectIsUsedByApp}
+          openTransferDepartment={openTransferDepartment}
         />
       )}
       className="z-20 min-w-[186px]"

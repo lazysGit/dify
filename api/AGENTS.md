@@ -1,4 +1,58 @@
-# API Agent Guide
+# API KNOWLEDGE BASE
+
+**Generated:** 2026-07-04
+**Stack:** Python Flask + SQLAlchemy + Celery + Redis
+
+## STRUCTURE
+
+```
+api/
+├── controllers/     # REST endpoints (console, service_api, web, inner_api, mcp, cli_api, trigger)
+├── services/        # Business logic orchestration (69 files)
+├── core/            # Domain logic (40 subdirs: agent, workflow, tools, rag, model_runtime, plugin, mcp)
+├── models/          # SQLAlchemy ORM models
+├── repositories/    # Data access abstraction
+├── migrations/      # Alembic migrations
+├── tasks/           # Celery async tasks (52 files)
+├── schedule/        # Scheduled Celery tasks (13+ beat schedules)
+├── events/          # Event definitions + handlers
+├── extensions/      # Flask extension bootstrapping (32 files)
+├── configs/         # Configuration management (pydantic-settings)
+├── libs/            # Utility helpers (37 files)
+├── fields/          # Flask-RESTx serialization (framework leak!)
+├── enums/           # Shared enums (4 files)
+├── constants/       # Constants
+├── commands/        # CLI commands (account, plugin, storage, system, vector, retention)
+├── factories/       # Object factories (3 files)
+├── templates/       # Email HTML templates (30+ files)
+├── context/         # Flask app context
+├── contexts/        # Recyclable context var wrapper (naming collision risk!)
+├── storage/         # File storage (privkeys/)
+├── dify_graph/      # Workflow graph engine
+├── app.py           # Entry point
+├── app_factory.py   # App factory (20 extensions)
+├── dify_app.py      # Custom Flask subclass
+├── celery_entrypoint.py # Celery worker entry
+├── pyproject.toml   # uv/ruff/type-check config
+└── gunicorn.conf.py # Gunicorn config
+```
+
+## WHERE TO LOOK
+
+| Task | Location | Notes |
+|------|----------|-------|
+| API endpoint | `controllers/` | 6 blueprint groups |
+| Business logic | `services/` | 69 service files |
+| Domain logic | `core/` | 40 subdirectories (monolithic!) |
+| ORM model | `models/` | SQLAlchemy models |
+| Data access | `repositories/` | Repository pattern |
+| Async task | `tasks/` | Celery tasks |
+| Scheduled task | `schedule/` | Beat schedules |
+| CLI command | `commands/` | Flask CLI commands |
+| Configuration | `configs/` | Pydantic settings |
+| Extension | `extensions/` | Flask extensions |
+| Utility | `libs/` | Helper functions |
+| Migration | `migrations/` | Alembic migrations |
 
 ## Notes for Agent (must-check)
 
@@ -200,3 +254,75 @@ Before opening a PR / submitting:
 - Maintain tenant awareness end-to-end; `tenant_id` must flow through every layer touching shared resources.
 - Queue async work through `services/async_workflow_service`; implement tasks under `tasks/` with explicit queue selection.
 - Keep experimental scripts under `dev/`; do not ship them in production builds.
+
+## ENTRY POINTS
+
+| Entry | File | Purpose |
+|-------|------|---------|
+| Flask app | `app.py` | Creates app via `create_app()` or `create_migrations_app()` |
+| App factory | `app_factory.py` | Initializes 20 extensions in order |
+| Celery worker | `celery_entrypoint.py` | Celery worker startup |
+| Gunicorn | `gunicorn.conf.py` | WSGI server config (gevent patching) |
+| CLI commands | `commands/` | Flask CLI commands |
+| Blueprints | `extensions/ext_blueprints.py` | Registers 7 Flask blueprints |
+
+## CONFIGURATION
+
+| Config | File | Purpose |
+|--------|------|---------|
+| Main config | `configs/__init__.py` | Exports `dify_config` singleton |
+| App config | `configs/app_config.py` | Pydantic settings model |
+| Ruff | `.ruff.toml` | Linting/formatting rules |
+| Type check | `pyrightconfig.json` | basedpyright config |
+| Pytest | `pytest.ini` | Test config + mock env vars |
+| Import linter | `.importlinter` | Architecture boundaries |
+
+## ANTI-PATTERNS (THIS PROJECT)
+
+| Pattern | Why Forbidden |
+|---------|---------------|
+| `print()` | Use `logging.getLogger(__name__)` |
+| Direct env reads | Use `configs.dify_config` |
+| `Any` type | Prefer explicit types, `TypedDict` |
+| `dict`/`Mapping` for typed payloads | Use `TypedDict` with `NotRequired` |
+| Files >800 lines | Split into modules |
+| Long-running services in agent work | Never start `flask run`, `uv run app.py` |
+| Circular imports | Use lazy imports (acknowledged anti-pattern) |
+| Service imports in core layer | Architecture boundary violation |
+| Abstract base with `NotImplementedError` | Use `abc.ABC` + `@abstractmethod` |
+| Raw SQL | Use SQLAlchemy expressions |
+| Missing `tenant_id` scope | Always filter by tenant |
+
+## UNIQUE STYLES
+
+1. **Triple type checking**: basedpyright + pyrefly + mypy (unprecedented strictness)
+2. **Single Docker image, 3 processes**: API image serves api/worker/beat via MODE env var
+3. **20+ vector databases**: Supported via docker-compose + env vars
+4. **680+ environment variables**: Massive configuration surface area
+5. **Core domain is monolithic**: 40 subdirectories in `core/` for separate bounded contexts
+6. **Enums scattered**: Across `enums/`, `models/enums.py`, `core/entities/`
+7. **`fields/` is framework leak**: Flask-RESTx serialization coupled to domain layer
+8. **`context/` vs `contexts/`**: Two directories with similar names (confusing)
+
+## COMMANDS
+
+```bash
+# Development
+uv run --project api flask run                    # Start dev server
+uv run --project api celery -A celery_entrypoint.celery worker -P gevent  # Start worker
+uv run --project api celery -A app.celery beat    # Start beat scheduler
+
+# Code quality
+make format                                       # Ruff format
+make lint                                         # Ruff check + import-linter + dotenv-linter
+make type-check                                   # basedpyright + pyrefly + mypy
+make test                                         # pytest (unit tests)
+
+# Targeted tests
+make test TARGET_TESTS=./api/tests/unit_tests/    # Run specific tests
+
+# CLI commands
+uv run --project api flask db upgrade             # Run migrations
+uv run --project api flask account reset-password # Reset password
+uv run --project api flask storage migrate-oss    # Migrate storage
+```

@@ -18,7 +18,6 @@ from flask_restx import Api
 from controllers.console.auth.error import (
     AuthenticationFailedError,
     EmailPasswordLoginLimitError,
-    InvalidEmailError,
 )
 from controllers.console.auth.login import LoginApi, LogoutApi
 from controllers.console.error import (
@@ -76,7 +75,6 @@ class TestLoginApi:
     @patch("controllers.console.wraps.db")
     @patch("controllers.console.auth.login.dify_config.BILLING_ENABLED", False)
     @patch("controllers.console.auth.login.AccountService.is_login_error_rate_limit")
-    @patch("controllers.console.auth.login.RegisterService.get_invitation_with_case_fallback")
     @patch("controllers.console.auth.login.AccountService.authenticate")
     @patch("controllers.console.auth.login.TenantService.get_join_tenants")
     @patch("controllers.console.auth.login.AccountService.login")
@@ -87,7 +85,6 @@ class TestLoginApi:
         mock_login,
         mock_get_tenants,
         mock_authenticate,
-        mock_get_invitation,
         mock_is_rate_limit,
         mock_db,
         app,
@@ -105,85 +102,72 @@ class TestLoginApi:
         # Arrange
         mock_db.session.query.return_value.first.return_value = MagicMock()
         mock_is_rate_limit.return_value = False
-        mock_get_invitation.return_value = None
         mock_authenticate.return_value = mock_account
         mock_get_tenants.return_value = [MagicMock()]  # Has at least one tenant
         mock_login.return_value = mock_token_pair
 
         # Act
-        with app.test_request_context(
-            "/login",
-            method="POST",
-            json={"email": "test@example.com", "password": encode_password("ValidPass123!")},
+        with (
+            app.test_request_context(
+                "/login",
+                method="POST",
+                json={"email": "test@example.com", "password": encode_password("ValidPass123!")},
+            ),
+            patch("controllers.console.auth.login.AccountService.is_using_default_password", return_value=False),
         ):
             login_api = LoginApi()
             response = login_api.post()
 
         # Assert
-        mock_authenticate.assert_called_once_with("test@example.com", "ValidPass123!", None)
+        mock_authenticate.assert_called_once_with("test@example.com", "ValidPass123!")
         mock_login.assert_called_once()
         mock_reset_rate_limit.assert_called_once_with("test@example.com")
         assert response.json["result"] == "success"
+        assert response.json["must_change_password"] is False
 
     @patch("controllers.console.wraps.db")
     @patch("controllers.console.auth.login.dify_config.BILLING_ENABLED", False)
     @patch("controllers.console.auth.login.AccountService.is_login_error_rate_limit")
-    @patch("controllers.console.auth.login.RegisterService.get_invitation_with_case_fallback")
     @patch("controllers.console.auth.login.AccountService.authenticate")
     @patch("controllers.console.auth.login.TenantService.get_join_tenants")
     @patch("controllers.console.auth.login.AccountService.login")
     @patch("controllers.console.auth.login.AccountService.reset_login_error_rate_limit")
-    def test_successful_login_with_valid_invitation(
+    def test_successful_login_flags_default_password(
         self,
         mock_reset_rate_limit,
         mock_login,
         mock_get_tenants,
         mock_authenticate,
-        mock_get_invitation,
         mock_is_rate_limit,
         mock_db,
         app,
         mock_account,
         mock_token_pair,
     ):
-        """
-        Test successful login with valid invitation token.
-
-        Verifies that:
-        - Invitation token is validated
-        - Email matches invitation email
-        - Authentication proceeds with invitation token
-        """
-        # Arrange
         mock_db.session.query.return_value.first.return_value = MagicMock()
         mock_is_rate_limit.return_value = False
-        mock_get_invitation.return_value = {"data": {"email": "test@example.com"}}
         mock_authenticate.return_value = mock_account
         mock_get_tenants.return_value = [MagicMock()]
         mock_login.return_value = mock_token_pair
 
-        # Act
-        with app.test_request_context(
-            "/login",
-            method="POST",
-            json={
-                "email": "test@example.com",
-                "password": encode_password("ValidPass123!"),
-                "invite_token": "valid_token",
-            },
+        with (
+            app.test_request_context(
+                "/login",
+                method="POST",
+                json={"email": "test@example.com", "password": encode_password("Dify1234")},
+            ),
+            patch("controllers.console.auth.login.AccountService.is_using_default_password", return_value=True),
         ):
             login_api = LoginApi()
             response = login_api.post()
 
-        # Assert
-        mock_authenticate.assert_called_once_with("test@example.com", "ValidPass123!", "valid_token")
         assert response.json["result"] == "success"
+        assert response.json["must_change_password"] is True
 
     @patch("controllers.console.wraps.db")
     @patch("controllers.console.auth.login.dify_config.BILLING_ENABLED", False)
     @patch("controllers.console.auth.login.AccountService.is_login_error_rate_limit")
-    @patch("controllers.console.auth.login.RegisterService.get_invitation_with_case_fallback")
-    def test_login_fails_when_rate_limited(self, mock_get_invitation, mock_is_rate_limit, mock_db, app):
+    def test_login_fails_when_rate_limited(self, mock_is_rate_limit, mock_db, app):
         """
         Test login rejection when rate limit is exceeded.
 
@@ -194,7 +178,6 @@ class TestLoginApi:
         # Arrange
         mock_db.session.query.return_value.first.return_value = MagicMock()
         mock_is_rate_limit.return_value = True
-        mock_get_invitation.return_value = None
 
         # Act & Assert
         with app.test_request_context(
@@ -230,14 +213,12 @@ class TestLoginApi:
     @patch("controllers.console.wraps.db")
     @patch("controllers.console.auth.login.dify_config.BILLING_ENABLED", False)
     @patch("controllers.console.auth.login.AccountService.is_login_error_rate_limit")
-    @patch("controllers.console.auth.login.RegisterService.get_invitation_with_case_fallback")
     @patch("controllers.console.auth.login.AccountService.authenticate")
     @patch("controllers.console.auth.login.AccountService.add_login_error_rate_limit")
     def test_login_fails_with_invalid_credentials(
         self,
         mock_add_rate_limit,
         mock_authenticate,
-        mock_get_invitation,
         mock_is_rate_limit,
         mock_db,
         app,
@@ -253,7 +234,6 @@ class TestLoginApi:
         # Arrange
         mock_db.session.query.return_value.first.return_value = MagicMock()
         mock_is_rate_limit.return_value = False
-        mock_get_invitation.return_value = None
         mock_authenticate.side_effect = AccountPasswordError("Invalid password")
 
         # Act & Assert
@@ -269,11 +249,8 @@ class TestLoginApi:
     @patch("controllers.console.wraps.db")
     @patch("controllers.console.auth.login.dify_config.BILLING_ENABLED", False)
     @patch("controllers.console.auth.login.AccountService.is_login_error_rate_limit")
-    @patch("controllers.console.auth.login.RegisterService.get_invitation_with_case_fallback")
     @patch("controllers.console.auth.login.AccountService.authenticate")
-    def test_login_fails_for_banned_account(
-        self, mock_authenticate, mock_get_invitation, mock_is_rate_limit, mock_db, app
-    ):
+    def test_login_fails_for_banned_account(self, mock_authenticate, mock_is_rate_limit, mock_db, app):
         """
         Test login rejection for banned accounts.
 
@@ -284,7 +261,6 @@ class TestLoginApi:
         # Arrange
         mock_db.session.query.return_value.first.return_value = MagicMock()
         mock_is_rate_limit.return_value = False
-        mock_get_invitation.return_value = None
         mock_authenticate.side_effect = AccountLoginError("Account is banned")
 
         # Act & Assert
@@ -298,7 +274,6 @@ class TestLoginApi:
     @patch("controllers.console.wraps.db")
     @patch("controllers.console.auth.login.dify_config.BILLING_ENABLED", False)
     @patch("controllers.console.auth.login.AccountService.is_login_error_rate_limit")
-    @patch("controllers.console.auth.login.RegisterService.get_invitation_with_case_fallback")
     @patch("controllers.console.auth.login.AccountService.authenticate")
     @patch("controllers.console.auth.login.TenantService.get_join_tenants")
     @patch("controllers.console.auth.login.FeatureService.get_system_features")
@@ -307,7 +282,6 @@ class TestLoginApi:
         mock_get_features,
         mock_get_tenants,
         mock_authenticate,
-        mock_get_invitation,
         mock_is_rate_limit,
         mock_db,
         app,
@@ -323,7 +297,6 @@ class TestLoginApi:
         # Arrange
         mock_db.session.query.return_value.first.return_value = MagicMock()
         mock_is_rate_limit.return_value = False
-        mock_get_invitation.return_value = None
         mock_authenticate.return_value = mock_account
         mock_get_tenants.return_value = []  # No tenants
 
@@ -343,38 +316,6 @@ class TestLoginApi:
     @patch("controllers.console.wraps.db")
     @patch("controllers.console.auth.login.dify_config.BILLING_ENABLED", False)
     @patch("controllers.console.auth.login.AccountService.is_login_error_rate_limit")
-    @patch("controllers.console.auth.login.RegisterService.get_invitation_with_case_fallback")
-    def test_login_invitation_email_mismatch(self, mock_get_invitation, mock_is_rate_limit, mock_db, app):
-        """
-        Test login failure when invitation email doesn't match login email.
-
-        Verifies that:
-        - InvalidEmailError is raised for email mismatch
-        - Security check prevents invitation token abuse
-        """
-        # Arrange
-        mock_db.session.query.return_value.first.return_value = MagicMock()
-        mock_is_rate_limit.return_value = False
-        mock_get_invitation.return_value = {"data": {"email": "invited@example.com"}}
-
-        # Act & Assert
-        with app.test_request_context(
-            "/login",
-            method="POST",
-            json={
-                "email": "different@example.com",
-                "password": encode_password("ValidPass123!"),
-                "invite_token": "token",
-            },
-        ):
-            login_api = LoginApi()
-            with pytest.raises(InvalidEmailError):
-                login_api.post()
-
-    @patch("controllers.console.wraps.db")
-    @patch("controllers.console.auth.login.dify_config.BILLING_ENABLED", False)
-    @patch("controllers.console.auth.login.AccountService.is_login_error_rate_limit")
-    @patch("controllers.console.auth.login.RegisterService.get_invitation_with_case_fallback")
     @patch("controllers.console.auth.login.AccountService.authenticate")
     @patch("controllers.console.auth.login.AccountService.add_login_error_rate_limit")
     @patch("controllers.console.auth.login.TenantService.get_join_tenants")
@@ -387,7 +328,6 @@ class TestLoginApi:
         mock_get_tenants,
         mock_add_rate_limit,
         mock_authenticate,
-        mock_get_invitation,
         mock_is_rate_limit,
         mock_db,
         app,
@@ -397,7 +337,6 @@ class TestLoginApi:
         """Test that login retries with lowercase email when uppercase lookup fails."""
         mock_db.session.query.return_value.first.return_value = MagicMock()
         mock_is_rate_limit.return_value = False
-        mock_get_invitation.return_value = None
         mock_authenticate.side_effect = [AccountPasswordError("Invalid"), mock_account]
         mock_get_tenants.return_value = [MagicMock()]
         mock_login_service.return_value = mock_token_pair
@@ -411,8 +350,8 @@ class TestLoginApi:
 
         assert response.json["result"] == "success"
         assert mock_authenticate.call_args_list == [
-            (("Upper@Example.com", "ValidPass123!", None), {}),
-            (("upper@example.com", "ValidPass123!", None), {}),
+            (("Upper@Example.com", "ValidPass123!"), {}),
+            (("upper@example.com", "ValidPass123!"), {}),
         ]
         mock_add_rate_limit.assert_not_called()
         mock_reset_rate_limit.assert_called_once_with("upper@example.com")

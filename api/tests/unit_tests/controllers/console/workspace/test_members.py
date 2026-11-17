@@ -13,18 +13,18 @@ from controllers.console.auth.error import (
     NotOwnerError,
     OwnerTransferLimitError,
 )
-from controllers.console.error import EmailSendIpLimitError, WorkspaceMembersLimitExceeded
+from controllers.console.error import EmailSendIpLimitError
 from controllers.console.workspace.members import (
     DatasetOperatorMemberListApi,
     MemberCancelInviteApi,
-    MemberInviteEmailApi,
+    MemberCreatePayload,
+    MemberInitialPasswordApi,
     MemberListApi,
     MemberUpdateRoleApi,
     OwnerTransfer,
     OwnerTransferCheckApi,
     SendOwnerTransferEmailApi,
 )
-from services.errors.account import AccountAlreadyInTenantError
 
 
 def unwrap(func):
@@ -39,7 +39,7 @@ class TestMemberListApi:
         method = unwrap(api.get)
 
         tenant = MagicMock()
-        user = MagicMock(current_tenant=tenant)
+        user = MagicMock(current_tenant=tenant, is_admin_or_owner=True)
         member = MagicMock()
         member.id = "m1"
         member.name = "Member"
@@ -47,12 +47,16 @@ class TestMemberListApi:
         member.avatar = "avatar.png"
         member.role = "admin"
         member.status = "active"
+        member.department_id = "dept1"
+        member.department_name = "Engineering"
+        member.is_department_admin = False
         members = [member]
 
         with (
             app.test_request_context("/"),
             patch("controllers.console.workspace.members.current_account_with_tenant", return_value=(user, "t1")),
             patch("controllers.console.workspace.members.TenantService.get_tenant_members", return_value=members),
+            patch("controllers.console.workspace.members.DepartmentService.is_department_admin", return_value=False),
         ):
             result, status = method(api)
 
@@ -72,127 +76,206 @@ class TestMemberListApi:
             with pytest.raises(ValueError):
                 method(api)
 
-
-class TestMemberInviteEmailApi:
-    def test_invite_success(self, app):
-        api = MemberInviteEmailApi()
-        method = unwrap(api.post)
+    def test_get_forbidden_for_normal_member(self, app):
+        """普通成员不能拉全量成员列表（设置页也不会用到）。"""
+        api = MemberListApi()
+        method = unwrap(api.get)
 
         tenant = MagicMock(id="t1")
-        user = MagicMock(current_tenant=tenant)
-        features = MagicMock()
-        features.workspace_members.is_available.return_value = True
-
-        payload = {
-            "emails": ["a@test.com"],
-            "role": "normal",
-            "language": "en-US",
-        }
+        user = MagicMock(
+            current_tenant=tenant,
+            id="u1",
+            is_admin_or_owner=False,
+            is_dataset_editor=False,
+        )
+        members = [MagicMock(department_id="d1")]
 
         with (
-            app.test_request_context("/", json=payload),
+            app.test_request_context("/"),
             patch("controllers.console.workspace.members.current_account_with_tenant", return_value=(user, "t1")),
-            patch("controllers.console.workspace.members.FeatureService.get_features", return_value=features),
-            patch("controllers.console.workspace.members.RegisterService.invite_new_member", return_value="token"),
-            patch("controllers.console.workspace.members.dify_config.CONSOLE_WEB_URL", "http://x"),
+            patch("controllers.console.workspace.members.TenantService.get_tenant_members", return_value=members),
+            patch("controllers.console.workspace.members.DepartmentService.is_department_admin", return_value=False),
         ):
             result, status = method(api)
 
-        assert status == 201
-        assert result["result"] == "success"
+        assert status == 403
+        assert result["code"] == "forbidden"
 
-    def test_invite_limit_exceeded(self, app):
-        api = MemberInviteEmailApi()
-        method = unwrap(api.post)
-
-        tenant = MagicMock(id="t1")
-        user = MagicMock(current_tenant=tenant)
-        features = MagicMock()
-        features.workspace_members.is_available.return_value = False
-
-        payload = {
-            "emails": ["a@test.com"],
-            "role": "normal",
-        }
-
-        with (
-            app.test_request_context("/", json=payload),
-            patch("controllers.console.workspace.members.current_account_with_tenant", return_value=(user, "t1")),
-            patch("controllers.console.workspace.members.FeatureService.get_features", return_value=features),
-        ):
-            with pytest.raises(WorkspaceMembersLimitExceeded):
-                method(api)
-
-    def test_invite_already_member(self, app):
-        api = MemberInviteEmailApi()
-        method = unwrap(api.post)
+    def test_get_editor_sees_same_department_only(self, app):
+        """知识库设置「部分部门成员」选择器：编辑可列本部门成员，不能看其他部门。"""
+        api = MemberListApi()
+        method = unwrap(api.get)
 
         tenant = MagicMock(id="t1")
-        user = MagicMock(current_tenant=tenant)
-        features = MagicMock()
-        features.workspace_members.is_available.return_value = True
-
-        payload = {
-            "emails": ["a@test.com"],
-            "role": "normal",
-        }
+        user = MagicMock(
+            current_tenant=tenant,
+            id="editor1",
+            is_admin_or_owner=False,
+            is_dataset_editor=True,
+        )
+        same = MagicMock()
+        same.id = "m1"
+        same.name = "Peer"
+        same.email = "peer@test.com"
+        same.avatar = None
+        same.role = "editor"
+        same.status = "active"
+        same.department_id = "dept-rd"
+        same.department_name = "研发部"
+        same.is_department_admin = False
+        other = MagicMock()
+        other.id = "m2"
+        other.name = "Other"
+        other.email = "other@test.com"
+        other.avatar = None
+        other.role = "editor"
+        other.status = "active"
+        other.department_id = "dept-mkt"
+        other.department_name = "市场部"
+        other.is_department_admin = False
 
         with (
-            app.test_request_context("/", json=payload),
+            app.test_request_context("/"),
             patch("controllers.console.workspace.members.current_account_with_tenant", return_value=(user, "t1")),
-            patch("controllers.console.workspace.members.FeatureService.get_features", return_value=features),
             patch(
-                "controllers.console.workspace.members.RegisterService.invite_new_member",
-                side_effect=AccountAlreadyInTenantError(),
+                "controllers.console.workspace.members.TenantService.get_tenant_members",
+                return_value=[same, other],
             ),
-            patch("controllers.console.workspace.members.dify_config.CONSOLE_WEB_URL", "http://x"),
+            patch("controllers.console.workspace.members.DepartmentService.is_department_admin", return_value=False),
+            patch(
+                "controllers.console.workspace.members.DepartmentService.get_user_department_id",
+                return_value="dept-rd",
+            ),
         ):
             result, status = method(api)
 
-        assert result["invitation_results"][0]["status"] == "success"
+        assert status == 200
+        assert [a["id"] for a in result["accounts"]] == ["m1"]
 
-    def test_invite_invalid_role(self, app):
-        api = MemberInviteEmailApi()
-        method = unwrap(api.post)
-
-        payload = {
-            "emails": ["a@test.com"],
-            "role": "owner",
-        }
-
-        with app.test_request_context("/", json=payload):
-            result, status = method(api)
-
-        assert status == 400
-        assert result["code"] == "invalid-role"
-
-    def test_invite_generic_exception(self, app):
-        api = MemberInviteEmailApi()
-        method = unwrap(api.post)
+    def test_get_editor_without_department_returns_empty(self, app):
+        """无所属部门的编辑：部分部门成员选择器为空，不泄露其他部门。"""
+        api = MemberListApi()
+        method = unwrap(api.get)
 
         tenant = MagicMock(id="t1")
-        user = MagicMock(current_tenant=tenant)
-        features = MagicMock()
-        features.workspace_members.is_available.return_value = True
-
-        payload = {
-            "emails": ["a@test.com"],
-            "role": "normal",
-        }
+        user = MagicMock(
+            current_tenant=tenant,
+            id="editor-no-dept",
+            is_admin_or_owner=False,
+            is_dataset_editor=True,
+        )
+        peer = MagicMock()
+        peer.id = "m1"
+        peer.name = "Peer"
+        peer.email = "peer@test.com"
+        peer.avatar = None
+        peer.role = "editor"
+        peer.status = "active"
+        peer.department_id = "dept-rd"
+        peer.department_name = "研发部"
+        peer.is_department_admin = False
 
         with (
-            app.test_request_context("/", json=payload),
+            app.test_request_context("/"),
             patch("controllers.console.workspace.members.current_account_with_tenant", return_value=(user, "t1")),
-            patch("controllers.console.workspace.members.FeatureService.get_features", return_value=features),
             patch(
-                "controllers.console.workspace.members.RegisterService.invite_new_member",
-                side_effect=Exception("boom"),
+                "controllers.console.workspace.members.TenantService.get_tenant_members",
+                return_value=[peer],
             ),
-            patch("controllers.console.workspace.members.dify_config.CONSOLE_WEB_URL", "http://x"),
+            patch("controllers.console.workspace.members.DepartmentService.is_department_admin", return_value=False),
+            patch(
+                "controllers.console.workspace.members.DepartmentService.get_user_department_id",
+                return_value=None,
+            ),
         ):
-            result, _ = method(api)
+            result, status = method(api)
 
-        assert result["invitation_results"][0]["status"] == "failed"
+        assert status == 200
+        assert result["accounts"] == []
+
+    def test_get_dataset_operator_sees_same_department_only(self, app):
+        """dataset_operator 同属 is_dataset_editor：仅本部门成员。"""
+        api = MemberListApi()
+        method = unwrap(api.get)
+
+        tenant = MagicMock(id="t1")
+        user = MagicMock(
+            current_tenant=tenant,
+            id="op1",
+            is_admin_or_owner=False,
+            is_dataset_editor=True,
+        )
+        same = MagicMock()
+        same.id = "m1"
+        same.name = "Peer"
+        same.email = "peer@test.com"
+        same.avatar = None
+        same.role = "normal"
+        same.status = "active"
+        same.department_id = "dept-rd"
+        same.department_name = "研发部"
+        same.is_department_admin = False
+        other = MagicMock()
+        other.id = "m2"
+        other.name = "Other"
+        other.email = "other@test.com"
+        other.avatar = None
+        other.role = "editor"
+        other.status = "active"
+        other.department_id = "dept-mkt"
+        other.department_name = "市场部"
+        other.is_department_admin = False
+
+        with (
+            app.test_request_context("/"),
+            patch("controllers.console.workspace.members.current_account_with_tenant", return_value=(user, "t1")),
+            patch(
+                "controllers.console.workspace.members.TenantService.get_tenant_members",
+                return_value=[same, other],
+            ),
+            patch("controllers.console.workspace.members.DepartmentService.is_department_admin", return_value=False),
+            patch(
+                "controllers.console.workspace.members.DepartmentService.get_user_department_id",
+                return_value="dept-rd",
+            ),
+        ):
+            result, status = method(api)
+
+        assert status == 200
+        assert [a["id"] for a in result["accounts"]] == ["m1"]
+
+
+class TestMemberInitialPasswordApi:
+    def test_get_success_for_admin(self, app):
+        api = MemberInitialPasswordApi()
+        method = unwrap(api.get)
+        tenant = MagicMock(id="t1")
+        user = MagicMock(current_tenant=tenant, is_admin_or_owner=True, id="u1")
+
+        with (
+            app.test_request_context("/"),
+            patch("controllers.console.workspace.members.current_account_with_tenant", return_value=(user, "t1")),
+            patch("controllers.console.workspace.members.dify_config.DEFAULT_MEMBER_PASSWORD", "Dify1234"),
+        ):
+            result = method(api)
+
+        assert result == {"password": "Dify1234"}
+
+    def test_forbidden_for_normal_member(self, app):
+        api = MemberInitialPasswordApi()
+        method = unwrap(api.get)
+        tenant = MagicMock(id="t1")
+        user = MagicMock(current_tenant=tenant, is_admin_or_owner=False, id="u1")
+
+        with (
+            app.test_request_context("/"),
+            patch("controllers.console.workspace.members.current_account_with_tenant", return_value=(user, "t1")),
+            patch("controllers.console.workspace.members.DepartmentService.is_department_admin", return_value=False),
+        ):
+            result, status = method(api)
+
+        assert status == 403
+        assert result["code"] == "forbidden"
 
 
 class TestMemberCancelInviteApi:
@@ -306,8 +389,13 @@ class TestMemberUpdateRoleApi:
         method = unwrap(api.put)
 
         tenant = MagicMock()
+        tenant.id = "t1"
         user = MagicMock(current_tenant=tenant)
         member = MagicMock()
+        member.id = "mid"
+
+        mock_join = MagicMock()
+        mock_join.is_department_admin = False
 
         payload = {"role": "normal"}
 
@@ -316,7 +404,9 @@ class TestMemberUpdateRoleApi:
             patch("controllers.console.workspace.members.current_account_with_tenant", return_value=(user, "t1")),
             patch("controllers.console.workspace.members.db.session.get", return_value=member),
             patch("controllers.console.workspace.members.TenantService.update_member_role"),
+            patch("controllers.console.workspace.members.db.session.query") as mock_query,
         ):
+            mock_query.return_value.filter_by.return_value.first.return_value = mock_join
             result = method(api, "id")
 
         if isinstance(result, tuple):
@@ -367,6 +457,9 @@ class TestDatasetOperatorMemberListApi:
         member.avatar = "avatar.png"
         member.role = "operator"
         member.status = "active"
+        member.department_id = "dept1"
+        member.department_name = "Engineering"
+        member.is_department_admin = False
         members = [member]
 
         with (
@@ -605,3 +698,18 @@ class TestOwnerTransferApi:
         ):
             with pytest.raises(MemberNotInTenantError):
                 method(api, "2")
+
+
+class TestMemberCreatePayload:
+    def test_keeps_is_department_admin_flag(self):
+        payload = MemberCreatePayload.model_validate(
+            {
+                "name": "Lead",
+                "email": "lead@test.com",
+                "password": "Valid1234",
+                "department_id": "d1",
+                "role": "editor",
+                "is_department_admin": True,
+            }
+        )
+        assert payload.is_department_admin is True

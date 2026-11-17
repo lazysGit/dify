@@ -5,7 +5,7 @@ from flask import Flask
 from flask_login import LoginManager, UserMixin
 
 from controllers.console.error import NotInitValidateError, NotSetupError, UnauthorizedAndForceLogout
-from controllers.console.workspace.error import AccountNotInitializedError
+from controllers.console.workspace.error import AccountNotInitializedError, MustChangePasswordError
 from controllers.console.wraps import (
     account_initialization_required,
     cloud_edition_billing_rate_limit_check,
@@ -60,11 +60,29 @@ class TestAccountInitialization:
             return "success"
 
         # Act
-        with patch("controllers.console.wraps.current_account_with_tenant", return_value=(mock_user, "tenant123")):
+        with (
+            patch("controllers.console.wraps.current_account_with_tenant", return_value=(mock_user, "tenant123")),
+            patch("services.account_service.AccountService.is_using_default_password", return_value=False),
+        ):
             result = protected_view()
 
         # Assert
         assert result == "success"
+
+    def test_should_reject_account_using_default_password(self):
+        mock_user = MagicMock()
+        mock_user.status = AccountStatus.ACTIVE
+
+        @account_initialization_required
+        def protected_view():
+            return "success"
+
+        with (
+            patch("controllers.console.wraps.current_account_with_tenant", return_value=(mock_user, "tenant123")),
+            patch("services.account_service.AccountService.is_using_default_password", return_value=True),
+        ):
+            with pytest.raises(MustChangePasswordError):
+                protected_view()
 
     def test_should_reject_uninitialized_account(self):
         """Test that uninitialized accounts raise AccountNotInitializedError"""

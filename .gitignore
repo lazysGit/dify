@@ -240,3 +240,16 @@ scripts/stress-test/reports/
 
 # Code Agent Folder
 .qoder/*
+/node_modules/
+/package.json
+/package-lock.json
+/.omo/
+
+# uv package manager
+uv.lock
+
+# Superpowers SDD workspace (agent scratch)
+.superpowers/
+
+# Local NBYS compose smoke volumes (runtime data; never commit)
+docker/volumes-nbys-smoke/

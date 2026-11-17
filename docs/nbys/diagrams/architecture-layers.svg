@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="720" viewBox="0 0 1400 720">
+  <rect width="1400" height="720" fill="#FFFFFF"/>
+  <text x="50" y="55" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="34" font-weight="700" fill="#1A1A1A">建设范围与总体架构</text>
+  <text x="50" y="95" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="18" fill="#666666">基础设施 → 核心能力 → 应用 → 展示；部门级访问控制纵向贯穿</text>
+
+  <rect x="50" y="130" width="1000" height="95" rx="14" fill="#FFF3E8" stroke="#FF6A00" stroke-width="3"/>
+  <text x="70" y="168" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="22" font-weight="700" fill="#1A1A1A">展示层</text>
+  <text x="70" y="200" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="18" fill="#333333">Web UI · 工作流编辑 · 知识库/监控 · RESTful API · WebSocket</text>
+
+  <rect x="50" y="245" width="1000" height="95" rx="14" fill="#FFE8D1" stroke="#FF6A00" stroke-width="3"/>
+  <text x="70" y="283" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="22" font-weight="700" fill="#1A1A1A">应用层</text>
+  <text x="70" y="315" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="18" fill="#333333">工作流 · RAG · Agent · 应用管理 · 部门权限（Dept. Permission）</text>
+
+  <rect x="50" y="360" width="1000" height="95" rx="14" fill="#FFD7B0" stroke="#FF6A00" stroke-width="3"/>
+  <text x="70" y="398" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="22" font-weight="700" fill="#1A1A1A">核心层</text>
+  <text x="70" y="430" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="18" fill="#333333">模型运行时 · 知识库/向量 · 工具 · 提示词引擎 · 内容审核</text>
+
+  <rect x="50" y="475" width="1000" height="95" rx="14" fill="#FFC690" stroke="#FF6A00" stroke-width="3"/>
+  <text x="70" y="513" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="22" font-weight="700" fill="#1A1A1A">基础设施层</text>
+  <text x="70" y="545" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="18" fill="#333333">PostgreSQL · Redis · 向量库 · 对象存储 · 消息队列 · 私有化算力</text>
+
+  <rect x="1090" y="130" width="260" height="440" rx="14" fill="#FF6A00" stroke="#E65C00" stroke-width="3"/>
+  <text x="1220" y="190" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="24" font-weight="700" fill="#FFFFFF">安全框架</text>
+  <text x="1220" y="260" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="18" fill="#FFFFFF">租户 + 部门</text>
+  <text x="1220" y="290" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="18" fill="#FFFFFF">双层隔离</text>
+  <text x="1220" y="360" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="18" fill="#FFFFFF">RBAC</text>
+  <text x="1220" y="390" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="18" fill="#FFFFFF">角色授权</text>
+  <text x="1220" y="460" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="18" fill="#FFFFFF">操作 / 调用</text>
+  <text x="1220" y="490" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="18" fill="#FFFFFF">审计日志</text>
+
+  <text x="700" y="640" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="20" font-weight="700" fill="#FF6A00">数据不出域 · 私有化部署 · 部门 ACL 贯穿</text>
+</svg>

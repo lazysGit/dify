@@ -234,7 +234,7 @@ class TestAppService:
             "mode": "chat",
         }
 
-        paginated_apps = app_service.get_paginate_apps(account.id, tenant.id, args)
+        paginated_apps = app_service.get_paginate_apps(account, tenant.id, args)
 
         # Verify pagination results
         assert paginated_apps is not None
@@ -297,7 +297,7 @@ class TestAppService:
             "limit": 10,
             "mode": "chat",
         }
-        chat_apps = app_service.get_paginate_apps(account.id, tenant.id, chat_args)
+        chat_apps = app_service.get_paginate_apps(account, tenant.id, chat_args)
         assert len(chat_apps.items) == 1
         assert chat_apps.items[0].mode == "chat"
 
@@ -308,7 +308,7 @@ class TestAppService:
             "mode": "chat",
             "name": "Chat",
         }
-        filtered_apps = app_service.get_paginate_apps(account.id, tenant.id, name_args)
+        filtered_apps = app_service.get_paginate_apps(account, tenant.id, name_args)
         assert len(filtered_apps.items) == 1
         assert "Chat" in filtered_apps.items[0].name
 
@@ -319,7 +319,7 @@ class TestAppService:
             "mode": "completion",
             "is_created_by_me": True,
         }
-        my_apps = app_service.get_paginate_apps(account.id, tenant.id, created_by_me_args)
+        my_apps = app_service.get_paginate_apps(account, tenant.id, created_by_me_args)
         assert len(my_apps.items) == 1
 
     def test_get_paginate_apps_with_tag_filters(
@@ -368,7 +368,7 @@ class TestAppService:
                 "tag_ids": ["tag1", "tag2"],
             }
 
-            paginated_apps = app_service.get_paginate_apps(account.id, tenant.id, args)
+            paginated_apps = app_service.get_paginate_apps(account, tenant.id, args)
 
             # Verify tag service was called
             mock_tag_service.assert_called_once_with("app", tenant.id, ["tag1", "tag2"])
@@ -389,7 +389,7 @@ class TestAppService:
                 "tag_ids": ["nonexistent_tag"],
             }
 
-            paginated_apps = app_service.get_paginate_apps(account.id, tenant.id, args)
+            paginated_apps = app_service.get_paginate_apps(account, tenant.id, args)
 
             # Should return None when no apps match tag filter
             assert paginated_apps is None
@@ -1217,7 +1217,7 @@ class TestAppService:
 
         # Test 1: Search with % character
         args = {"name": "50%", "mode": "chat", "page": 1, "limit": 10}
-        paginated_apps = app_service.get_paginate_apps(account.id, tenant.id, args)
+        paginated_apps = app_service.get_paginate_apps(account, tenant.id, args)
         assert paginated_apps is not None
         assert paginated_apps.total == 1
         assert len(paginated_apps.items) == 1
@@ -1225,7 +1225,7 @@ class TestAppService:
 
         # Test 2: Search with _ character
         args = {"name": "test_data", "mode": "chat", "page": 1, "limit": 10}
-        paginated_apps = app_service.get_paginate_apps(account.id, tenant.id, args)
+        paginated_apps = app_service.get_paginate_apps(account, tenant.id, args)
         assert paginated_apps is not None
         assert paginated_apps.total == 1
         assert len(paginated_apps.items) == 1
@@ -1233,7 +1233,7 @@ class TestAppService:
 
         # Test 3: Search with \ character
         args = {"name": "path\\to\\app", "mode": "chat", "page": 1, "limit": 10}
-        paginated_apps = app_service.get_paginate_apps(account.id, tenant.id, args)
+        paginated_apps = app_service.get_paginate_apps(account, tenant.id, args)
         assert paginated_apps is not None
         assert paginated_apps.total == 1
         assert len(paginated_apps.items) == 1
@@ -1241,7 +1241,7 @@ class TestAppService:
 
         # Test 4: Search with % should NOT match 100% (verifies escaping works)
         args = {"name": "50%", "mode": "chat", "page": 1, "limit": 10}
-        paginated_apps = app_service.get_paginate_apps(account.id, tenant.id, args)
+        paginated_apps = app_service.get_paginate_apps(account, tenant.id, args)
         assert paginated_apps is not None
         assert paginated_apps.total == 1
         assert all("50%" in app.name for app in paginated_apps.items)

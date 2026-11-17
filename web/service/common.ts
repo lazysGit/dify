@@ -39,6 +39,7 @@ import { del, get, patch, post, put } from './base'
 type LoginSuccess = {
   result: 'success'
   data?: { access_token?: string }
+  must_change_password?: boolean
 }
 type LoginFail = {
   result: 'fail'
@@ -175,14 +176,6 @@ export const validatePluginProviderKey = ({ url, body }: { url: string, body: { 
 }
 export const updatePluginProviderAIKey = ({ url, body }: { url: string, body: { credentials: any } }): Promise<UpdateOpenAIKeyResponse> => {
   return post<UpdateOpenAIKeyResponse>(url, { body })
-}
-
-export const invitationCheck = ({ url, params }: { url: string, params: { workspace_id?: string, email?: string, token: string } }): Promise<CommonResponse & { is_valid: boolean, data: { workspace_name: string, email: string, workspace_id: string } }> => {
-  return get<CommonResponse & { is_valid: boolean, data: { workspace_name: string, email: string, workspace_id: string } }>(url, { params })
-}
-
-export const activateMember = ({ url, body }: { url: string, body: any }): Promise<LoginResponse> => {
-  return post<LoginResponse>(url, { body })
 }
 
 export const fetchModelProviders = (url: string): Promise<{ data: ModelProvider[] }> => {
