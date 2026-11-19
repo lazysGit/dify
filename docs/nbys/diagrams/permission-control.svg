@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="780" viewBox="0 0 1400 780">
+  <rect width="1400" height="780" fill="#FFFFFF"/>
+  <text x="50" y="48" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="30" font-weight="700" fill="#1A1A1A">二开权限控制技术架构</text>
+  <text x="50" y="82" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="16" fill="#666666">开源租户隔离之上叠加部门级访问控制：谁建谁管、发到哪谁用、操作留痕</text>
+
+  <rect x="40" y="120" width="280" height="210" rx="14" fill="#FFF3E8" stroke="#FF6A00" stroke-width="3"/>
+  <text x="180" y="158" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="20" font-weight="700" fill="#1A1A1A">身份与角色</text>
+  <text x="60" y="198" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="16" fill="#333333">登录账号</text>
+  <text x="60" y="230" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="16" fill="#333333">租户角色（所有者/管理员/</text>
+  <text x="60" y="254" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="16" fill="#333333">编辑/成员）</text>
+  <text x="60" y="286" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="16" fill="#333333">部门管理员徽章</text>
+
+  <path d="M330 225 L360 225" stroke="#FF6A00" stroke-width="3" fill="none"/>
+  <polygon points="360,218 378,225 360,232" fill="#FF6A00"/>
+
+  <rect x="390" y="120" width="280" height="210" rx="14" fill="#FFE8D1" stroke="#FF6A00" stroke-width="3"/>
+  <text x="530" y="158" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="20" font-weight="700" fill="#1A1A1A">组织边界</text>
+  <text x="410" y="198" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="16" fill="#333333">树形部门（最多 10 级）</text>
+  <text x="410" y="230" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="16" fill="#333333">成员归属部门</text>
+  <text x="410" y="262" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="16" fill="#333333">本部门 / 子部门管辖范围</text>
+  <text x="410" y="294" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="16" fill="#333333">默认部门例外规则</text>
+
+  <path d="M680 225 L710 225" stroke="#FF6A00" stroke-width="3" fill="none"/>
+  <polygon points="710,218 728,225 710,232" fill="#FF6A00"/>
+
+  <rect x="740" y="120" width="280" height="210" rx="14" fill="#FFD7B0" stroke="#FF6A00" stroke-width="3"/>
+  <text x="880" y="158" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="20" font-weight="700" fill="#1A1A1A">资源控制</text>
+  <text x="760" y="198" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="16" fill="#333333">工作室 / 知识库归属隔离</text>
+  <text x="760" y="230" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="16" fill="#333333">归属部门 = 谁可编辑</text>
+  <text x="760" y="262" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="16" fill="#333333">发布部门 = 谁可使用</text>
+  <text x="760" y="294" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="16" fill="#333333">权责分离</text>
+
+  <path d="M1030 225 L1060 225" stroke="#FF6A00" stroke-width="3" fill="none"/>
+  <polygon points="1060,218 1078,225 1060,232" fill="#FF6A00"/>
+
+  <rect x="1090" y="120" width="270" height="210" rx="14" fill="#FFC690" stroke="#FF6A00" stroke-width="3"/>
+  <text x="1225" y="158" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="20" font-weight="700" fill="#1A1A1A">使用入口鉴权</text>
+  <text x="1110" y="198" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="16" fill="#333333">探索：须发布到用户部门</text>
+  <text x="1110" y="230" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="16" fill="#333333">/chat：登录 + 部门发布</text>
+  <text x="1110" y="262" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="16" fill="#333333">嵌入：合法 embed token</text>
+  <text x="1110" y="294" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="16" fill="#333333">所有者亦不豁免发布校验</text>
+
+  <path d="M880 330 L880 370" stroke="#FF6A00" stroke-width="3" fill="none"/>
+  <polygon points="873,370 880,388 887,370" fill="#FF6A00"/>
+
+  <rect x="620" y="400" width="520" height="70" rx="12" fill="#FFF3E8" stroke="#FF6A00" stroke-width="3"/>
+  <text x="880" y="444" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="18" font-weight="700" fill="#1A1A1A">模型白名单（按成员配置可用模型）</text>
+
+  <path d="M880 470 L880 510" stroke="#FF6A00" stroke-width="3" fill="none"/>
+  <polygon points="873,510 880,528 887,510" fill="#FF6A00"/>
+
+  <rect x="620" y="540" width="520" height="70" rx="12" fill="#FF6A00" stroke="#E65C00" stroke-width="3"/>
+  <text x="880" y="584" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="18" font-weight="700" fill="#FFFFFF">关键操作 → 审计日志（发布 / 转移 / 模型授权等）</text>
+
+  <rect x="40" y="400" width="540" height="210" rx="14" fill="#FFFFFF" stroke="#FF6A00" stroke-width="2"/>
+  <text x="60" y="438" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="18" font-weight="700" fill="#FF6A00">安全闭环三句</text>
+  <text x="60" y="480" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="16" fill="#333333">1. 双层隔离：租户隔离（开源）+ 部门 ACL（二开）</text>
+  <text x="60" y="518" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="16" fill="#333333">2. 权责分离：归属管编辑，发布管使用</text>
+  <text x="60" y="556" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="16" fill="#333333">3. 可追溯：关键操作落审计，授权可回溯</text>
+
+  <text x="700" y="740" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="18" font-weight="700" fill="#FF6A00">开源租户能力复用 · 部门 ACL 为二开增量 · 归属与发布分离</text>
+</svg>

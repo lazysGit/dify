@@ -5,8 +5,7 @@
 建议时长：45–60 分钟（含约 20 分钟演示）  
 受众：一场混合（租户管理员 / 部门管理员 / 编辑 / 成员）  
 口径：[使用手册-部门访问控制.md](./使用手册-部门访问控制.md)、UAT v1.4  
-成稿：`docs/pptx/NBYS-定制功能培训-v1.0.pptx`  
-生成脚本：`docs/pptx/generate-nbys-training-ppt.js`
+成稿：`docs/pptx/NBYS-定制功能培训-v1.0.pptx`
 
 ---
 
@@ -228,4 +227,3 @@
 | --- | --- |
 | 本大纲 | `docs/nbys/培训-定制功能-PPT大纲.md` |
 | PPT | `docs/pptx/NBYS-定制功能培训-v1.0.pptx` |
-| 脚本 | `docs/pptx/generate-nbys-training-ppt.js` |
